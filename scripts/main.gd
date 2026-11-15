@@ -58,7 +58,36 @@ func _ready() -> void:
 	_build_room()
 	_spawn_characters()
 	_build_camera()
+	var capture_dir := _apply_arguments()
 	_build_hud()
+	if not capture_dir.is_empty():
+		_capture(capture_dir)
+
+
+## Arguments de ligne de commande, pour vérifier le rendu sans intervention :
+##   godot --path . -- --capture=/chemin/vers/un/dossier [--no-shadows]
+## Enregistre trois images à deux secondes d'intervalle, puis quitte.
+func _apply_arguments() -> String:
+	var capture_dir := ""
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--capture="):
+			capture_dir = arg.trim_prefix("--capture=")
+		elif arg == "--no-shadows":
+			_shadows_on = false
+			_moon.shadow_enabled = false
+	return capture_dir
+
+
+func _capture(dir: String) -> void:
+	for i in 3:
+		await get_tree().create_timer(2.0).timeout
+		await RenderingServer.frame_post_draw
+		var image := get_viewport().get_texture().get_image()
+		var path := "%s/capture_%d.png" % [dir, i + 1]
+		var error := image.save_png(path)
+		print("capture %s : %s — %d images/s, %.1f ms" % [
+			path, error_string(error), Engine.get_frames_per_second(), _avg_ms])
+	get_tree().quit()
 
 
 func _process(delta: float) -> void:
@@ -110,6 +139,11 @@ func _build_environment() -> void:
 	_moon.light_energy = 0.25
 	_moon.rotation_degrees = Vector3(-55.0, 35.0, 0.0)
 	_moon.shadow_enabled = true
+	# Par défaut, Godot calcule cette ombre en quatre passes et redessine donc
+	# toute la scène quatre fois de plus. Une seule passe à portée réduite
+	# suffit pour une salle, et coûte quatre fois moins.
+	_moon.directional_shadow_mode = DirectionalLight3D.SHADOW_ORTHOGONAL
+	_moon.directional_shadow_max_distance = 40.0
 	add_child(_moon)
 
 
