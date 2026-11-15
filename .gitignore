@@ -1,0 +1,19 @@
+# Godot
+.godot/
+*.translation
+
+# Sorties de build
+build/
+*.apk
+*.aab
+*.idsig
+
+# Android
+android/
+
+# Clés de signature : jamais dans le dépôt
+*.keystore
+*.jks
+
+# Notes de scénario gardées hors du dépôt public
+histoires.txt
