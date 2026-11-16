@@ -214,6 +214,8 @@ func _run() -> void:
 		return
 	if not await _gear_effect_tests():
 		return
+	if not await _supplies_tests():
+		return
 	if not await _bestiary_tests():
 		return
 	if not await _boss_tests():
@@ -804,6 +806,120 @@ func _gear_effect_tests() -> bool:
 	return true
 
 
+## Fioles et vivres : achats, boire (soin, interruption), ceinture, repas.
+func _supplies_tests() -> bool:
+	var arena := _level() as Arena
+	var hero := arena.hero
+	var saved_gold := Progress.gold
+	var saved_flasks := Progress.flasks
+	Progress.flasks = 0
+	Progress.gold = 500
+	for i in 3:
+		if not Progress.buy_flask():
+			return _fail("la fiole %d n'a pas pu être achetée" % (i + 1))
+	if Progress.buy_flask() or Progress.flask_blocker() != "pleines":
+		return _fail("on peut porter plus de 3 fioles")
+	if Progress.gold != 500 - 3 * int(Supplies.FLASK["cost"]):
+		return _fail("les fioles n'ont pas coûté leur prix (or %d)" % Progress.gold)
+	print("test réussi : on achète jusqu'à 3 fioles")
+
+	# Les fioles se voient à la ceinture.
+	await _frames(3)
+	var belt := hero._model.find_child("FlaskBelt", true, false)
+	var shown := 0
+	if belt != null:
+		for bottle in belt.get_children():
+			if (bottle as Node3D).visible:
+				shown += 1
+	if shown != 3:
+		return _fail("%d fioles visibles à la ceinture au lieu de 3" % shown)
+
+	# Boire : un instant sans défense, puis la vie revient et la fiole disparaît.
+	_passive = true
+	var max_life := hero.max_health
+	hero.health = 30
+	hero.health_changed.emit(30, max_life)
+	arena.controls.flask_pressed.emit()
+	if hero.state != Hero.State.DRINK:
+		return _fail("le héros ne boit pas quand on touche FIOLE")
+	await _frames(70)
+	if Progress.flasks != 2 or hero.health != 30 + int(Supplies.FLASK["heal"]):
+		return _fail("boire n'a pas soigné de %d ni retiré une fiole (vie %d, fioles %d)" % [int(Supplies.FLASK["heal"]), hero.health, Progress.flasks])
+	var left := hero._model.find_child("FlaskBelt", true, false)
+	await _frames(2)
+	var after := 0
+	for bottle in left.get_children():
+		if (bottle as Node3D).visible:
+			after += 1
+	if after != 2:
+		return _fail("la ceinture montre %d fioles après en avoir bu une" % after)
+	print("test réussi : boire une fiole soigne, en retire une, et la ceinture suit")
+
+	# Un coup pendant qu'on boit annule : la fiole est gardée.
+	hero.health = 30
+	arena.controls.flask_pressed.emit()
+	hero.take_damage(5, hero.global_position + Vector3.FORWARD)
+	await _frames(70)
+	if Progress.flasks != 2 or hero.health > 30:
+		return _fail("un coup n'a pas annulé la fiole (fioles %d, vie %d)" % [Progress.flasks, hero.health])
+	# Une esquive aussi.
+	hero.health = 30
+	hero.state = Hero.State.MOVE
+	hero._dodge_cooldown = 0.0
+	arena.controls.flask_pressed.emit()
+	arena.controls.press_dodge()
+	await _frames(70)
+	if Progress.flasks != 2 or hero.health != 30:
+		return _fail("une esquive n'a pas annulé la fiole (fioles %d, vie %d)" % [Progress.flasks, hero.health])
+	# Et on ne boit pas à pleine vie.
+	hero.heal(1000)
+	arena.controls.flask_pressed.emit()
+	if hero.state == Hero.State.DRINK:
+		return _fail("le héros boit alors qu'il est en pleine forme")
+	print("test réussi : un coup ou une esquive annule la fiole, pas de fiole à pleine vie")
+
+	# Les repas : un seul à la fois, valables pour le niveau.
+	Progress.gold = 200
+	Progress.packed_meal = &""
+	Progress.active_meal = &""
+	if not Progress.pack_meal(&"ragout") or Progress.gold != 200 - 60:
+		return _fail("le ragoût n'a pas pu être emballé pour 60 or")
+	if Progress.pack_meal(&"pain") or Progress.meal_blocker(&"pain") != "deja":
+		return _fail("on peut emballer deux repas à la fois")
+	var base := Progress.hero_stats()
+	Progress.start_level_meal()
+	var fed := Progress.hero_stats()
+	if Progress.packed_meal != &"" or Progress.active_meal != &"ragout":
+		return _fail("le repas emballé n'est pas devenu le repas du niveau")
+	if int(fed["max_health"]) != int(base["max_health"]) + 30 or int(fed["rest_heal"]) != int(base["rest_heal"]) + 3:
+		return _fail("le ragoût ne donne pas +30 de vie et +3 par Repos")
+	Progress.end_level_meal()
+	if int(Progress.hero_stats()["max_health"]) != int(base["max_health"]):
+		return _fail("le repas ne disparaît pas à la fin du niveau")
+	for id: StringName in Supplies.MEALS:
+		if not ResourceLoader.exists(ShopScreen.ICONS + "%s.png" % Supplies.MEALS[id]["icon"]):
+			return _fail("l'icône de %s manque" % id)
+	if not ResourceLoader.exists(ShopScreen.ICONS + "%s.png" % Supplies.FLASK["icon"]):
+		return _fail("l'icône de la fiole manque")
+	print("test réussi : un repas à la fois, valable pour le niveau, avec ses effets")
+
+	# La sauvegarde garde fioles et sac.
+	Progress.pack_meal(&"fromage")
+	Progress.save()
+	var kept_flasks := Progress.flasks
+	Progress.flasks = 0
+	Progress.packed_meal = &""
+	Progress.load_save()
+	if Progress.flasks != kept_flasks or Progress.packed_meal != &"fromage":
+		return _fail("fioles ou repas emballé non relus de la sauvegarde")
+	Progress.packed_meal = &""
+	Progress.gold = saved_gold
+	Progress.flasks = saved_flasks
+	Progress.changed.emit()
+	_passive = false
+	return true
+
+
 func _grille_tests() -> bool:
 	main.load_level(&"la_grille")
 	_watch(_level())
@@ -926,11 +1042,15 @@ func _map_tests() -> bool:
 	await get_tree().process_frame
 	if chosen[0] != &"" or main.level != null:
 		return _fail("un niveau pas encore construit s'est ouvert")
+	Progress.add_gold(100)
+	Progress.pack_meal(&"pain")
 	map.select_level(&"les_allees")
 	map.enter_selected()
 	await get_tree().process_frame
 	if chosen[0] != &"les_allees" or main.level == null or main.world_map != null:
 		return _fail("le niveau choisi sur la carte ne s'est pas ouvert")
+	if Progress.active_meal != &"pain" or Progress.packed_meal != &"":
+		return _fail("le repas emballé n'est pas mangé en partant pour un niveau")
 	print("test 12 réussi : la carte ouvre le niveau choisi, refuse celui qui n'existe pas")
 
 	# Abandon depuis le carnet : retour à la carte.
@@ -940,6 +1060,8 @@ func _map_tests() -> bool:
 	await get_tree().process_frame
 	if main.level != null or main.world_map == null or get_tree().paused:
 		return _fail("quitter le niveau depuis le carnet ne ramène pas à la carte")
+	if Progress.active_meal != &"":
+		return _fail("le repas du niveau n'est pas fini en revenant à la carte")
 	print("test 12 réussi : quitter le niveau ramène à la carte")
 
 	# Le moulin est petit et un niveau proche passe avant lui : un toucher sur
@@ -955,7 +1077,9 @@ func _map_tests() -> bool:
 		return _fail("un toucher sur le moulin ne le choisit pas")
 	print("test 12 réussi : la Grille et le moulin ne se disputent plus les touchers")
 
-	# Le moulin se choisit comme un niveau.
+	# Le moulin se choisit comme un niveau, mais ne consomme pas le repas.
+	Progress.add_gold(100)
+	Progress.pack_meal(&"fromage")
 	map.select_refuge()
 	if map.selected_id() != &"refuge":
 		return _fail("le moulin ne se choisit pas sur la carte")
@@ -963,6 +1087,8 @@ func _map_tests() -> bool:
 	await get_tree().process_frame
 	if main.level == null or main.level.title != "Le moulin":
 		return _fail("le moulin ne s'ouvre pas depuis la carte")
+	if Progress.packed_meal != &"fromage" or Progress.active_meal != &"":
+		return _fail("aller au moulin a consommé le repas emballé")
 	print("test 12 réussi : le moulin s'ouvre depuis la carte")
 	return true
 
@@ -1085,9 +1211,25 @@ func _refuge_tests() -> bool:
 	var before := Progress.gold
 	if not level.shop.buy(&"ecu_insigne"):
 		return _fail("l'achat depuis l'écran de la boutique a échoué")
+	var after_gear := Progress.gold
+	if after_gear != before - 140:
+		return _fail("l'écu à l'insigne n'a pas coûté 140 or (or %d sur %d)" % [after_gear, before])
+	level.shop.show_tab(&"fioles")
+	Progress.flasks = 1
+	if not level.shop.buy_flask() or Progress.flasks != 2 or Progress.gold != after_gear - int(Supplies.FLASK["cost"]):
+		return _fail("l'onglet Fioles n'a pas vendu une fiole au bon prix")
+	level.shop.show_tab(&"vivres")
+	Progress.packed_meal = &""
+	var gold_before_meal := Progress.gold
+	if not level.shop.pack(&"jambon") or Progress.packed_meal != &"jambon" \
+			or Progress.gold != gold_before_meal - int(Supplies.MEALS[&"jambon"]["cost"]):
+		return _fail("l'onglet Vivres n'a pas emballé le jambon au bon prix")
+	Progress.packed_meal = &""
+	Progress.flasks = 0
+	Progress.gold = after_gear
 	level.shop.close()
 	await _frames(3)
-	if Progress.gold != before - 140 or hero.max_health != int(Progress.hero_stats()["max_health"]) or hero.max_health != 125:
+	if Progress.gold != after_gear or hero.max_health != int(Progress.hero_stats()["max_health"]) or hero.max_health != 125:
 		return _fail("l'achat n'a pas changé la vie du héros (%d)" % hero.max_health)
 	if not (hero._model.find_child("Badge_Shield", true, false) as Node3D).visible \
 			or (hero._model.find_child("Rectangle_Shield", true, false) as Node3D).visible:
@@ -1311,6 +1453,7 @@ func _capture_refuge() -> void:
 	Progress.mark_completed(&"les_allees")
 	Progress.add_gold(700)
 	Progress.add_memories(300)
+	Progress.flasks = 2
 	main.load_level(&"refuge")
 	var level := _level() as Refuge
 	await get_tree().create_timer(0.8).timeout
@@ -1330,6 +1473,14 @@ func _capture_refuge() -> void:
 	level.shop.select(&"hache")
 	await get_tree().create_timer(0.8).timeout
 	await _shoot("refuge_05b_hache")
+	level.shop.show_tab(&"fioles")
+	await get_tree().create_timer(0.8).timeout
+	await _shoot("refuge_05d_fioles")
+	level.shop.show_tab(&"vivres")
+	level.shop.selected_meal = &"ragout"
+	level.shop.show_tab(&"vivres")
+	await get_tree().create_timer(0.5).timeout
+	await _shoot("refuge_05e_vivres")
 	level.shop.buy(&"hache")
 	level.shop.close()
 	level.open_book()

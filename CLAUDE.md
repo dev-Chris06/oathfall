@@ -131,6 +131,15 @@ boutique (gambison, cotte, lame, bottes, bandages) sont remboursés au
 chargement d'une ancienne sauvegarde. Les packs ne contiennent ni cuirasse ni
 bottes séparées : ne pas en vendre sans modèle fidèle.
 
+**Fioles et vivres** (`scripts/data/supplies.gd`, boutique de Maud, onglets
+Fioles et Vivres) : une fiole (au plus 3, visibles à la ceinture du héros) se
+boit avec le bouton FIOLE (touche F) : 0,85 s **sans défense**, un coup ou une
+esquive l'annule et la garde ; elle rend 45 de vie. Un repas emballé (pain,
+fromage, jambon, ragoût ; un seul à la fois) donne son bonus pour le **prochain
+niveau seulement** : `Main` le mange en partant pour un niveau (pas pour le
+moulin) et il disparaît au retour à la carte. Le héros émet `flask_drunk` ;
+`Level` retire la fiole et soigne.
+
 Style de toute l'interface : « théâtre d'ombres » (silhouettes de papier noir,
 nuit bleue, braises et or pâle). Les couleurs et les boutons sont dans
 `Theatre`. Le chapitre 1 est écrit en chiffres romains dans les titres : le
@@ -270,7 +279,7 @@ Règles à garder :
 - **Sol** : `pave()` dessine tous les carreaux en un seul appel. Ne pas
   poser les carreaux un par un.
 - **Entrées** : le jeu ne lit que `TouchControls.move`, `rite_held` et les
-  signaux `attack_pressed`, `dodge_pressed` et `book_pressed`.
+  signaux `attack_pressed`, `dodge_pressed`, `flask_pressed` et `book_pressed`.
 - **Caractéristiques du héros** : la progression les calcule
   (`Progress.hero_stats()`) et le niveau les applique avec
   `hero.apply_stats()`. Le héros ne lit jamais `Progress` lui-même.

@@ -126,6 +126,7 @@ func start_new_game() -> void:
 
 ## Affiche la carte. Le niveau en cours, s'il y en a un, est abandonné.
 func show_map() -> void:
+	Progress.end_level_meal()
 	_drop_level()
 	_drop_map()
 	_drop_screens()
@@ -184,6 +185,9 @@ func _drop_map() -> void:
 
 
 func _on_level_chosen(id: StringName) -> void:
+	# Un repas emballé se mange en partant pour un niveau (pas pour le moulin).
+	if id != &"refuge":
+		Progress.start_level_meal()
 	load_level(id, 0)
 
 

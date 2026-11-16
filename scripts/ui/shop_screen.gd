@@ -1,14 +1,17 @@
 class_name ShopScreen
 extends CanvasLayer
-## La boutique de Maud : de l'équipement avec son icône, ce qu'il fait, et un
-## aperçu du héros qui essaie l'objet avant de l'acheter. Le jeu est en pause
-## tant qu'elle est ouverte.
+## La boutique de Maud, en trois onglets : l'équipement (avec un aperçu du
+## héros qui essaie l'objet avant de l'acheter), les fioles, les vivres. Chaque
+## article a son icône. Le jeu est en pause tant qu'elle est ouverte.
 
 signal closed
 
 const ICONS := "res://assets/ui/icons/"
 
 var selected: StringName = &"ecu_insigne"
+## L'onglet : « equipement », « fioles » ou « vivres ».
+var tab := &"equipement"
+var selected_meal: StringName = &"pain"
 
 var _page: CutPage
 var _gold: Label
@@ -72,6 +75,26 @@ func select(item_id: StringName) -> void:
 	_refresh()
 
 
+func show_tab(new_tab: StringName) -> void:
+	tab = new_tab
+	_refresh()
+
+
+## Achète une fiole, comme si le joueur avait touché son bouton.
+func buy_flask() -> bool:
+	var bought := Progress.buy_flask()
+	_refresh()
+	return bought
+
+
+## Emballe un repas pour le prochain niveau.
+func pack(meal_id: StringName) -> bool:
+	selected_meal = meal_id
+	var packed := Progress.pack_meal(meal_id)
+	_refresh()
+	return packed
+
+
 func _refresh() -> void:
 	var column := _page.column
 	for child in column.get_children():
@@ -95,12 +118,37 @@ func _refresh() -> void:
 	rule.color = Color(Theatre.AMBER, 0.5)
 	column.add_child(rule)
 
+	var tabs := HBoxContainer.new()
+	tabs.add_theme_constant_override("separation", 10)
+	for entry: Array in [[&"equipement", "Équipement"], [&"fioles", "Fioles"], [&"vivres", "Vivres"]]:
+		var button := Button.new()
+		button.text = entry[1]
+		Theatre.pill(button, 20, Theatre.AMBER if tab == entry[0] else Theatre.MUTED)
+		button.pressed.connect(show_tab.bind(entry[0]))
+		tabs.add_child(button)
+	column.add_child(tabs)
+
 	var body := HBoxContainer.new()
 	body.add_theme_constant_override("separation", 30)
 	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	column.add_child(body)
+	if tab == &"fioles":
+		_fill_flasks(body)
+	elif tab == &"vivres":
+		_fill_meals(body)
+	else:
+		_fill_gear(body)
 
-	# À gauche : l'équipement, par emplacement, en icônes.
+	var back := Button.new()
+	back.text = "Refermer"
+	Theatre.pill(back, 20)
+	back.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	back.pressed.connect(close)
+	column.add_child(back)
+
+
+## L'équipement, par emplacement, en icônes ; à droite l'aperçu et la fiche.
+func _fill_gear(body: HBoxContainer) -> void:
 	var shelves := VBoxContainer.new()
 	shelves.add_theme_constant_override("separation", 6)
 	body.add_child(shelves)
@@ -121,13 +169,6 @@ func _refresh() -> void:
 	_detail.add_theme_constant_override("separation", 6)
 	body.add_child(_detail)
 	_fill_detail()
-
-	var back := Button.new()
-	back.text = "Refermer"
-	Theatre.pill(back, 20)
-	back.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
-	back.pressed.connect(close)
-	column.add_child(back)
 
 
 ## L'équipement porté, avec l'objet donné à la place de son emplacement.
@@ -198,6 +239,107 @@ func _fill_detail() -> void:
 		if short > 0:
 			_detail.add_child(Theatre.label("Il te manque %d or." % short, 18, Theatre.EMBER, GameFonts.italic()))
 	_detail.add_child(button)
+
+
+## Les fioles : l'icône, ce qu'elles font, et le héros avec celles qu'il porte.
+func _fill_flasks(body: HBoxContainer) -> void:
+	var flask: Dictionary = Supplies.FLASK
+	var icon := TextureRect.new()
+	icon.custom_minimum_size = Vector2(200.0, 200.0)
+	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	var path := ICONS + "%s.png" % flask["icon"]
+	icon.texture = load(path) as Texture2D if ResourceLoader.exists(path) else null
+	body.add_child(icon)
+	_preview = HeroPreview.new(Vector2(250.0, 380.0))
+	body.add_child(_preview)
+	_preview.show_gear(Progress.equipped_map())
+	var detail := VBoxContainer.new()
+	detail.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	detail.add_theme_constant_override("separation", 6)
+	body.add_child(detail)
+	detail.add_child(Theatre.label(flask["name"], 36))
+	var text := Theatre.label(flask["text"], 21, Theatre.CREAM, GameFonts.italic())
+	text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	detail.add_child(text)
+	detail.add_child(Theatre.label("Rend %d de vie." % int(flask["heal"]), 21, Theatre.EMBER))
+	detail.add_child(Theatre.label("Boire prend un instant, sans défense. Un coup ou une esquive l'annule.", 19, Theatre.MUTED, GameFonts.italic()))
+	detail.add_child(Theatre.label("Tu en portes %d sur %d. Elles se voient à ta ceinture." % [Progress.flasks, int(flask["max"])], 21, Theatre.AMBER))
+	var filler := Control.new()
+	filler.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	filler.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	detail.add_child(filler)
+	var blocker := Progress.flask_blocker()
+	var button := Button.new()
+	button.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	button.text = "Acheter une fiole : %d or" % int(flask["cost"])
+	Theatre.primary(button, 24)
+	button.disabled = blocker != ""
+	button.pressed.connect(buy_flask)
+	detail.add_child(button)
+	if blocker == "pleines":
+		detail.add_child(Theatre.label("Ta ceinture est pleine.", 18, Theatre.EMBER, GameFonts.italic()))
+	elif blocker == "or":
+		detail.add_child(Theatre.label("Il te manque %d or." % (int(flask["cost"]) - Progress.gold), 18, Theatre.EMBER, GameFonts.italic()))
+
+
+## Les vivres : un repas emballé, pour le prochain niveau seulement.
+func _fill_meals(body: HBoxContainer) -> void:
+	var shelf := HBoxContainer.new()
+	shelf.add_theme_constant_override("separation", 10)
+	body.add_child(shelf)
+	for id: StringName in Supplies.MEALS:
+		var cell := VBoxContainer.new()
+		cell.add_theme_constant_override("separation", 2)
+		var button := Button.new()
+		button.custom_minimum_size = Vector2(112.0, 112.0)
+		button.expand_icon = true
+		var meal: Dictionary = Supplies.MEALS[id]
+		var path := ICONS + "%s.png" % meal["icon"]
+		button.icon = load(path) as Texture2D if ResourceLoader.exists(path) else null
+		for state in ["normal", "hover", "pressed"]:
+			button.add_theme_stylebox_override(state, _cell(id == selected_meal or state != "normal"))
+		button.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+		button.pressed.connect(func() -> void:
+			selected_meal = id
+			_refresh())
+		cell.add_child(button)
+		var label := Theatre.label("Emballé" if Progress.packed_meal == id else "%d or" % int(meal["cost"]), 17,
+			Theatre.AMBER if Progress.packed_meal == id else Theatre.MUTED)
+		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		cell.add_child(label)
+		shelf.add_child(cell)
+
+	var meal: Dictionary = Supplies.MEALS[selected_meal]
+	var detail := VBoxContainer.new()
+	detail.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	detail.add_theme_constant_override("separation", 6)
+	body.add_child(detail)
+	detail.add_child(Theatre.label(meal["name"], 36))
+	var text := Theatre.label(meal["text"], 21, Theatre.CREAM, GameFonts.italic())
+	text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	detail.add_child(text)
+	for line in Supplies.describe_meal(selected_meal):
+		detail.add_child(Theatre.label(line, 21, Theatre.EMBER))
+	detail.add_child(Theatre.label("Un seul repas à la fois, pour le prochain niveau seulement.", 19, Theatre.MUTED, GameFonts.italic()))
+	if Progress.packed_meal != &"":
+		detail.add_child(Theatre.label("Dans ton sac : %s." % String(Supplies.MEALS[Progress.packed_meal]["name"]).to_lower(), 21, Theatre.AMBER))
+	var filler := Control.new()
+	filler.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	filler.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	detail.add_child(filler)
+	var blocker := Progress.meal_blocker(selected_meal)
+	var button := Button.new()
+	button.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	button.text = "Emballer : %d or" % int(meal["cost"])
+	Theatre.primary(button, 24)
+	button.disabled = blocker != ""
+	button.pressed.connect(pack.bind(selected_meal))
+	detail.add_child(button)
+	if blocker == "deja":
+		detail.add_child(Theatre.label("Tu as déjà un repas dans ton sac.", 18, Theatre.EMBER, GameFonts.italic()))
+	elif blocker == "or":
+		detail.add_child(Theatre.label("Il te manque %d or." % (int(meal["cost"]) - Progress.gold), 18, Theatre.EMBER, GameFonts.italic()))
 
 
 func _cell(active: bool) -> StyleBoxFlat:

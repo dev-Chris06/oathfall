@@ -88,6 +88,7 @@ func _ready() -> void:
 	hero.hurt.connect(_on_hero_hurt)
 	hero.died.connect(_on_hero_died)
 	controls.book_pressed.connect(open_book)
+	hero.flask_drunk.connect(_on_flask_drunk)
 	Progress.leveled_up.connect(_on_leveled_up)
 	Progress.skill_learned.connect(_on_skill_learned)
 	Progress.changed.connect(_refresh_progress)
@@ -302,9 +303,15 @@ func _on_leave() -> void:
 func _refresh_progress() -> void:
 	# Un achat ou un rite appris change les caractéristiques tout de suite.
 	hero.apply_stats(Progress.hero_stats())
+	hero.flasks = Progress.flasks
 	hero.apply_gear(Progress.equipped_map())
 	hud.set_progress(Progress.hero_level, Progress.level_progress(), Progress.gold)
 	controls.book_alert = Progress.skill_points > 0
+
+
+func _on_flask_drunk() -> void:
+	if Progress.use_flask():
+		hero.heal(int(Supplies.FLASK["heal"]))
 
 
 func _on_leveled_up(level: int) -> void:

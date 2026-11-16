@@ -30,6 +30,7 @@ const CLASSES := {
 			"death": "Death_A",
 			"block": "Blocking",
 			"rite": "Interact",
+			"drink": "Use_Item",
 		},
 		# Enchaînement de base : chaque coup a ses dégâts et sa vitesse.
 		"attacks": [

@@ -27,6 +27,12 @@ var level_id: StringName = &"la_grille"
 var checkpoint := 0
 ## Les niveaux terminés (identifiant → vrai). Ils restent rejouables.
 var completed := {}
+## Les fioles portées, et le repas emballé pour le prochain niveau ; le repas
+## « actif » est celui du niveau en cours (il disparaît quand on le quitte).
+var flasks := 0
+var packed_meal: StringName = &""
+var active_meal: StringName = &""
+
 ## L'équipement : les objets achetés (identifiant → vrai ; ceux de base sont
 ## toujours possédés) et celui qu'on porte dans chaque emplacement.
 var owned := {}
@@ -51,6 +57,9 @@ func reset() -> void:
 	completed = {}
 	owned = {}
 	equipped = {}
+	flasks = 0
+	packed_meal = &""
+	active_meal = &""
 	heard = {}
 	met = {}
 	rests = {}
@@ -65,7 +74,7 @@ func new_game() -> void:
 
 ## Vrai s'il y a une partie à continuer.
 func has_progress() -> bool:
-	return memories > 0 or gold > 0 or not completed.is_empty() or not owned.is_empty()
+	return memories > 0 or gold > 0 or not completed.is_empty() or not owned.is_empty() or flasks > 0
 
 
 func is_completed(id: StringName) -> bool:
@@ -174,6 +183,70 @@ func hear(conversation_id: StringName) -> void:
 	save()
 
 
+# --- Fioles et vivres -----------------------------------------------------------
+
+## Pourquoi on ne peut pas acheter une fiole : « », « pleines » ou « or ».
+func flask_blocker() -> String:
+	if flasks >= int(Supplies.FLASK["max"]):
+		return "pleines"
+	if gold < int(Supplies.FLASK["cost"]):
+		return "or"
+	return ""
+
+
+func buy_flask() -> bool:
+	if flask_blocker() != "":
+		return false
+	gold -= int(Supplies.FLASK["cost"])
+	flasks += 1
+	changed.emit()
+	save()
+	return true
+
+
+## Boit une fiole (le héros est soigné par `Level`). Renvoie faux s'il n'en reste pas.
+func use_flask() -> bool:
+	if flasks <= 0:
+		return false
+	flasks -= 1
+	changed.emit()
+	save()
+	return true
+
+
+## Pourquoi on ne peut pas emballer un repas : « », « deja » ou « or ».
+func meal_blocker(meal_id: StringName) -> String:
+	if packed_meal != &"":
+		return "deja"
+	if gold < int(Supplies.MEALS[meal_id]["cost"]):
+		return "or"
+	return ""
+
+
+func pack_meal(meal_id: StringName) -> bool:
+	if meal_blocker(meal_id) != "":
+		return false
+	gold -= int(Supplies.MEALS[meal_id]["cost"])
+	packed_meal = meal_id
+	changed.emit()
+	save()
+	return true
+
+
+## On part en niveau : le repas emballé devient le repas du niveau.
+func start_level_meal() -> void:
+	active_meal = packed_meal
+	packed_meal = &""
+	changed.emit()
+
+
+## On quitte le niveau : son repas est fini.
+func end_level_meal() -> void:
+	if active_meal != &"":
+		active_meal = &""
+		changed.emit()
+
+
 # --- L'équipement ---------------------------------------------------------------
 
 func owns(item_id: StringName) -> bool:
@@ -231,6 +304,11 @@ func hero_stats() -> Dictionary:
 		if rank > 0:
 			var rank_data: Dictionary = skill["ranks"][rank - 1]
 			stats.merge(rank_data["stats"], true)
+	# Le repas du niveau en cours.
+	if active_meal != &"":
+		var meal_bonus: Dictionary = Supplies.MEALS[active_meal]["stats"]
+		for key: String in meal_bonus:
+			stats[key] = stats.get(key, 0) + meal_bonus[key]
 	# L'équipement porté s'ajoute.
 	for slot in Gear.SLOTS:
 		var bonus: Dictionary = Gear.ITEMS[equipped_id(slot)]["stats"]
@@ -260,6 +338,9 @@ func save() -> bool:
 		"level_id": String(level_id),
 		"checkpoint": checkpoint,
 		"completed": completed.keys(),
+		"flasks": flasks,
+		"packed_meal": String(packed_meal),
+		"active_meal": String(active_meal),
 		"owned": owned.keys(),
 		"equipped": equipped,
 		"heard": heard.keys(),
@@ -302,6 +383,11 @@ func load_save() -> bool:
 	if typeof(saved_done) == TYPE_ARRAY:
 		for id in saved_done:
 			completed[String(id)] = true
+	flasks = clampi(int(data.get("flasks", 0)), 0, int(Supplies.FLASK["max"]))
+	var saved_packed := StringName(data.get("packed_meal", ""))
+	packed_meal = saved_packed if Supplies.MEALS.has(saved_packed) else &""
+	var saved_active := StringName(data.get("active_meal", ""))
+	active_meal = saved_active if Supplies.MEALS.has(saved_active) else &""
 	owned = {}
 	var saved_owned = data.get("owned", [])
 	if typeof(saved_owned) == TYPE_ARRAY:

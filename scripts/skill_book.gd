@@ -215,7 +215,13 @@ func _fill_equipment(page: VBoxContainer) -> void:
 			var effect := Theatre.label(line, 16, Theatre.EMBER, GameFonts.italic())
 			effect.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 			shelves.add_child(effect)
-	var hint := Theatre.label("Maud vend d'autres équipements, au moulin.", 17, Theatre.MUTED, GameFonts.italic())
+	var supplies := "Fioles : %d sur %d" % [Progress.flasks, int(Supplies.FLASK["max"])]
+	if Progress.packed_meal != &"":
+		supplies += "    Sac : %s" % String(Supplies.MEALS[Progress.packed_meal]["name"]).to_lower()
+	elif Progress.active_meal != &"":
+		supplies += "    Repas : %s" % String(Supplies.MEALS[Progress.active_meal]["name"]).to_lower()
+	page.add_child(Theatre.label(supplies, 18, Theatre.AMBER))
+	var hint := Theatre.label("Maud vend équipement, fioles et vivres, au moulin.", 17, Theatre.MUTED, GameFonts.italic())
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	page.add_child(hint)
 

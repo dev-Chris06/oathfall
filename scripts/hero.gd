@@ -15,8 +15,10 @@ signal died
 signal rest_given(enemy: Enemy)
 ## Le joueur appuie sur le bouton alors qu'une interaction est possible.
 signal interacted
+## Le héros a fini de boire une fiole : `Level` en retire une et le soigne.
+signal flask_drunk
 
-enum State { MOVE, ATTACK, DODGE, HIT, RITE, DEAD }
+enum State { MOVE, ATTACK, DODGE, HIT, RITE, DEAD, DRINK }
 
 const TURN_SPEED := 16.0
 const ATTACK_RANGE := 2.7
@@ -33,6 +35,8 @@ const HIT_TIME := 0.3
 const RITE_RANGE := 2.3
 ## Secondes pour couper une corde de cloche, sans défense.
 const CUT_TIME := 1.5
+## Secondes pour boire une fiole, sans défense.
+const DRINK_TIME := 0.85
 const RITE_TIME := 1.0
 
 var controls: TouchControls
@@ -69,6 +73,8 @@ var thorns := 0
 ## Ce qu'on peut faire ici sans que ce soit le Repos (parler, partir) : le
 ## niveau y met le libellé du bouton, vide quand il n'y a rien à faire.
 var interaction_label := ""
+## Fioles portées, tenues à jour par `Level`.
+var flasks := 0
 var _interact_was_held := false
 
 
@@ -100,6 +106,7 @@ func setup(class_id: StringName, input: TouchControls) -> void:
 
 	controls.attack_pressed.connect(_on_attack_pressed)
 	controls.dodge_pressed.connect(_on_dodge_pressed)
+	controls.flask_pressed.connect(_on_flask_pressed)
 	_loop(_animation("idle"))
 
 
@@ -153,11 +160,17 @@ func _physics_process(delta: float) -> void:
 		State.RITE:
 			velocity = Vector3.ZERO
 			_update_rite(delta)
+		State.DRINK:
+			velocity = Vector3.ZERO
+			if _state_time >= DRINK_TIME:
+				state = State.MOVE
+				flask_drunk.emit()
 		State.DEAD:
 			velocity = Vector3.ZERO
 
 	# Le bouton du Repos n'apparaît que près d'un corps, ou d'une corde.
 	var can_interact := interaction_label != "" and body == null and rope == null
+	controls.flask_count = flasks
 	controls.rite_available = state != State.DEAD and (body != null or rope != null or can_interact or state == State.RITE)
 	controls.rite_label = "COUPER" if (_cut_target != null or (body == null and rope != null)) \
 		else (interaction_label if can_interact else "REPOS")
@@ -230,6 +243,7 @@ func apply_stats(stats: Dictionary) -> void:
 func apply_gear(equipped: Dictionary) -> void:
 	if _model != null:
 		Gear.apply(_model, equipped)
+		Supplies.apply_belt(_model, flasks)
 
 
 func heal(amount: int) -> void:
@@ -256,10 +270,19 @@ func _on_attack_pressed() -> void:
 			_queued = true
 
 
+## Boire une fiole : un instant sans défense ; un coup ou une esquive l'annule.
+func _on_flask_pressed() -> void:
+	if state != State.MOVE or flasks <= 0 or health >= max_health:
+		return
+	state = State.DRINK
+	_state_time = 0.0
+	_once(_animation("drink"), 1.0)
+
+
 func _on_dodge_pressed() -> void:
 	if _dodge_cooldown > 0.0:
 		return
-	if state != State.MOVE and state != State.ATTACK and state != State.RITE:
+	if state != State.MOVE and state != State.ATTACK and state != State.RITE and state != State.DRINK:
 		return
 	var wish := _wish_direction()
 	_dodge_direction = wish.normalized() if wish.length() > 0.1 else _facing

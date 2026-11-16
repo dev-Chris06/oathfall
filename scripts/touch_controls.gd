@@ -8,12 +8,14 @@ extends CanvasLayer
 signal attack_pressed
 signal dodge_pressed
 signal book_pressed
+signal flask_pressed
 
 const STICK_RADIUS := 95.0
 const ATTACK_RADIUS := 88.0
 const DODGE_RADIUS := 62.0
 const RITE_RADIUS := 66.0
 const BOOK_RADIUS := 44.0
+const FLASK_RADIUS := 50.0
 
 ## Direction voulue, de longueur 0 à 1. x vers la droite, y vers le bas de l'écran.
 var move := Vector2.ZERO
@@ -24,6 +26,8 @@ var rite_held := false
 var rite_available := false
 ## Ce qu'écrit le bouton : « REPOS » près d'un corps, « COUPER » près d'une corde.
 var rite_label := "REPOS"
+## Fioles portées : le bouton FIOLE n'apparaît que s'il en reste.
+var flask_count := 0
 var rite_progress := 0.0
 ## Vrai quand des points de compétence attendent : le bouton du carnet luit.
 var book_alert := false
@@ -75,6 +79,8 @@ func _input(event: InputEvent) -> void:
 				book_pressed.emit()
 			elif touch.position.distance_to(_attack_center()) <= ATTACK_RADIUS * 1.25:
 				press_attack()
+			elif flask_count > 0 and touch.position.distance_to(_flask_center()) <= FLASK_RADIUS * 1.3:
+				flask_pressed.emit()
 			elif touch.position.distance_to(_dodge_center()) <= DODGE_RADIUS * 1.3:
 				press_dodge()
 			elif rite_available and touch.position.distance_to(_rite_center()) <= RITE_RADIUS * 1.3:
@@ -101,6 +107,8 @@ func _input(event: InputEvent) -> void:
 					press_attack()
 				KEY_K, KEY_SHIFT:
 					press_dodge()
+				KEY_F:
+					flask_pressed.emit()
 				KEY_C, KEY_TAB:
 					_release_all()
 					book_pressed.emit()
@@ -121,6 +129,10 @@ func _release_all() -> void:
 	_stick_index = -1
 	_stick_vector = Vector2.ZERO
 	_rite_index = -1
+
+
+func _flask_center() -> Vector2:
+	return Vector2(_pad.size.x - 318.0, _pad.size.y - 232.0)
 
 
 func _book_center() -> Vector2:
@@ -151,6 +163,8 @@ func _draw_pad() -> void:
 	_draw_button(_attack_center(), ATTACK_RADIUS, Color(0.85, 0.25, 0.2), _attack_flash, "FRAPPER", font)
 	_draw_button(_dodge_center(), DODGE_RADIUS, Color(0.75, 0.7, 0.55), _dodge_flash, "ESQUIVE", font)
 
+	if flask_count > 0:
+		_draw_button(_flask_center(), FLASK_RADIUS, Color(0.45, 0.85, 0.7), 0.0, "FIOLE ×%d" % flask_count, font)
 	var glow := 0.5 + 0.5 * sin(Time.get_ticks_msec() / 220.0) if book_alert else 0.0
 	_draw_button(_book_center(), BOOK_RADIUS, Color(1.0, 0.85, 0.5), glow, "CARNET", font)
 

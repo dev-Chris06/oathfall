@@ -64,10 +64,11 @@ func _ready() -> void:
 
 
 ## Montre ce que porterait le héros avec cet équipement.
-func show_gear(equipped: Dictionary) -> void:
+func show_gear(equipped: Dictionary, flask_count := -1) -> void:
 	_equipped = equipped
 	if _model != null:
 		Gear.apply(_model, equipped)
+		Supplies.apply_belt(_model, Progress.flasks if flask_count < 0 else flask_count)
 
 
 func _process(delta: float) -> void:
