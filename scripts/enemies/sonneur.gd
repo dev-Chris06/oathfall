@@ -132,6 +132,7 @@ func _begin_quake() -> void:
 
 
 func _slam() -> void:
+	Audio.play(&"quake")
 	_clear_quake_marker()
 	_phase = Phase.QUAKE
 	_state_time = 0.0
@@ -214,6 +215,7 @@ func _special(_delta: float) -> void:
 
 
 func _toll() -> void:
+	Audio.play(&"bell_toll")
 	var raised := 0
 	for node in get_tree().get_nodes_in_group(&"bodies"):
 		var body := node as Enemy

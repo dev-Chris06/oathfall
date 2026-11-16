@@ -138,6 +138,7 @@ func _melee_or_approach(distance: float) -> void:
 
 
 func _start_melee() -> void:
+	Audio.play(&"swing_heavy")
 	_attacks += 1
 	if _attacks % 3 == 0:
 		_begin(Act.SWEEP)
@@ -326,6 +327,7 @@ func current_stage() -> int:
 # --- Phase 2 : sous terre ------------------------------------------------------
 
 func _begin_dive() -> void:
+	Audio.play(&"dig")
 	_begin(Act.DIVE)
 	_invulnerable = true
 	remove_from_group(&"hittable")
@@ -386,6 +388,7 @@ func _do_under(delta: float) -> void:
 
 
 func _emerge() -> void:
+	Audio.play(&"dig")
 	_clear_marker()
 	_mound.visible = false
 	_model.visible = true
@@ -512,6 +515,7 @@ func _do_throw_tele() -> void:
 
 
 func _launch_stone() -> void:
+	Audio.play(&"swing_heavy")
 	var stone := GraveStone.new()
 	stone.hero = _hero
 	stone.start = global_position + Vector3(0.0, 3.2, 0.0) + _facing * 0.8
@@ -524,6 +528,7 @@ func _launch_stone() -> void:
 
 
 func _begin_raise() -> void:
+	Audio.play(&"scream")
 	_begin(Act.RAISE_TELE)
 	_play_fit("raise", float(_type["raise_windup"]) + 0.3)
 

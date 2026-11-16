@@ -18,6 +18,13 @@ Le texte de licence de chaque pack est conservé à côté de ses fichiers
 (`LICENSE.txt`). La licence CC0 n'impose pas de crédit ; Kay Lousberg
 (www.kaylousberg.com) est cité ici par reconnaissance.
 
+## Sons et musiques
+
+| Fichiers | Auteur | Licence | Source | Emplacement |
+|---|---|---|---|---|
+| Kenney : 50 RPG sound effects (pas, tissu, pièces, livre, grincements) | Kenney Vleugels | CC0 1.0 | https://opengameart.org/content/50-rpg-sound-effects | `assets/audio/kenney/` |
+| Cloches, impacts, cris, séisme, six musiques en boucle | Faits pour le jeu, par synthèse (`tools/audio/generate.py`) | Propres au projet | aucune source extérieure | `assets/audio/sfx/`, `assets/audio/music/` |
+
 ## Polices
 
 | Police | Auteur | Licence | Source | Fichiers utilisés |

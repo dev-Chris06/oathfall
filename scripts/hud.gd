@@ -115,6 +115,7 @@ func hide_counts() -> void:
 func show_boss(boss_name: String, health: int, max_health: int) -> void:
 	_boss_label.text = boss_name
 	_boss_box.visible = true
+	Audio.music(&"boss")
 	set_boss(health, max_health)
 
 
@@ -125,6 +126,7 @@ func set_boss(health: int, max_health: int) -> void:
 
 func hide_boss() -> void:
 	_boss_box.visible = false
+	Audio.music(Audio.level_track)
 
 
 func _process(delta: float) -> void:

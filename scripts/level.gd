@@ -36,6 +36,8 @@ var start_checkpoint := 0
 ## Vrai quand un joueur automatique tient les commandes : le niveau ne se
 ## recharge pas seul et laisse le test décider.
 var scripted := false
+## Musique du niveau (vide : selon le décor, souterrain ou cimetière).
+var music_track: StringName = &""
 
 var hero: Hero
 var controls: TouchControls
@@ -65,6 +67,10 @@ func _ready() -> void:
 	add_child(_solids)
 	_build_environment()
 	_build()
+	if music_track == &"":
+		music_track = &"underground" if underground else &"cemetery"
+	Audio.level_track = music_track
+	Audio.music(music_track)
 
 	controls = TouchControls.new()
 	add_child(controls)
@@ -180,6 +186,7 @@ func finish() -> void:
 	if _finished:
 		return
 	_finished = true
+	Audio.play(&"level_done")
 	completed.emit()
 
 
@@ -225,6 +232,8 @@ func open_gate(index: int, instant := false) -> void:
 	if gate["open"]:
 		return
 	gate["open"] = true
+	if not instant:
+		Audio.play(&"gate")
 	(gate["blocker"] as CollisionShape3D).set_deferred("disabled", true)
 	for side: int in [0, 1]:
 		var leaf := gate["leaves"][side] as Node3D

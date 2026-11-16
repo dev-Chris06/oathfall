@@ -315,6 +315,7 @@ func _chase() -> void:
 
 
 func _strike() -> void:
+	Audio.play(&"swing_light", -6.0)
 	if _hero == null:
 		return
 	var offset := _hero.global_position - global_position
@@ -327,6 +328,7 @@ func _strike() -> void:
 
 
 func _fall() -> void:
+	Audio.play(&"enemy_fall")
 	_on_fall()
 	state = State.DOWN
 	_state_time = 0.0
@@ -343,6 +345,7 @@ func _fall() -> void:
 
 
 func _start_rising() -> void:
+	Audio.play(&"enemy_rise")
 	state = State.RISING
 	_state_time = 0.0
 	remove_from_group(&"bodies")

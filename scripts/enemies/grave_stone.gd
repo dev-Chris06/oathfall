@@ -50,6 +50,7 @@ func _physics_process(delta: float) -> void:
 
 
 func _land() -> void:
+	Audio.play(&"hit_heavy")
 	var hit := false
 	if hero != null and not hero.is_dead() and not hero.is_dodging():
 		var offset := hero.global_position - target

@@ -41,6 +41,8 @@ const RITE_TIME := 1.0
 
 var controls: TouchControls
 var state := State.MOVE
+## Temps avant le prochain bruit de pas.
+var _stride := 0.0
 var max_health := 100
 var health := 100
 
@@ -134,6 +136,10 @@ func _physics_process(delta: float) -> void:
 			elif wish.length() > 0.1:
 				_facing = wish.normalized()
 				_loop(_animation("run"))
+				_stride -= delta
+				if _stride <= 0.0:
+					_stride = 0.34
+					Audio.play(&"step")
 			else:
 				_loop(_animation("idle"))
 		State.ATTACK:
@@ -166,6 +172,7 @@ func _physics_process(delta: float) -> void:
 			velocity = Vector3.ZERO
 			if _state_time >= DRINK_TIME:
 				state = State.MOVE
+				Audio.play(&"heal")
 				flask_drunk.emit()
 		State.DEAD:
 			velocity = Vector3.ZERO
@@ -206,6 +213,7 @@ func take_damage(amount: int, from: Vector3, attacker: Node = null) -> void:
 		(attacker as Enemy).take_hit(global_position, thorns)
 	health_changed.emit(health, max_health)
 	hurt.emit()
+	Audio.play(&"hurt")
 	_rite_target = null
 	_cut_target = null
 	_rite_progress = 0.0
@@ -213,6 +221,7 @@ func take_damage(amount: int, from: Vector3, attacker: Node = null) -> void:
 		state = State.DEAD
 		_state_time = 0.0
 		_once(_animation("death"), 1.0)
+		Audio.play(&"hero_die")
 		died.emit()
 		return
 	var push := global_position - from
@@ -279,6 +288,7 @@ func _on_flask_pressed() -> void:
 		return
 	state = State.DRINK
 	_state_time = 0.0
+	Audio.play(&"drink")
 	_once(_animation("drink"), 1.0)
 
 
@@ -296,6 +306,7 @@ func _on_dodge_pressed() -> void:
 	state = State.DODGE
 	_state_time = 0.0
 	_dodge_cooldown = dodge_cooldown
+	Audio.play(&"dodge")
 	_once(_animation("dodge"), 1.4)
 
 
@@ -308,6 +319,7 @@ func _start_attack(index: int) -> void:
 	_state_time = 0.0
 	var speed := float(attack["speed"]) * attack_speed_scale
 	var length := _once(attack["animation"], speed)
+	Audio.play(&"swing_heavy" if index == _data["attacks"].size() - 1 else &"swing_light")
 	_attack_duration = length / speed * RECOVERY_CUT if length > 0.0 else 0.4
 
 
@@ -329,6 +341,7 @@ func _strike() -> void:
 		touched = true
 	if touched:
 		var attacks: Array = _data["attacks"]
+		Audio.play(&"hit_heavy" if _combo == attacks.size() - 1 else &"hit_flesh")
 		hit_landed.emit(_combo == attacks.size() - 1)
 
 
@@ -425,6 +438,7 @@ func _update_rite(delta: float) -> void:
 		body.give_rest()
 		if rest_heal > 0:
 			heal(rest_heal)
+		Audio.play(&"rest_done")
 		rest_given.emit(body)
 
 

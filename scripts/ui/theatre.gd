@@ -64,6 +64,9 @@ static func primary(button: Button, font_size := 24) -> void:
 
 
 static func _style_button(button: Button, font_size: int) -> void:
+	if not button.has_meta(&"clic"):
+		button.set_meta(&"clic", true)
+		button.pressed.connect(func() -> void: Audio.play(&"ui_click"))
 	button.add_theme_font_override("font", GameFonts.text())
 	button.add_theme_font_size_override("font_size", font_size)
 	button.add_theme_color_override("font_hover_color", CREAM)

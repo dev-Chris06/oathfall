@@ -62,6 +62,7 @@ func take_hit(from: Vector3, damage: int) -> void:
 
 
 func _scream() -> void:
+	Audio.play(&"scream")
 	var raised := 0
 	for node in get_tree().get_nodes_in_group(&"bodies"):
 		var body := node as Enemy

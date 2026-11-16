@@ -61,6 +61,7 @@ func cut_now() -> void:
 
 
 func _snap() -> void:
+	Audio.play(&"rope_snap")
 	is_cut = true
 	remove_from_group(&"ropes")
 	_marker.visible = false

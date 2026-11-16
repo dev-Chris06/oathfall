@@ -24,6 +24,7 @@ func _chase() -> void:
 
 
 func _ring() -> void:
+	Audio.play(&"bell_small")
 	Fx.ring(get_parent(), global_position, Color(0.85, 0.62, 0.3, 0.55), BELL_RADIUS, 1.3)
 	if _bell != null:
 		var tween := _bell.create_tween()

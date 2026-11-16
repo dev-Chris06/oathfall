@@ -86,7 +86,7 @@ apprendre les compétences et quelques personnages à qui parler.
 | 7. Niveau 3 : le Sonneur | Fait |
 | 8. Niveau 5 : la Fossoyeuse | Fait |
 | 9. Le refuge, le menu, le texte d'ouverture | Fait |
-| 10. Finition : sons, musique, équilibrage, icône, APK signé | **À faire, c'est la suite** |
+| 10. Finition : sons, musique, équilibrage, icône, APK signé | **En cours** : sons et musiques faits ; restent icône, APK signé, équilibrage |
 
 Le jeu s'ouvre sur **l'écran-titre** (`TitleScreen` : Continuer s'il y a une
 partie, Nouvelle partie avec confirmation, Options avec crédits et effacement
@@ -204,6 +204,8 @@ Retour de l'auteur encore attendu : les sensations de combat sur téléphone
 | `scripts/data/refuge_texts.gd`, `gear.gd` | Conversations du refuge ; équipement (objets, effets, `Gear.apply`) |
 | `scripts/dev/portrait_tool.gd` | Fabrique les portraits du bestiaire (`-- --portraits`), rendus des vrais modèles |
 | `scripts/enemies/` | Comportements propres : archer (et son carreau), Porte-cloche, Fouisseur, Veuve, Sonneur, la grosse cloche avec ses cordes (`great_bell.gd`, `bell_rope.gd`), Fossoyeuse et ses pierres (`fossoyeuse.gd`, `grave_stone.gd`) |
+| `scripts/audio.gd` | Chargé en permanence (`Audio`) : bruitages (`Audio.play(&"clang")`), musiques en fondu (`Audio.music(&"boss")`), volumes des options. Événements et fichiers déclarés dans ses tableaux `EVENTS` et `TRACKS` |
+| `tools/audio/generate.py` | Fabrique les bruitages lourds et les six musiques en boucle (`python3 -I tools/audio/generate.py assets/audio`), reproductible |
 | `scripts/fx.gd` | Effets partagés : ondes au sol, matériaux simples |
 | `scripts/map/` | La carte : `world_map.gd` (écran, défilement, choix), `map_scene.gd` (la ville dessinée par code) |
 | `scripts/data/world_data.gd` | Chapitres et niveaux dans l'ordre de la route |
@@ -291,6 +293,13 @@ Règles à garder :
   test qui réussit une fois doit réussir toujours.
 - **Tests et sauvegarde** : en mode test ou capture, `Main` écrit dans
   `user://essai.json`, jamais dans la vraie sauvegarde du joueur.
+
+**Le son** : un nouveau bruit s'ajoute à `Audio.EVENTS` (fichier dans
+`assets/audio/sfx/`, ou `kenney/`) et s'appelle par `Audio.play(&"nom")` ; le
+test vérifie que les fichiers existent et que les événements attendus ont été
+joués. Musique par niveau : `music_track` (cimetière par défaut, souterrain si
+`underground`, `refuge`), `boss` dès que `hud.show_boss()` est appelé. Volumes
+dans Options, gardés dans `user://reglages.json`.
 
 ## Vérifier son travail
 

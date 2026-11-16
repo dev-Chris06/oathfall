@@ -250,8 +250,52 @@ func _run() -> void:
 		return
 	if not await _menu_tests():
 		return
+	if not _audio_tests():
+		return
 	print("SELFTEST OK")
 	get_tree().quit(0)
+
+
+## Tous les sons déclarés existent, ceux que le test a provoqués ont été joués,
+## et les volumes se gardent.
+func _audio_tests() -> bool:
+	for id: StringName in Audio.EVENTS:
+		var event: Dictionary = Audio.EVENTS[id]
+		for file: String in event["files"]:
+			var path: String = (Audio.KEN if event.get("kenney", false) else Audio.SFX) + file + ".ogg"
+			if not ResourceLoader.exists(path):
+				return _fail("le son %s manque : %s" % [id, path])
+	for id: StringName in Audio.TRACKS:
+		var path: String = Audio.MUSIC + String(Audio.TRACKS[id]["file"]) + ".ogg"
+		if not ResourceLoader.exists(path):
+			return _fail("la musique %s manque : %s" % [id, path])
+	# Un bouton du thème joue son clic.
+	var probe := Button.new()
+	Theatre.pill(probe, 20)
+	probe.pressed.emit()
+	probe.free()
+	var expected: Array[StringName] = [&"step", &"swing_light", &"swing_heavy", &"hit_flesh", &"hit_heavy",
+		&"dodge", &"hurt", &"rest_done", &"enemy_fall", &"enemy_rise", &"drink", &"heal", &"twang",
+		&"bell_toll", &"bell_small", &"bell_crash", &"rope_snap", &"quake", &"scream", &"dig",
+		&"level_done", &"gate", &"coins", &"book_open", &"book_close", &"ui_click",
+		&"music:title", &"music:map", &"music:cemetery", &"music:underground", &"music:boss", &"music:refuge"]
+	for id in expected:
+		if int(Audio.heard.get(id, 0)) == 0:
+			return _fail("le son %s n'a jamais été joué pendant le test" % id)
+	Audio.set_music_volume(0.35)
+	Audio.set_sfx_volume(0.0)
+	Audio.save_settings()
+	Audio.set_music_volume(0.9)
+	Audio.set_sfx_volume(0.9)
+	Audio.load_settings()
+	if absf(Audio.music_volume - 0.35) > 0.001 or Audio.sfx_volume != 0.0:
+		return _fail("les volumes n'ont pas été relus (%.2f, %.2f)" % [Audio.music_volume, Audio.sfx_volume])
+	if not AudioServer.is_bus_mute(AudioServer.get_bus_index("Sons")):
+		return _fail("le volume nul ne coupe pas le bus des sons")
+	Audio.set_music_volume(0.7)
+	Audio.set_sfx_volume(0.9)
+	print("test réussi : sons et musiques présents, joués aux bons moments, volumes gardés")
+	return true
 
 
 func _arena_tests() -> bool:

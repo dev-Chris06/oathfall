@@ -76,6 +76,7 @@ func _ready() -> void:
 		Progress.save_path = "user://essai.json"
 		Progress.delete_save()
 		Progress.reset()
+		Audio.use_test_settings()
 		# Le joueur automatique choisit lui-même les niveaux.
 		var bot := SelftestBot.new()
 		bot.main = self
@@ -108,6 +109,7 @@ func show_title() -> void:
 	_drop_screens()
 	Engine.time_scale = 1.0
 	get_tree().paused = false
+	Audio.music(&"title")
 	title_screen = TitleScreen.new()
 	title_screen.continue_pressed.connect(show_map)
 	title_screen.new_game_pressed.connect(start_new_game)
@@ -132,6 +134,7 @@ func show_map() -> void:
 	_drop_screens()
 	Engine.time_scale = 1.0
 	get_tree().paused = false
+	Audio.music(&"map")
 	world_map = WorldMap.new()
 	world_map.available = ready_levels()
 	world_map.level_chosen.connect(_on_level_chosen)

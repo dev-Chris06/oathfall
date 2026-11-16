@@ -130,6 +130,7 @@ func _on_rope_cut(_rope: BellRope) -> void:
 
 
 func _fall() -> void:
+	Audio.play(&"bell_crash")
 	is_fallen = true
 	_bell.rotation.z = 0.0
 	var tween := create_tween()

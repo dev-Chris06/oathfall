@@ -87,6 +87,7 @@ func _show_aim(progress: float) -> void:
 
 
 func _shoot() -> void:
+	Audio.play(&"twang")
 	var bolt := Bolt.new()
 	var start := global_position + Vector3(0.0, 1.2, 0.0) + _facing * 0.6
 	var target := _hero.global_position + Vector3(0.0, 1.0, 0.0)

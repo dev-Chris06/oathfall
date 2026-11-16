@@ -66,6 +66,8 @@ func close() -> void:
 ## Achète l'objet sélectionné ou donné, comme si le joueur avait touché son bouton.
 func buy(item_id: StringName) -> bool:
 	var bought := Progress.buy_gear(item_id)
+	if bought:
+		Audio.play(&"coins")
 	_refresh()
 	return bought
 
@@ -83,6 +85,8 @@ func show_tab(new_tab: StringName) -> void:
 ## Achète une fiole, comme si le joueur avait touché son bouton.
 func buy_flask() -> bool:
 	var bought := Progress.buy_flask()
+	if bought:
+		Audio.play(&"coins")
 	_refresh()
 	return bought
 

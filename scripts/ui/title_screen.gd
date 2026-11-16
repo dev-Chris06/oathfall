@@ -73,8 +73,9 @@ func _ready() -> void:
 		["Crédits", func() -> void: _show_panel(_credits)],
 		["Effacer la sauvegarde", erase_save],
 		["Retour", func() -> void: _show_panel(null)]])
+	_add_volume_sliders(_options)
 	_credits = _panel("Crédits",
-		"Modèles : KayKit, de Kay Lousberg (CC0).\nPolices : Standard Blackletter, de David Grigg, et MFB Oldstyle (CC0).\nMoteur : Godot Engine (licence MIT).",
+		"Modèles : KayKit, de Kay Lousberg (CC0).\nPolices : Standard Blackletter, de David Grigg, et MFB Oldstyle (CC0).\nSons : Kenney (CC0). Musiques et bruitages lourds : synthèse faite pour le jeu.\nMoteur : Godot Engine (licence MIT).",
 		[["Retour", func() -> void: _show_panel(_options)]])
 	refresh()
 
@@ -170,6 +171,35 @@ func _panel(heading: String, text: String, buttons: Array) -> PanelContainer:
 		column.add_child(button)
 	add_child(panel)
 	return panel
+
+
+## Deux curseurs de volume, sous le titre du panneau des options.
+func _add_volume_sliders(panel: PanelContainer) -> void:
+	var column := panel.get_child(0) as VBoxContainer
+	var rows := [["Musique", Audio.music_volume, Audio.set_music_volume],
+		["Sons", Audio.sfx_volume, Audio.set_sfx_volume]]
+	var at := 1
+	for entry: Array in rows:
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 16)
+		var name_label := Theatre.label(entry[0], 22, Theatre.CREAM)
+		name_label.custom_minimum_size = Vector2(130.0, 0.0)
+		row.add_child(name_label)
+		var slider := HSlider.new()
+		slider.min_value = 0.0
+		slider.max_value = 1.0
+		slider.step = 0.05
+		slider.value = entry[1]
+		slider.custom_minimum_size = Vector2(420.0, 40.0)
+		slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		slider.value_changed.connect(entry[2])
+		slider.drag_ended.connect(func(_changed: bool) -> void:
+			Audio.save_settings()
+			Audio.play(&"ui_select"))
+		row.add_child(slider)
+		column.add_child(row)
+		column.move_child(row, at)
+		at += 1
 
 
 ## La ville à l'horizon et le moulin, en silhouettes.

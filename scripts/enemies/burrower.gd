@@ -89,6 +89,7 @@ func _special(delta: float) -> void:
 
 
 func _burst() -> void:
+	Audio.play(&"dig")
 	_phase = Phase.BURST
 	_state_time = 0.0
 	_burst_hit = false

@@ -60,6 +60,7 @@ func _ready() -> void:
 	_right.custom_minimum_size = Vector2(560.0, 610.0)
 	row.add_child(_right)
 
+	Audio.play(&"book_open")
 	_refresh()
 
 
@@ -74,6 +75,7 @@ func _unhandled_input(event: InputEvent) -> void:
 func close_book() -> void:
 	if is_queued_for_deletion():
 		return
+	Audio.play(&"book_close")
 	get_tree().paused = false
 	closed.emit()
 	queue_free()

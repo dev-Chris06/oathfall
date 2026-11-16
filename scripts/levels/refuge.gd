@@ -151,6 +151,7 @@ var advanced_screen: AdvancedRitesScreen
 # --- Décor --------------------------------------------------------------------
 
 func _build() -> void:
+	music_track = &"refuge"
 	var cells: Array[Vector2] = []
 	for col in range(-4, 5):
 		for row in range(-7, 3):
