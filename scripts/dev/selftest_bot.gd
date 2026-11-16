@@ -1188,7 +1188,38 @@ func _refuge_tests() -> bool:
 		return _fail("la phrase de repli de Maud ne change pas")
 	print("test 13 réussi : conversations ouvertes par les niveaux, entendues une fois")
 
+	# --- Les rites supérieurs, sans l'écran.
+	Progress.reset()
+	Progress.skill_points = 10
+	if Progress.advanced_blocker(&"garde_ferme") != "niveau" or Progress.learn_advanced(&"garde_ferme"):
+		return _fail("un rite supérieur s'apprend sans avoir terminé son niveau")
+	Progress.mark_completed(&"la_chapelle")
+	Progress.mark_completed(&"l_ossuaire")
+	Progress.mark_completed(&"la_fosse")
+	var plain := Progress.hero_stats()
+	if not Progress.learn_advanced(&"garde_ferme") or not Progress.learn_advanced(&"veillee") or not Progress.learn_advanced(&"elan"):
+		return _fail("les rites supérieurs n'ont pas pu être appris")
+	if Progress.skill_points != 10 - 2 - 2 - 3:
+		return _fail("les rites supérieurs n'ont pas coûté leurs points (%d restants)" % Progress.skill_points)
+	if Progress.learn_advanced(&"elan") or Progress.advanced_blocker(&"elan") != "appris":
+		return _fail("un rite supérieur peut être appris deux fois")
+	var trained := Progress.hero_stats()
+	if absf(float(trained["guard"]) - float(plain["guard"]) - 0.15) > 0.001 or int(trained["rest_heal"]) != int(plain["rest_heal"]) + 8 \
+			or absf(float(trained["dodge_extra"]) - 0.12) > 0.001:
+		return _fail("les effets des rites supérieurs ne s'ajoutent pas : %s" % [trained])
+	Progress.save()
+	Progress.advanced = {}
+	Progress.load_save()
+	if not Progress.has_advanced(&"veillee"):
+		return _fail("les rites supérieurs ne sont pas relus de la sauvegarde")
+	if Progress.forget_skills() != 7 or Progress.skill_points != 10 or not Progress.advanced.is_empty():
+		return _fail("oublier les rites ne rend pas les points des rites supérieurs (%d)" % Progress.skill_points)
+	if Progress.advanced_blocker(&"elan") != "":
+		return _fail("un rite oublié ne peut pas être réappris")
+	print("test 13 réussi : rites supérieurs (déblocage, coût, effets, sauvegarde, remboursement)")
+
 	# --- Dans le moulin.
+	Progress.reset()
 	Progress.add_gold(500)
 	main.load_level(&"refuge")
 	var level := _level() as Refuge
@@ -1290,6 +1321,25 @@ func _refuge_tests() -> bool:
 	if get_tree().paused:
 		return _fail("le jeu est resté en pause après la conversation d'Anselme")
 	print("test 13 réussi : le carnet apprend partout, Anselme fait tout désapprendre")
+
+	# Les rites supérieurs, chez Anselme : fermés tant que le niveau n'est pas fait.
+	level.talk_to_nearest()
+	await _frames(2)
+	level.dialogue.close(&"advanced")
+	await _frames(2)
+	if level.advanced_screen == null:
+		return _fail("l'écran des rites supérieurs ne s'ouvre pas chez Anselme")
+	if level.advanced_screen.learn(&"garde_ferme"):
+		return _fail("un rite supérieur s'apprend sans avoir terminé la Chapelle")
+	Progress.mark_completed(&"la_chapelle")
+	Progress.skill_points += 3
+	if not level.advanced_screen.learn(&"garde_ferme"):
+		return _fail("le rite supérieur n'a pas pu être appris une fois la Chapelle terminée")
+	level.advanced_screen.close()
+	await _frames(3)
+	if absf(hero.guard - float(Progress.hero_stats()["guard"])) > 0.001 or get_tree().paused:
+		return _fail("le héros n'a pas la garde du rite supérieur, ou le jeu est resté en pause")
+	print("test 13 réussi : Anselme enseigne un rite supérieur à qui a terminé le niveau")
 
 	# Tibert montre le bestiaire : seuls les morts rencontrés y figurent.
 	Progress.meet(&"depouille")
@@ -1451,6 +1501,8 @@ func _capture_title() -> void:
 func _capture_refuge() -> void:
 	Progress.mark_completed(&"la_grille")
 	Progress.mark_completed(&"les_allees")
+	Progress.mark_completed(&"la_chapelle")
+	Progress.skill_points = 4
 	Progress.add_gold(700)
 	Progress.add_memories(300)
 	Progress.flasks = 2
@@ -1493,10 +1545,10 @@ func _capture_refuge() -> void:
 	await _shoot("refuge_06_anselme")
 	level.talk_to_nearest()
 	await get_tree().create_timer(0.3).timeout
-	level.dialogue.close(&"forget")
-	await get_tree().create_timer(1.0).timeout
-	await _shoot("refuge_07_oublier")
-	level.dialogue.close(&"leave")
+	level.dialogue.close(&"advanced")
+	await get_tree().create_timer(0.8).timeout
+	await _shoot("refuge_07_sup")
+	level.advanced_screen.close()
 	for type_id: StringName in [&"depouille", &"archer_creux", &"porte_cloche", &"fouisseur", &"sonneur"]:
 		Progress.meet(type_id)
 		Progress.rests[String(type_id)] = 7

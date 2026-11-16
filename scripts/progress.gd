@@ -20,6 +20,8 @@ var memories := 0
 var hero_level := 1
 var skill_points := 0
 var gold := 0
+## Les rites supérieurs appris (identifiant → vrai).
+var advanced := {}
 ## Rang atteint dans chaque compétence (identifiant → rang, 0 si absente).
 var ranks := {}
 ## Où reprendre la partie.
@@ -52,6 +54,7 @@ func reset() -> void:
 	skill_points = 0
 	gold = 0
 	ranks = {}
+	advanced = {}
 	level_id = &"la_grille"
 	checkpoint = 0
 	completed = {}
@@ -132,11 +135,45 @@ func forget_skills() -> int:
 		var rank := rank_of(skill["id"])
 		for i in rank:
 			refunded += int(skill["ranks"][i]["cost"])
+	for rite: Dictionary in Progression.ADVANCED:
+		if has_advanced(rite["id"]):
+			refunded += int(rite["cost"])
 	ranks = {}
+	advanced = {}
 	skill_points += refunded
 	changed.emit()
 	save()
 	return refunded
+
+
+# --- Les rites supérieurs -------------------------------------------------------
+
+func has_advanced(rite_id: StringName) -> bool:
+	return advanced.has(String(rite_id))
+
+
+## Pourquoi on ne peut pas apprendre un rite supérieur : « », « appris »,
+## « niveau » (un niveau à terminer d'abord) ou « points ».
+func advanced_blocker(rite_id: StringName) -> String:
+	if has_advanced(rite_id):
+		return "appris"
+	var rite := Progression.find_advanced(rite_id)
+	for level_id: StringName in rite["needs"]:
+		if not is_completed(level_id):
+			return "niveau"
+	if skill_points < int(rite["cost"]):
+		return "points"
+	return ""
+
+
+func learn_advanced(rite_id: StringName) -> bool:
+	if advanced_blocker(rite_id) != "":
+		return false
+	skill_points -= int(Progression.find_advanced(rite_id)["cost"])
+	advanced[String(rite_id)] = true
+	changed.emit()
+	save()
+	return true
 
 
 func can_learn(skill_id: StringName) -> bool:
@@ -304,6 +341,12 @@ func hero_stats() -> Dictionary:
 		if rank > 0:
 			var rank_data: Dictionary = skill["ranks"][rank - 1]
 			stats.merge(rank_data["stats"], true)
+	# Les rites supérieurs s'ajoutent à ceux des rites ordinaires.
+	for rite: Dictionary in Progression.ADVANCED:
+		if has_advanced(rite["id"]):
+			var gains: Dictionary = rite["stats"]
+			for key: String in gains:
+				stats[key] = stats.get(key, 0) + gains[key]
 	# Le repas du niveau en cours.
 	if active_meal != &"":
 		var meal_bonus: Dictionary = Supplies.MEALS[active_meal]["stats"]
@@ -338,6 +381,7 @@ func save() -> bool:
 		"level_id": String(level_id),
 		"checkpoint": checkpoint,
 		"completed": completed.keys(),
+		"advanced": advanced.keys(),
 		"flasks": flasks,
 		"packed_meal": String(packed_meal),
 		"active_meal": String(active_meal),
@@ -383,6 +427,12 @@ func load_save() -> bool:
 	if typeof(saved_done) == TYPE_ARRAY:
 		for id in saved_done:
 			completed[String(id)] = true
+	advanced = {}
+	var saved_advanced = data.get("advanced", [])
+	if typeof(saved_advanced) == TYPE_ARRAY:
+		for id in saved_advanced:
+			if not Progression.find_advanced(StringName(id)).is_empty():
+				advanced[String(id)] = true
 	flasks = clampi(int(data.get("flasks", 0)), 0, int(Supplies.FLASK["max"]))
 	var saved_packed := StringName(data.get("packed_meal", ""))
 	packed_meal = saved_packed if Supplies.MEALS.has(saved_packed) else &""

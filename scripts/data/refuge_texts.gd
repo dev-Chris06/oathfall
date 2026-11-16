@@ -11,8 +11,7 @@ extends RefCounted
 const NPCS := {
 	&"maud": {
 		"name": "Maud",
-		"service": &"shop",
-		"service_label": "Voir la boutique",
+		"services": [{"id": &"shop", "label": "Voir la boutique"}],
 		"conversations": [
 			{
 				"id": &"maud_1",
@@ -56,8 +55,7 @@ const NPCS := {
 	},
 	&"anselme": {
 		"name": "Frère Anselme",
-		"service": &"forget",
-		"service_label": "Oublier mes rites",
+		"services": [{"id": &"advanced", "label": "Rites supérieurs"}, {"id": &"forget", "label": "Oublier mes rites"}],
 		"conversations": [
 			{
 				"id": &"anselme_1",
@@ -85,6 +83,14 @@ const NPCS := {
 				],
 			},
 			{
+				"id": &"anselme_sup",
+				"needs": [&"la_chapelle"],
+				"lines": [
+					"Tu as coupé la corde et donné le Repos à celui qui sonnait. Tu n'es plus un simple soldat.",
+					"Il y a des rites que je n'enseigne pas à n'importe qui. Demande-les-moi quand tu veux : je te les apprendrai, à mesure que tu les mérites.",
+				],
+			},
+			{
 				"id": &"anselme_4",
 				"needs": [&"la_chapelle"],
 				"lines": [
@@ -108,8 +114,7 @@ const NPCS := {
 	},
 	&"tibert": {
 		"name": "Tibert",
-		"service": &"bestiary",
-		"service_label": "Montrer ce que j'ai vu",
+		"services": [{"id": &"bestiary", "label": "Montrer ce que j'ai vu"}],
 		"conversations": [
 			{
 				"id": &"tibert_1",

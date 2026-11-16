@@ -95,9 +95,7 @@ func _talk(npc: Npc) -> void:
 		lines = [RefugeTexts.idle_line(npc.id, visit)]
 	else:
 		lines = conversation["lines"]
-	var actions: Array = []
-	if data["service"] != &"":
-		actions.append({"id": data["service"], "label": data["service_label"]})
+	var actions: Array = data["services"].duplicate()
 	actions.append({"id": &"leave", "label": "Partir"})
 
 	dialogue = DialogueBox.new()
@@ -112,6 +110,10 @@ func _talk(npc: Npc) -> void:
 		await shop.closed
 	elif action == &"forget":
 		await _forget_rites()
+	elif action == &"advanced":
+		advanced_screen = AdvancedRitesScreen.new()
+		add_child(advanced_screen)
+		await advanced_screen.closed
 	elif action == &"bestiary":
 		bestiary = BestiaryScreen.new()
 		add_child(bestiary)
@@ -143,6 +145,7 @@ func _forget_rites() -> void:
 var dialogue: DialogueBox
 var shop: ShopScreen
 var bestiary: BestiaryScreen
+var advanced_screen: AdvancedRitesScreen
 
 
 # --- Décor --------------------------------------------------------------------

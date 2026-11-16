@@ -70,6 +70,8 @@ var attack_speed_scale := 1.0
 var guard := 0.0
 ## Dégâts rendus à celui qui frappe le héros de près.
 var thorns := 0
+## Durée de l'esquive : la base, plus ce que les rites y ajoutent.
+var dodge_time := DODGE_TIME
 ## Ce qu'on peut faire ici sans que ce soit le Repos (parler, partir) : le
 ## niveau y met le libellé du bouton, vide quand il n'y a rien à faire.
 var interaction_label := ""
@@ -149,9 +151,9 @@ func _physics_process(delta: float) -> void:
 				else:
 					state = State.MOVE
 		State.DODGE:
-			var slowdown := 1.0 - 0.6 * (_state_time / DODGE_TIME)
+			var slowdown := 1.0 - 0.6 * (_state_time / dodge_time)
 			velocity = _dodge_direction * DODGE_SPEED * slowdown
-			if _state_time >= DODGE_TIME:
+			if _state_time >= dodge_time:
 				state = State.MOVE
 		State.HIT:
 			velocity = _knockback * (1.0 - _state_time / HIT_TIME)
@@ -232,6 +234,7 @@ func apply_stats(stats: Dictionary) -> void:
 	attack_speed_scale = float(stats.get("attack_speed", 1.0))
 	guard = float(stats.get("guard", 0.0))
 	thorns = int(stats.get("thorns", 0))
+	dodge_time = DODGE_TIME + float(stats.get("dodge_extra", 0.0))
 	var new_max := int(stats.get("max_health", max_health))
 	if new_max != max_health:
 		health = clampi(health + new_max - max_health, 1, new_max)

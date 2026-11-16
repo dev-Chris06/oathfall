@@ -176,6 +176,15 @@ func _fill_right() -> void:
 		return
 	for skill: Dictionary in Progression.skills_for(Progress.class_id):
 		page.add_child(_skill_entry(skill))
+	var known: Array[String] = []
+	for rite: Dictionary in Progression.ADVANCED:
+		if Progress.has_advanced(rite["id"]):
+			known.append(rite["name"])
+	var note := "Rites supérieurs : %s." % ", ".join(known) if not known.is_empty() \
+		else "Frère Anselme enseigne des rites supérieurs, au moulin."
+	var summary := Theatre.label(note, 18, Theatre.AMBER if not known.is_empty() else Theatre.MUTED, GameFonts.italic())
+	summary.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	page.add_child(summary)
 
 
 ## L'équipement porté : le héros qui tourne, et ce qu'on possède par emplacement.

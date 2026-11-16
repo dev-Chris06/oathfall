@@ -107,7 +107,10 @@ dernier point de reprise. L'arène d'essai reste disponible (`-- --arena`).
 **Le refuge** (`refuge.gd`) est le moulin, hors des murs : un niveau calme, sans
 mort. Maud (boutique d'**équipement** payé en or, `Gear` et `ShopScreen`), frère
 Anselme (les rites s'apprennent dans le carnet, partout ; Anselme fait
-**désapprendre** tous les rites et rend les points) et Tibert (il pose des
+**désapprendre** tous les rites et rend les points, et il est **le seul à
+enseigner les rites supérieurs**, `Progression.ADVANCED` : Garde ferme (après la
+Chapelle), Veillée (après l'Ossuaire), Élan (après la Fosse), à un seul rang,
+payés en points ; leurs bonus s'ajoutent à ceux des rites ordinaires) et Tibert (il pose des
 questions et ouvre **le bestiaire** : un portrait et une fiche par type de
 mort rencontré, `BestiaryScreen`, les inconnus restent des silhouettes). On touche PARLER près d'un personnage ; la route au sud, PARTIR,
 ramène à la carte. Leurs conversations (`RefugeTexts`) s'ouvrent à mesure que

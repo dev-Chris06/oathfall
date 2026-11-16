@@ -31,6 +31,8 @@ const BASE_STATS := {
 	"guard": 0.0,
 	# Dégâts rendus à celui qui frappe le héros de près.
 	"thorns": 0,
+	# Secondes de plus pour l'esquive (donc pour la protection qu'elle donne).
+	"dodge_extra": 0.0,
 }
 
 ## Compétences de chaque classe. Chaque rang donne la valeur finale des
@@ -75,6 +77,35 @@ const SKILLS := {
 		},
 	],
 }
+
+
+## Les rites supérieurs : frère Anselme seul les enseigne, à celui qui a
+## accompli ce qu'ils demandent (`needs` : niveaux terminés). Un seul rang ;
+## leurs bonus s'ajoutent à ceux des rites ordinaires.
+const ADVANCED := [
+	{
+		"id": &"garde_ferme", "name": "Garde ferme", "cost": 2, "needs": [&"la_chapelle"],
+		"text": "Le bouclier couvre mieux celui qui s'agenouille.",
+		"stats": {"guard": 0.15}, "effect": "Garde : −15 % de dégâts de plus au Repos",
+	},
+	{
+		"id": &"veillee", "name": "Veillée", "cost": 2, "needs": [&"l_ossuaire"],
+		"text": "Celui qui veille un mort en tire de la force.",
+		"stats": {"rest_heal": 8}, "effect": "+8 de vie par Repos",
+	},
+	{
+		"id": &"elan", "name": "Élan", "cost": 3, "needs": [&"la_fosse"],
+		"text": "Un pas de côté plus long : on reste intouchable un instant de plus.",
+		"stats": {"dodge_extra": 0.12}, "effect": "Esquive plus longue de 0,12 s",
+	},
+]
+
+
+static func find_advanced(id: StringName) -> Dictionary:
+	for rite: Dictionary in ADVANCED:
+		if rite["id"] == id:
+			return rite
+	return {}
 
 
 ## Souvenirs cumulés nécessaires pour atteindre `level`.
