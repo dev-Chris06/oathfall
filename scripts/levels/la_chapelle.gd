@@ -5,8 +5,8 @@ extends Level
 ## Un porche étroit, puis la nef et ses bancs, puis le chœur où pend la grosse
 ## cloche. Le Sonneur ne se bat presque pas : il sonne, et chaque coup relève
 ## d'un coup tous les corps sans repos. On lui répond en donnant le Repos aux
-## corps entre deux coups, ou en grimpant couper les trois cordes qui
-## retiennent la cloche (bouton GRIMPER près d'une corde, sans défense).
+## corps entre deux coups, ou en coupant les trois cordes qui
+## retiennent la cloche (bouton COUPER près d'une corde, sans défense).
 ## Tant que la cloche sonne, de nouveaux morts se couchent dans le chœur.
 ##
 ##   z =   5 … -14 : le porche               grille z = -14
@@ -136,7 +136,7 @@ func _on_boss_health(health: int, max_health: int) -> void:
 func _on_tolling_soon() -> void:
 	if _first_warning:
 		_first_warning = false
-		hud.show_message("La cloche va sonner.\nDonne le Repos aux corps, ou grimpe couper les cordes.", 5.5)
+		hud.show_message("La cloche va sonner.\nDonne le Repos aux corps, ou coupe les cordes.", 5.5)
 
 
 func _on_quaking_soon() -> void:

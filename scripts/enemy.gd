@@ -305,9 +305,7 @@ func _chase() -> void:
 		_state_time = 0.0
 		_struck = false
 		velocity = Vector3.ZERO
-		var speed := float(_type["attack_speed"])
-		var length := _once(_animation("attack"), speed)
-		_attack_duration = maxf(length / speed, float(_type["attack_windup"]) + 0.2)
+		_attack_duration = _play_attack()
 	elif distance > attack_range * 0.85:
 		velocity = _facing * float(_type["move_speed"])
 		_loop(_animation("walk"))
@@ -467,6 +465,34 @@ func _loop(anim_name: String) -> void:
 		return
 	_anim.get_animation(anim_name).loop_mode = Animation.LOOP_LINEAR
 	_anim.play(anim_name, 0.15)
+
+
+## Joue l'animation d'attaque et renvoie la durée de l'attaque. Si le type
+## donne `attack_impact` (la part de l'animation où le coup frappe), la
+## vitesse est réglée pour que le coup visible tombe juste au moment où les
+## dégâts sont appliqués (`attack_windup`) : sinon on voit le coup toucher,
+## puis les dégâts n'arrivent que plus tard, et il suffit de s'écarter entre
+## les deux.
+func _play_attack() -> float:
+	var anim_name := _animation("attack")
+	var windup := float(_type["attack_windup"])
+	if _type.has("attack_impact"):
+		return maxf(_play_blow("attack", windup, float(_type["attack_impact"])), windup + 0.2)
+	var speed := float(_type["attack_speed"])
+	var length := _once(anim_name, speed)
+	return maxf(length / speed, windup + 0.2)
+
+
+## Joue l'animation `key` de façon que son moment d'impact (la part `impact`
+## de sa durée) tombe `windup` secondes après le début. Renvoie sa durée.
+func _play_blow(key: String, windup: float, impact: float) -> float:
+	var anim_name := _animation(key)
+	if _anim == null or not _anim.has_animation(anim_name):
+		return windup + 0.2
+	var length := _anim.get_animation(anim_name).length
+	var speed := length * impact / maxf(windup, 0.05)
+	_once(anim_name, speed)
+	return length / speed
 
 
 func _once(anim_name: String, speed: float) -> float:

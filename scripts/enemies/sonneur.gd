@@ -7,7 +7,7 @@ extends Enemy
 ## intervalles, s'il y a des corps sans repos, il lève les bras : la cloche se
 ## balance (c'est le moment de réagir), puis elle sonne et relève d'un coup
 ## tous les corps. Deux réponses : donner le Repos aux corps avant le coup, ou
-## grimper couper les cordes. Chaque corde coupée espace les coups ; la
+## couper les cordes. Chaque corde coupée espace les coups ; la
 ## troisième fait tomber la cloche sur lui, ce qui lui coûte une part de sa
 ## vie et l'étourdit, et la cloche ne sonne plus.
 ##
@@ -83,9 +83,7 @@ func _chase() -> void:
 		_state_time = 0.0
 		_struck = false
 		velocity = Vector3.ZERO
-		var speed := float(_type["attack_speed"])
-		var length := _once(_animation("attack"), speed)
-		_attack_duration = maxf(length / speed, float(_type["attack_windup"]) + 0.2)
+		_attack_duration = _play_attack()
 		return
 	# Il ne poursuit personne : si on l'a repoussé, il regagne sa place.
 	var back := home - global_position
@@ -113,11 +111,8 @@ func _begin_quake() -> void:
 	_phase = Phase.QUAKE_WINDUP
 	_begin_special()
 	var windup := float(_type["quake_windup"])
-	var anim_name := _animation("quake")
-	var length := 1.2
-	if _anim != null and _anim.has_animation(anim_name):
-		length = _anim.get_animation(anim_name).length
-	_once(anim_name, length / (windup + 0.25))
+	# Le maillet touche le sol au moment où l'onde part.
+	_play_blow("quake", windup, float(_type["quake_impact"]))
 	# Un disque rouge au sol marque jusqu'où l'onde ira.
 	var radius := float(_type["quake_radius"])
 	var disc := CylinderMesh.new()

@@ -22,7 +22,7 @@ var rite_held := false
 ## Renseignés par le héros : le bouton du Repos n'apparaît que près d'un corps,
 ## et son anneau se remplit pendant le rite.
 var rite_available := false
-## Ce qu'écrit le bouton : « REPOS » près d'un corps, « GRIMPER » près d'une corde.
+## Ce qu'écrit le bouton : « REPOS » près d'un corps, « COUPER » près d'une corde.
 var rite_label := "REPOS"
 var rite_progress := 0.0
 ## Vrai quand des points de compétence attendent : le bouton du carnet luit.

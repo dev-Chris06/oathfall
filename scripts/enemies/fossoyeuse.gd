@@ -141,11 +141,11 @@ func _start_melee() -> void:
 	_attacks += 1
 	if _attacks % 3 == 0:
 		_begin(Act.SWEEP)
-		_play_fit("sweep", float(_type["sweep_windup"]) + 0.2)
+		_play_blow("sweep", float(_type["sweep_windup"]), float(_type["sweep_impact"]))
 		_show_sector(float(_type["sweep_range"]), float(_type["sweep_arc"]), Color(1.0, 0.45, 0.1, 0.3))
 	else:
 		_begin(Act.SWING)
-		_play_fit("swing", float(_type["swing_windup"]) + 0.2)
+		_play_blow("swing", float(_type["swing_windup"]), float(_type["swing_impact"]))
 		_show_sector(float(_type["swing_range"]), float(_type["swing_arc"]), Color(1.0, 0.2, 0.1, 0.35))
 	_hit_done = false
 
@@ -257,15 +257,22 @@ func _do_melee() -> void:
 			_facing = offset.normalized()
 	if _warn != null:
 		_warn.rotation.y = atan2(_facing.x, _facing.z)
+	var range_name := "sweep_range" if sweep else "swing_range"
+	var damage := int(_type["sweep_damage" if sweep else "swing_damage"])
 	if not _hit_done and _state_time >= windup:
+		# Le moment de l'impact : la pelle touche le sol à l'écran (voir
+		# `_play_blow`) et, au même instant, les dégâts sont appliqués. La
+		# zone flashe pour montrer où le coup a porté.
 		_hit_done = true
-		_clear_marker()
-		var range_name := "sweep_range" if sweep else "swing_range"
+		if _warn != null:
+			_warn.material_override.albedo_color = Color(1.0, 0.92, 0.7, 0.65)
 		if _in_arc(float(_type[range_name]), float(_type["sweep_arc" if sweep else "swing_arc"])):
-			_hurt_hero(int(_type["sweep_damage" if sweep else "swing_damage"]))
+			_hurt_hero(damage)
 		Fx.ring(get_parent(), global_position + _facing * float(_type[range_name]) * 0.55,
 			Color(0.55, 0.42, 0.28, 0.7), 3.0, 0.4)
 		shook.emit(0.8)
+	if _hit_done and _warn != null and _state_time >= windup + 0.18:
+		_clear_marker()
 	if _hit_done and _state_time >= windup + float(_type["recover"]):
 		_end_act(float(_type["attack_gap"]))
 
@@ -473,7 +480,7 @@ func _do_charge(delta: float) -> void:
 
 func _begin_throw() -> void:
 	_begin(Act.THROW_TELE)
-	_play_fit("throw", float(_type["throw_windup"]) + 0.2)
+	_play_blow("throw", float(_type["throw_windup"]), float(_type["throw_impact"]))
 	_arrache_stone()
 
 

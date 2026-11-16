@@ -1,7 +1,7 @@
 class_name BellRope
 extends Node3D
 ## Une des cordes qui retiennent la grosse cloche. Le héros ne la frappe pas :
-## il grimpe pour la couper (voir `Hero._start_climb`), en restant sans
+## il la coupe en maintenant le bouton (voir `Hero._start_cut`), en restant sans
 ## défense. Elle est dans le groupe « ropes » tant qu'elle tient.
 
 signal cut(rope: BellRope)

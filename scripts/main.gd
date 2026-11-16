@@ -57,6 +57,10 @@ func _ready() -> void:
 			direct = true
 
 	if scripted:
+		# Le hasard du jeu (monticules de la Fossoyeuse, apparitions) est fixé :
+		# un test qui réussit une fois réussit toujours, le build ne dépend pas
+		# de la chance.
+		seed(20261116)
 		# Les tests ne touchent pas à la vraie partie du joueur.
 		Progress.save_path = "user://essai.json"
 		Progress.delete_save()

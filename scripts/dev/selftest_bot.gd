@@ -216,6 +216,8 @@ func _run() -> void:
 		return
 	if not await _fossoyeuse_tests():
 		return
+	if not await _blow_alignment_tests():
+		return
 	if not await _grille_tests():
 		return
 	if not await _traverse(&"les_allees"):
@@ -475,23 +477,23 @@ func _boss_tests() -> bool:
 		return _fail("le Sonneur n'a pas été mis au repos")
 	print("test boss réussi : le Sonneur reçoit le Repos")
 
-	# Grimper : le héros qui maintient le bouton près d'une corde la coupe.
+	# Couper : le héros qui maintient le bouton près d'une corde la coupe.
 	var tower := GreatBell.new()
 	tower.position = Vector3.ZERO
 	arena.add_child(tower)
 	await get_tree().process_frame
 	var seen := [false]
 	var done := await _until(func() -> bool:
-		if arena.controls.rite_label == "GRIMPER":
+		if arena.controls.rite_label == "COUPER":
 			seen[0] = true
 		return tower.ropes_cut() == 3, 60.0)
 	if not done:
-		return _fail("le héros n'a coupé que %d corde(s) sur 3 en grimpant" % tower.ropes_cut())
+		return _fail("le héros n'a coupé que %d corde(s) sur 3 en les coupant" % tower.ropes_cut())
 	if not seen[0]:
-		return _fail("le bouton n'a jamais affiché GRIMPER près d'une corde")
+		return _fail("le bouton n'a jamais affiché COUPER près d'une corde")
 	if not await _until(func() -> bool: return tower.is_fallen, 10.0):
 		return _fail("la cloche n'est pas tombée après la troisième corde")
-	print("test boss réussi : le héros grimpe et coupe les trois cordes")
+	print("test boss réussi : le héros coupe les trois cordes")
 	tower.queue_free()
 	return true
 
@@ -660,6 +662,72 @@ func _fossoyeuse_tests() -> bool:
 	if not await _until(func() -> bool: return arena.enemies_left() == 0, 180.0):
 		return _fail("la Fossoyeuse n'a pas été mise au repos")
 	print("test fossoyeuse réussi : la Fossoyeuse reçoit le Repos")
+	return true
+
+
+## Le coup visible tombe au moment des dégâts : pour chaque geste, l'instant où
+## l'animation frappe (la part `impact` de sa durée, à la vitesse jouée) doit
+## être celui où les dégâts sont appliqués (`windup`). Sans cela, on voit le
+## coup toucher, puis les dégâts n'arrivent que plus tard.
+func _blow_alignment_tests() -> bool:
+	var arena := _level() as Arena
+	var hero := arena.hero
+	hero.heal(1000)
+	hero.global_position = Vector3(0.0, 0.0, 3.0)
+	_passive = true
+	_allow_rest = false
+
+	# Les gestes dont on déclenche l'animation à la main.
+	var boss := arena.spawn(&"fossoyeuse", Vector3(0.0, 0.0, -8.0), false) as FossoyeuseEnemy
+	var type := EnemyTypes.get_type(&"fossoyeuse")
+	boss._start_melee()
+	if not _check_blow("coup de pelle", boss, float(type["swing_windup"]), float(type["swing_impact"])):
+		return false
+	boss._attacks = 2
+	boss._start_melee()
+	if not _check_blow("balayage", boss, float(type["sweep_windup"]), float(type["sweep_impact"])):
+		return false
+	boss._begin_throw()
+	if not _check_blow("lancer de pierre", boss, float(type["throw_windup"]), float(type["throw_impact"])):
+		return false
+	boss.take_hit(hero.global_position, 100000)
+
+	var sonneur := arena.spawn(&"sonneur", Vector3(0.0, 0.0, -8.0), false) as SonneurEnemy
+	sonneur._begin_quake()
+	var sonneur_type := EnemyTypes.get_type(&"sonneur")
+	if not _check_blow("frappe sismique", sonneur, float(sonneur_type["quake_windup"]), float(sonneur_type["quake_impact"])):
+		return false
+	sonneur.take_hit(hero.global_position, 100000)
+
+	# Les morts du chapitre : on attend qu'ils arment leur coup au corps à corps.
+	for id: StringName in [&"depouille", &"porte_cloche", &"fouisseur", &"archer_creux"]:
+		var enemy := arena.spawn(id, hero.global_position + Vector3(1.3, 0.0, 0.0), false)
+		enemy._cooldown = 0.0
+		var armed := await _until(func() -> bool:
+			hero.heal(1000)
+			return enemy.state == Enemy.State.WINDUP, 20.0)
+		if not armed:
+			return _fail("%s n'a pas armé de coup au corps à corps" % id)
+		var data := EnemyTypes.get_type(id)
+		if not _check_blow(String(id), enemy, float(data["attack_windup"]), float(data["attack_impact"])):
+			return false
+		enemy.take_hit(hero.global_position, 100000)
+
+	print("test réussi : le coup visible tombe au moment des dégâts, pour tous les gestes")
+	_passive = false
+	_allow_rest = true
+	if not await _until(func() -> bool: return arena.enemies_left() == 0, 240.0):
+		return _fail("les morts de l'essai d'alignement n'ont pas été mis au repos")
+	return true
+
+
+func _check_blow(label: String, enemy: Enemy, windup: float, impact: float) -> bool:
+	var player: AnimationPlayer = enemy._anim
+	var anim := player.get_animation(player.current_animation)
+	var visible := anim.length * impact / player.get_playing_speed()
+	if absf(visible - windup) > 0.03:
+		_fail("%s : le coup frappe à %.2f s à l'écran, mais les dégâts tombent à %.2f s" % [label, visible, windup])
+		return false
 	return true
 
 

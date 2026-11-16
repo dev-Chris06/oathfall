@@ -18,6 +18,8 @@ const TYPES := {
 		"attack_windup": 0.55,
 		"attack_cooldown": 1.3,
 		"attack_speed": 1.0,
+		# Part de l'animation où le coup frappe (voir Enemy._play_attack).
+		"attack_impact": 0.40,
 		# Secondes passées au sol avant de se relever, et part de vie retrouvée.
 		"rise_delay": 20.0,
 		"rise_health": 0.6,
@@ -50,6 +52,7 @@ const TYPES := {
 		"attack_windup": 0.5,
 		"attack_cooldown": 1.5,
 		"attack_speed": 1.0,
+		"attack_impact": 0.47,
 		# Le carreau : temps de visée (la fenêtre pour esquiver), dégâts, vitesse.
 		"aim_time": 0.9,
 		"bolt_damage": 7,
@@ -88,6 +91,7 @@ const TYPES := {
 		"attack_windup": 0.8,
 		"attack_cooldown": 1.8,
 		"attack_speed": 0.9,
+		"attack_impact": 0.68,
 		# Secondes entre deux coups de cloche (visibles au sol).
 		"ring_interval": 2.6,
 		"rise_delay": 22.0,
@@ -120,9 +124,10 @@ const TYPES := {
 		"surface_time": 7.0,
 		"attack_range": 1.9,
 		"attack_damage": 9,
-		"attack_windup": 0.5,
+		"attack_windup": 0.6,
 		"attack_cooldown": 1.3,
 		"attack_speed": 1.1,
+		"attack_impact": 0.42,
 		"rise_delay": 18.0,
 		"rise_health": 0.6,
 		"memories": 7,
@@ -191,6 +196,8 @@ const TYPES := {
 		"attack_windup": 0.7,
 		"attack_cooldown": 3.0,
 		"attack_speed": 1.0,
+		"attack_impact": 0.52,
+		"quake_impact": 0.52,
 		# Secondes entre deux coups de cloche, préparation (le moment de
 		# réagir), et secondes de plus par corde coupée.
 		"toll_interval": 7.0,
@@ -256,10 +263,12 @@ const TYPES := {
 		"swing_range": 3.1,
 		"swing_arc": 70.0,
 		"swing_damage": 26,
+		"swing_impact": 0.52,
 		"sweep_windup": 1.45,
 		"sweep_range": 3.9,
 		"sweep_arc": 200.0,
 		"sweep_damage": 20,
+		"sweep_impact": 0.52,
 		"recover": 0.9,
 		"attack_gap": 0.7,
 		# Phase 2 : plongée, trajet sous terre, jaillissement (qui blesse), puis
@@ -284,6 +293,7 @@ const TYPES := {
 		"throw_flight": 1.15,
 		"throw_radius": 2.3,
 		"throw_damage": 22,
+		"throw_impact": 0.53,
 		"raise_windup": 1.5,
 		"raise_interval": 14.0,
 		"poise_time": 2.0,

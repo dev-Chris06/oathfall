@@ -111,8 +111,8 @@ l'Ossuaire sont souterrains (`underground`) : ni lune ni ombre portée.
 Le Sonneur « ne se bat presque pas : il sonne » (scénario) : il reste sous sa
 cloche, ne repousse que celui qui se colle à lui, et sonne à rythme régulier ;
 chaque coup relève tous les corps sans repos. Réponses : le Repos entre deux
-coups, ou **grimper** couper les trois cordes (maintenir le bouton, qui
-affiche alors GRIMPER, près d'une corde : 1,5 s sans défense). La troisième
+coups, ou **couper** les trois cordes (maintenir le bouton, qui affiche alors
+COUPER, près d'une corde : 1,5 s sans défense). La troisième
 corde fait tomber la cloche sur lui (35 % de sa vie, étourdi) et la cloche ne
 sonne plus. Tant qu'elle sonne, de nouveaux morts se couchent dans le chœur.
 Un boss tombé doit lui aussi recevoir le Repos.
@@ -197,6 +197,14 @@ Règles à garder :
   choisit la classe. Un comportement écrit `_chase()` et, pour ses actions
   propres, `_special()` dans l'état SPECIAL. Frapper un mort en SPECIAL
   l'interrompt.
+- **Un coup se cale sur son animation** : le coup visible doit tomber au
+  moment où les dégâts sont appliqués (`attack_windup`), sinon on voit le
+  coup toucher puis les dégâts n'arrivent que plus tard, et il suffit de
+  s'écarter entre les deux. Le type donne `attack_impact` (part de
+  l'animation où le coup frappe, mesurée sur le modèle) et `Enemy._play_attack`
+  / `_play_blow` règlent la vitesse. Un nouveau geste dangereux ajoute son
+  `*_impact` et une ligne au test d'alignement. Pas de « fenêtre d'impact »
+  après coup : elle rendrait l'esquive plus stricte.
 - **Boss** : le type porte `"boss": true` ; le niveau affiche sa barre avec
   `hud.show_boss()` / `hud.set_boss()` / `hud.hide_boss()`, alimentée par le
   signal `Enemy.health_changed`. Un boss qui ne chasse personne garde un
@@ -222,6 +230,9 @@ Règles à garder :
 - **Caractéristiques du héros** : la progression les calcule
   (`Progress.hero_stats()`) et le niveau les applique avec
   `hero.apply_stats()`. Le héros ne lit jamais `Progress` lui-même.
+- **Hasard des tests** : `Main` fixe la graine du hasard en mode test
+  (`seed(...)`) : la Fosse tire au sort ses monticules et ses Dépouilles, et un
+  test qui réussit une fois doit réussir toujours.
 - **Tests et sauvegarde** : en mode test ou capture, `Main` écrit dans
   `user://essai.json`, jamais dans la vraie sauvegarde du joueur.
 
