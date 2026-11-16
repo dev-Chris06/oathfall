@@ -1,6 +1,6 @@
 class_name Hero
 extends CharacterBody3D
-## Le héros : déplacement, enchaînement de coups et esquive.
+## Le héros : déplacement, enchaînement de coups, esquive et rite du Repos.
 ##
 ## Le modèle et les noms d'animations viennent de HeroClasses, pour que ce
 ## code reste le même quelle que soit la classe ou le pack de modèles.
@@ -8,8 +8,13 @@ extends CharacterBody3D
 ## Émis quand un coup touche au moins une cible. `heavy` vaut vrai pour le
 ## dernier coup de l'enchaînement.
 signal hit_landed(heavy: bool)
+signal health_changed(health: int, max_health: int)
+signal hurt
+signal died
+## Émis quand un mort reçoit le Repos des mains du héros.
+signal rest_given(enemy: Enemy)
 
-enum State { MOVE, ATTACK, DODGE }
+enum State { MOVE, ATTACK, DODGE, HIT, RITE, DEAD }
 
 const TURN_SPEED := 16.0
 const ATTACK_RANGE := 2.7
@@ -21,9 +26,15 @@ const RECOVERY_CUT := 0.8
 const DODGE_SPEED := 13.0
 const DODGE_TIME := 0.38
 const DODGE_COOLDOWN := 0.8
+const HIT_TIME := 0.3
+## Le rite du Repos : il faut rester près du corps, sans défense, ce temps-là.
+const RITE_RANGE := 2.3
+const RITE_TIME := 1.0
 
 var controls: TouchControls
 var state := State.MOVE
+var max_health := 100
+var health := 100
 
 var _data: Dictionary
 var _model: Node3D
@@ -36,11 +47,16 @@ var _hit_done := false
 var _attack_duration := 0.0
 var _dodge_direction := Vector3.ZERO
 var _dodge_cooldown := 0.0
+var _knockback := Vector3.ZERO
+var _rite_target: Enemy
+var _rite_progress := 0.0
 
 
 func setup(class_id: StringName, input: TouchControls) -> void:
 	_data = HeroClasses.get_class_data(class_id)
 	controls = input
+	max_health = int(_data.get("health", 100))
+	health = max_health
 
 	var shape := CollisionShape3D.new()
 	var capsule := CapsuleShape3D.new()
@@ -73,11 +89,14 @@ func _physics_process(delta: float) -> void:
 	_state_time += delta
 	_dodge_cooldown = maxf(0.0, _dodge_cooldown - delta)
 	var wish := _wish_direction()
+	var body := _nearest_body()
 
 	match state:
 		State.MOVE:
 			velocity = wish * float(_data["move_speed"])
-			if wish.length() > 0.1:
+			if controls.rite_held and body != null:
+				_start_rite(body)
+			elif wish.length() > 0.1:
 				_facing = wish.normalized()
 				_loop(_animation("run"))
 			else:
@@ -101,6 +120,19 @@ func _physics_process(delta: float) -> void:
 			velocity = _dodge_direction * DODGE_SPEED * slowdown
 			if _state_time >= DODGE_TIME:
 				state = State.MOVE
+		State.HIT:
+			velocity = _knockback * (1.0 - _state_time / HIT_TIME)
+			if _state_time >= HIT_TIME:
+				state = State.MOVE
+		State.RITE:
+			velocity = Vector3.ZERO
+			_update_rite(delta)
+		State.DEAD:
+			velocity = Vector3.ZERO
+
+	# Le bouton du Repos n'apparaît que près d'un corps.
+	controls.rite_available = state != State.DEAD and (body != null or state == State.RITE)
+	controls.rite_progress = _rite_progress if state == State.RITE else 0.0
 
 	# Les modèles regardent vers +Z.
 	var target_yaw := atan2(_facing.x, _facing.z)
@@ -111,6 +143,32 @@ func _physics_process(delta: float) -> void:
 ## Vrai pendant l'esquive : les coups ennemis ne portent pas.
 func is_dodging() -> bool:
 	return state == State.DODGE
+
+
+func is_dead() -> bool:
+	return state == State.DEAD
+
+
+func take_damage(amount: int, from: Vector3) -> void:
+	if state == State.DODGE or state == State.DEAD:
+		return
+	health = maxi(0, health - amount)
+	health_changed.emit(health, max_health)
+	hurt.emit()
+	_rite_target = null
+	_rite_progress = 0.0
+	if health == 0:
+		state = State.DEAD
+		_state_time = 0.0
+		_once(_animation("death"), 1.0)
+		died.emit()
+		return
+	var push := global_position - from
+	push.y = 0.0
+	_knockback = push.normalized() * 4.0
+	state = State.HIT
+	_state_time = 0.0
+	_once(_animation("hit"), 1.6)
 
 
 func _wish_direction() -> Vector3:
@@ -131,11 +189,15 @@ func _on_attack_pressed() -> void:
 
 
 func _on_dodge_pressed() -> void:
-	if state == State.DODGE or _dodge_cooldown > 0.0:
+	if _dodge_cooldown > 0.0:
+		return
+	if state != State.MOVE and state != State.ATTACK and state != State.RITE:
 		return
 	var wish := _wish_direction()
 	_dodge_direction = wish.normalized() if wish.length() > 0.1 else _facing
 	_facing = _dodge_direction
+	_rite_target = null
+	_rite_progress = 0.0
 	state = State.DODGE
 	_state_time = 0.0
 	_dodge_cooldown = DODGE_COOLDOWN
@@ -174,6 +236,54 @@ func _strike() -> void:
 		var attacks: Array = _data["attacks"]
 		hit_landed.emit(_combo == attacks.size() - 1)
 
+
+# --- Le Repos -----------------------------------------------------------------
+
+## Le corps à terre le plus proche, s'il est à portée du rite.
+func _nearest_body() -> Enemy:
+	var best: Enemy = null
+	var best_distance := RITE_RANGE
+	for node in get_tree().get_nodes_in_group(&"bodies"):
+		var enemy := node as Enemy
+		if enemy == null or not enemy.is_down():
+			continue
+		var distance := global_position.distance_to(enemy.body_position())
+		if distance <= best_distance:
+			best_distance = distance
+			best = enemy
+	return best
+
+
+func _start_rite(body: Enemy) -> void:
+	state = State.RITE
+	_state_time = 0.0
+	_rite_target = body
+	_rite_progress = 0.0
+	var offset := body.body_position() - global_position
+	offset.y = 0.0
+	if offset.length() > 0.2:
+		_facing = offset.normalized()
+	_loop(_animation("rite"))
+
+
+func _update_rite(delta: float) -> void:
+	# Relâcher le bouton, ou voir le mort se relever, interrompt le rite.
+	if not controls.rite_held or not is_instance_valid(_rite_target) or not _rite_target.is_down():
+		_rite_target = null
+		_rite_progress = 0.0
+		state = State.MOVE
+		return
+	_rite_progress += delta / RITE_TIME
+	if _rite_progress >= 1.0:
+		var body := _rite_target
+		_rite_target = null
+		_rite_progress = 0.0
+		state = State.MOVE
+		body.give_rest()
+		rest_given.emit(body)
+
+
+# --- Animations ---------------------------------------------------------------
 
 func _animation(key: String) -> String:
 	var names: Dictionary = _data["animations"]

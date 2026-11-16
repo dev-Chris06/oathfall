@@ -100,18 +100,19 @@ jobs:
           set -euo pipefail
           ~/godot-cache/godot --headless --path . --import
 
-      # Joue une courte démonstration sans affichage : course, enchaînement de
-      # trois coups, esquive. Le build échoue si le combat ne répond plus.
-      - name: Test automatique du combat
+      # Un joueur automatique livre un vrai combat sans affichage : il abat des
+      # morts, leur donne le Repos, vérifie qu'un corps laissé seul se relève
+      # et qu'un ennemi sait frapper. Le build échoue si l'un de ces points casse.
+      - name: Test automatique du jeu
         run: |
           set -euo pipefail
           ~/godot-cache/godot --headless --path . --fixed-fps 60 -- --selftest 2>&1 | tee selftest.log
-          if grep -E "ERROR|SCRIPT ERROR" selftest.log; then
+          if grep -E "SCRIPT ERROR|^ERROR" selftest.log; then
             echo "::error::Le test automatique a produit des erreurs."
             exit 1
           fi
-          grep -q "étape 6_fin .* coups portés 3" selftest.log || {
-            echo "::error::L'enchaînement de trois coups n'a pas porté."
+          grep -q "SELFTEST OK" selftest.log || {
+            echo "::error::Le test automatique du jeu a échoué."
             exit 1
           }
 

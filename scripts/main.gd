@@ -1,17 +1,18 @@
 extends Node3D
-## Étape 1 — salle d'entraînement.
+## Étapes 2 et 3 — l'arène du Repos.
 ##
-## Le héros se déplace, enchaîne trois coups et esquive, face à des morts
-## immobiles qui encaissent. La salle est construite par code ; elle sera
-## remplacée par les vrais niveaux.
+## Des Dépouilles attaquent par vagues. Abattues, elles restent au sol puis
+## se relèvent, sauf si le héros leur donne le Repos. Une vague n'est finie
+## que lorsque tous les morts reposent. La salle est construite par code ;
+## elle sera remplacée par les vrais niveaux.
 ##
 ## Vérification sans intervention :
+##   godot --headless --path . --fixed-fps 60 -- --selftest
 ##   godot --path . -- --capture=/chemin/vers/un/dossier
-## joue une courte démonstration, enregistre des images, puis quitte.
+
+signal wave_cleared
 
 const DUNGEON := "res://assets/kaykit/dungeon/"
-const SKELETON_MINION := "res://assets/kaykit/skeletons/Skeleton_Minion.glb"
-const SKELETON_WARRIOR := "res://assets/kaykit/skeletons/Skeleton_Warrior.glb"
 
 ## Les dalles et les murs du pack font 4 unités de côté.
 const TILE := 4.0
@@ -19,44 +20,56 @@ const COLS := 7
 const ROWS := 5
 const WALL_HEIGHT := 4.0
 
+var hero: Hero
+var controls: TouchControls
+
 var _torches: Array[OmniLight3D] = []
-var _hero: Hero
+var _enemies: Array[Enemy] = []
 var _camera: GameCamera
-var _controls: TouchControls
-var _label: Label
+var _hud: Hud
 var _time := 0.0
 var _hud_timer := 0.0
-var _hits_landed := 0
+var _wave := 0
+var _memories := 0
+var _scripted := false
 
 
 func _ready() -> void:
+	Engine.time_scale = 1.0
 	_build_environment()
 	_build_room()
 
-	_controls = TouchControls.new()
-	add_child(_controls)
+	controls = TouchControls.new()
+	add_child(controls)
 
-	_hero = Hero.new()
-	add_child(_hero)
-	_hero.setup(HeroClasses.DEFAULT, _controls)
-	_hero.hit_landed.connect(_on_hit_landed)
-
-	_spawn_target(SKELETON_WARRIOR, Vector3(0.0, 0.0, -5.0), 0.0)
-	_spawn_target(SKELETON_MINION, Vector3(-4.5, 0.0, -3.0), 40.0)
-	_spawn_target(SKELETON_MINION, Vector3(4.5, 0.0, -3.0), -40.0)
+	hero = Hero.new()
+	add_child(hero)
+	hero.setup(HeroClasses.DEFAULT, controls)
 
 	_camera = GameCamera.new()
 	add_child(_camera)
-	_camera.follow(_hero)
+	_camera.follow(hero)
 
-	_build_hud()
+	_hud = Hud.new()
+	add_child(_hud)
+	_hud.set_health(hero.health, hero.max_health)
+
+	hero.hit_landed.connect(_on_hit_landed)
+	hero.health_changed.connect(_hud.set_health)
+	hero.hurt.connect(_on_hero_hurt)
+	hero.died.connect(_on_hero_died)
 
 	for arg in OS.get_cmdline_user_args():
-		if arg.begins_with("--capture="):
-			_run_capture(arg.trim_prefix("--capture="))
-		elif arg == "--selftest":
-			# Même démonstration, sans images : utilisable sans affichage.
-			_run_capture("")
+		if arg == "--selftest" or arg.begins_with("--capture="):
+			_scripted = true
+			var bot := SelftestBot.new()
+			bot.main = self
+			bot.capture_dir = arg.trim_prefix("--capture=") if arg.begins_with("--capture=") else ""
+			add_child(bot)
+
+	if not _scripted:
+		_hud.show_message("Les morts se relèvent.\nReste près d'un corps et maintiens REPOS.", 6.0)
+		_next_wave()
 
 
 func _process(delta: float) -> void:
@@ -67,19 +80,94 @@ func _process(delta: float) -> void:
 
 	_hud_timer -= delta
 	if _hud_timer <= 0.0:
-		_hud_timer = 0.5
-		_label.text = "Oathfall %s — %d images/s" % [
+		_hud_timer = 0.25
+		_hud.set_counts(
+			get_tree().get_nodes_in_group(&"hittable").size(),
+			get_tree().get_nodes_in_group(&"bodies").size(),
+			_memories)
+		_hud.set_debug("Oathfall %s — vague %d — %d images/s" % [
 			ProjectSettings.get_setting("application/config/version", "?"),
-			Engine.get_frames_per_second()]
+			_wave, Engine.get_frames_per_second()])
 
+
+# --- Vagues -------------------------------------------------------------------
+
+## Fait entrer `count` Dépouilles. `rise_delay` remplace, s'il est positif, le
+## délai de relèvement du type (utilisé par les tests).
+func spawn_wave(count: int, rise_delay := -1.0) -> void:
+	var half_x := COLS * TILE / 2.0 - 1.5
+	var half_z := ROWS * TILE / 2.0 - 1.5
+	var start := randf() * TAU
+	for i in count:
+		var angle := start + TAU * i / count
+		var pos := hero.global_position + Vector3(cos(angle), 0.0, sin(angle)) * 8.5
+		pos.x = clampf(pos.x, -half_x, half_x)
+		pos.z = clampf(pos.z, -half_z, half_z)
+		pos.y = 0.0
+		var enemy := Enemy.new()
+		enemy.position = pos
+		add_child(enemy)
+		enemy.setup(&"depouille", hero)
+		if rise_delay > 0.0:
+			enemy.rise_delay = rise_delay
+		enemy.rested.connect(_on_enemy_rested)
+		enemy.rose.connect(_on_enemy_rose)
+		_enemies.append(enemy)
+
+
+func enemies() -> Array[Enemy]:
+	return _enemies
+
+
+func enemies_left() -> int:
+	return _enemies.size()
+
+
+func _next_wave() -> void:
+	_wave += 1
+	spawn_wave(mini(2 + _wave, 8))
+
+
+func _on_enemy_rose(_enemy: Enemy) -> void:
+	if not _scripted:
+		_hud.show_message("Il se relève.", 1.6)
+
+
+func _on_enemy_rested(enemy: Enemy) -> void:
+	_enemies.erase(enemy)
+	_memories += int(EnemyTypes.get_type(&"depouille")["memories"])
+	if not _enemies.is_empty():
+		return
+	wave_cleared.emit()
+	if _scripted:
+		return
+	_hud.show_message("La salle est en paix.", 3.0)
+	await get_tree().create_timer(3.5).timeout
+	if not hero.is_dead():
+		_next_wave()
+
+
+# --- Réactions ----------------------------------------------------------------
 
 func _on_hit_landed(heavy: bool) -> void:
-	_hits_landed += 1
 	_camera.shake(0.9 if heavy else 0.45)
 	# Bref arrêt sur image : c'est lui qui donne l'impression que le coup pèse.
 	Engine.time_scale = 0.08
 	await get_tree().create_timer(0.09 if heavy else 0.05, true, false, true).timeout
 	Engine.time_scale = 1.0
+
+
+func _on_hero_hurt() -> void:
+	_camera.shake(0.7)
+	_hud.flash_damage()
+
+
+func _on_hero_died() -> void:
+	if _scripted:
+		return
+	_hud.show_message("Nul ne meurt en Orvana.\nTu te relèves.", 3.5)
+	await get_tree().create_timer(4.0, true, false, true).timeout
+	get_tree().reload_current_scene()
 
 
 # --- Ambiance -----------------------------------------------------------------
@@ -143,7 +231,7 @@ func _build_room() -> void:
 	_add_torch(Vector3(-half_x, 2.3, 2.0), 90.0)
 	_add_torch(Vector3(half_x, 2.3, 2.0), -90.0)
 
-	# Murs invisibles : le héros ne sort pas de la salle.
+	# Murs invisibles : personne ne sort de la salle.
 	var bounds := StaticBody3D.new()
 	add_child(bounds)
 	_add_wall_collider(bounds, Vector3(0.0, 0.0, -half_z - 0.5), Vector3(COLS * TILE + 2.0, WALL_HEIGHT, 1.0))
@@ -184,76 +272,3 @@ func _place(file: String, pos: Vector3, yaw_deg := 0.0) -> Node3D:
 	node.rotation_degrees.y = yaw_deg
 	add_child(node)
 	return node
-
-
-func _spawn_target(model_path: String, pos: Vector3, yaw_deg: float) -> void:
-	var target := TrainingTarget.new()
-	target.position = pos
-	target.rotation_degrees.y = yaw_deg
-	add_child(target)
-	target.setup(model_path, "Idle_Combat")
-
-
-# --- Affichage ----------------------------------------------------------------
-
-func _build_hud() -> void:
-	var layer := CanvasLayer.new()
-	add_child(layer)
-	_label = Label.new()
-	_label.position = Vector2(20.0, 14.0)
-	_label.add_theme_font_size_override("font_size", 16)
-	_label.add_theme_color_override("font_color", Color(1.0, 0.92, 0.75, 0.8))
-	_label.add_theme_color_override("font_outline_color", Color.BLACK)
-	_label.add_theme_constant_override("outline_size", 5)
-	layer.add_child(_label)
-
-
-# --- Démonstration enregistrée ------------------------------------------------
-
-func _run_capture(dir: String) -> void:
-	await _wait(1.0)
-	await _snapshot(dir, "1_repos")
-
-	# Course vers la cible du fond.
-	_controls.simulated_move = Vector2(0.0, -1.0)
-	await _wait(0.45)
-	await _snapshot(dir, "2_course")
-	await _wait(0.2)
-	_controls.simulated_move = Vector2.ZERO
-
-	# Enchaînement de trois coups.
-	_controls.press_attack()
-	await _wait(0.2)
-	await _snapshot(dir, "3_coup_1")
-	_controls.press_attack()
-	await _wait(0.45)
-	_controls.press_attack()
-	await _wait(0.55)
-	await _snapshot(dir, "4_coup_3")
-	await _wait(0.8)
-
-	# Esquive vers la droite.
-	_controls.simulated_move = Vector2(1.0, 0.3)
-	await _wait(0.05)
-	_controls.press_dodge()
-	await _wait(0.2)
-	await _snapshot(dir, "5_esquive")
-	_controls.simulated_move = Vector2.ZERO
-	await _wait(0.6)
-	await _snapshot(dir, "6_fin")
-	get_tree().quit()
-
-
-func _wait(seconds: float) -> void:
-	await get_tree().create_timer(seconds).timeout
-
-
-func _snapshot(dir: String, shot_name: String) -> void:
-	var saved := "sans image"
-	if not dir.is_empty():
-		await RenderingServer.frame_post_draw
-		var image := get_viewport().get_texture().get_image()
-		saved = error_string(image.save_png("%s/%s.png" % [dir, shot_name]))
-	print("étape %s : %s — héros en %s, état %s, coups portés %d, vitesse du temps %.2f" % [
-		shot_name, saved, _hero.global_position.snapped(Vector3.ONE * 0.1),
-		Hero.State.keys()[_hero.state], _hits_landed, Engine.time_scale])
