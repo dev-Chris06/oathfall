@@ -244,6 +244,8 @@ func _run() -> void:
 		return
 	if not await _traverse(&"la_fosse"):
 		return
+	if not await _traverse(&"la_porte_des_halles"):
+		return
 	if not await _map_tests():
 		return
 	if not await _refuge_tests():

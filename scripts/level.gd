@@ -438,6 +438,45 @@ func pave(file: String, cells: Array[Vector2]) -> void:
 	model.free()
 
 
+## Un étal de marché : table, quatre poteaux et une toile tendue de travers.
+## Le côté qui sert regarde vers +Z avant rotation de `yaw_deg`.
+func stall(pos: Vector3, yaw_deg: float, cloth: Color) -> void:
+	var root := Node3D.new()
+	root.position = pos
+	root.rotation_degrees.y = yaw_deg
+	add_child(root)
+	var wood := Fx.flat(Color(0.2, 0.14, 0.1), 0.0, 0.9)
+	var parts := [
+		[Vector3(2.6, 0.12, 1.1), Vector3(0.0, 0.9, 0.0), wood],
+		[Vector3(2.4, 0.9, 0.12), Vector3(0.0, 0.45, -0.4), wood],
+		[Vector3(0.14, 2.5, 0.14), Vector3(-1.3, 1.25, -0.55), wood],
+		[Vector3(0.14, 2.5, 0.14), Vector3(1.3, 1.25, -0.55), wood],
+		[Vector3(0.14, 2.0, 0.14), Vector3(-1.3, 1.0, 0.6), wood],
+		[Vector3(0.14, 2.0, 0.14), Vector3(1.3, 1.0, 0.6), wood],
+	]
+	for part: Array in parts:
+		var piece := MeshInstance3D.new()
+		var box := BoxMesh.new()
+		box.size = part[0]
+		piece.mesh = box
+		piece.position = part[1]
+		piece.material_override = part[2]
+		root.add_child(piece)
+	var awning := MeshInstance3D.new()
+	var sheet := BoxMesh.new()
+	sheet.size = Vector3(3.0, 0.06, 2.0)
+	awning.mesh = sheet
+	awning.position = Vector3(0.0, 2.3, 0.0)
+	awning.rotation_degrees.x = 11.0
+	awning.material_override = Fx.flat(cloth, 0.0, 1.0)
+	root.add_child(awning)
+	var crate := place("barrel_small_stack.glb", pos + Vector3(0.0, 1.0, 0.0), yaw_deg)
+	if crate != null:
+		crate.scale = Vector3.ONE * 0.45
+	var footprint := Vector3(2.6, 1.0, 1.2) if absf(fmod(yaw_deg, 180.0)) < 45.0 else Vector3(1.2, 1.0, 2.6)
+	solid(pos, footprint)
+
+
 ## Ajoute un obstacle invisible. `size.y` vaut par défaut la hauteur d'un mur.
 func solid(center: Vector3, size: Vector3, yaw_deg := 0.0) -> CollisionShape3D:
 	var shape := CollisionShape3D.new()

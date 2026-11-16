@@ -200,6 +200,7 @@ Retour de l'auteur encore attendu : les sensations de combat sur téléphone
 | `scripts/levels/la_chapelle.gd` | Niveau 3 : porche, nef, chœur, combat du Sonneur |
 | `scripts/levels/l_ossuaire.gd` | Niveau 4 : couloirs et salles, Fouisseur, Veuve |
 | `scripts/levels/la_fosse.gd` | Niveau 5 : le chemin, la fosse ronde, la Fossoyeuse |
+| `scripts/levels/la_porte_des_halles.gd` | Niveau 6 (chapitre II, « Le Marché aux absents ») : place de marché, étals (`Level.stall()`), trois parties. Les niveaux 7 à 10 du chapitre sont déclarés dans `WorldData.CHAPTER_2` mais pas encore construits : Étals (Boucher, Crieur), Balance (boss : le Peseur), Caves, Halle du Prévôt (boss) |
 | `scripts/levels/refuge.gd`, `npc.gd` | Le moulin et ses personnages |
 | `scripts/data/refuge_texts.gd`, `gear.gd` | Conversations du refuge ; équipement (objets, effets, `Gear.apply`) |
 | `scripts/dev/portrait_tool.gd` | Fabrique les portraits du bestiaire (`-- --portraits`), rendus des vrais modèles |
