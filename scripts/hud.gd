@@ -43,10 +43,10 @@ func _ready() -> void:
 	_debug.position = Vector2(24.0, 78.0)
 
 	_message = _make_label(30, Color(1.0, 0.93, 0.78))
-	_message.set_anchors_preset(Control.PRESET_CENTER_TOP)
-	_message.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	# Toute la largeur de l'écran : le texte se centre quelle que soit sa longueur.
+	_message.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
+	_message.offset_top = 110.0
 	_message.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_message.position.y = 110.0
 	_message.modulate.a = 0.0
 
 

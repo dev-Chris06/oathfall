@@ -80,18 +80,19 @@ apprendre les compétences et quelques personnages à qui parler.
 | 1. Le héros : déplacement, enchaînement, esquive, commandes tactiles | Fait |
 | 2. La Dépouille | Fait |
 | 3. Le Repos | Fait |
-| 4. Niveau 1, La Grille : décor, vagues scénarisées, fin de niveau | **À faire, c'est la suite** |
-| 5. Progression : souvenirs, niveaux du héros, or, compétences, sauvegarde | À faire |
+| 4. Niveau 1, La Grille : décor, vagues scénarisées, fin de niveau | Fait |
+| 5. Progression : souvenirs, niveaux du héros, or, compétences, sauvegarde | **À faire, c'est la suite** |
 | 6. Niveaux 2 et 4, et les quatre autres morts | À faire |
 | 7. Niveau 3 : le Sonneur | À faire |
 | 8. Niveau 5 : la Fossoyeuse | À faire |
 | 9. Le refuge, le menu, le texte d'ouverture | À faire |
 | 10. Finition : sons, musique, équilibrage, icône, APK signé | À faire |
 
-L'état actuel du jeu est une arène : des Dépouilles arrivent par vagues, et
-une vague n'est finie que lorsque tous les morts reposent. `scripts/main.gd`
-construit encore la salle par code ; l'étape 4 doit le remplacer par un vrai
-système de niveaux.
+Le jeu s'ouvre sur la Grille : trois cours séparées par des grilles, chacune
+ouverte quand ses morts reposent, puis la sortie derrière le caveau. Le
+héros qui tombe se relève au dernier point de reprise, avec les souvenirs
+qu'il y portait. La fin du niveau affiche un bilan puis relance la Grille,
+en attendant les Allées. L'arène d'essai reste disponible (`-- --arena`).
 
 Retour de l'auteur encore attendu : les sensations de combat sur téléphone
 (poids des coups, vitesse, difficulté, confort des boutons).
@@ -100,7 +101,10 @@ Retour de l'auteur encore attendu : les sensations de combat sur téléphone
 
 | Fichier | Rôle |
 |---|---|
-| `scripts/main.gd` | L'arène : décor, vagues, liaison entre les éléments |
+| `scripts/main.gd` | Point d'entrée : charge les niveaux, points de reprise |
+| `scripts/level.gd` | Base des niveaux : héros, caméra, HUD, apparition des morts, outils de scénario (`say`, `reach`, `until_peace`, `wait`) |
+| `scripts/levels/la_grille.gd` | Niveau 1 : décor, grilles, scénario |
+| `scripts/levels/arena.gd` | Salle d'essai, utilisée par le test automatique |
 | `scripts/hero.gd` | Le héros : états MOVE, ATTACK, DODGE, HIT, RITE, DEAD |
 | `scripts/enemy.gd` | Un mort : CHASE, WINDUP, STAGGER, DOWN, RISING, RESTED |
 | `scripts/touch_controls.gd` | Joystick, boutons tactiles, clavier |
@@ -119,6 +123,16 @@ Règles à garder :
   corps au sol.
 - **Les modèles regardent vers +Z.** L'orientation se calcule avec
   `atan2(direction.x, direction.z)`.
+- **Un niveau** hérite de `Level` et écrit `_build()` (décor),
+  `_run(point_de_reprise)` (scénario) et `_checkpoint_position()`. Il signale
+  `completed`, `failed` et `checkpoint_reached` ; `Main` fait le reste. Le
+  niveau avance vers -Z, dos à la caméra. Il fixe `objective` quand le héros
+  doit rejoindre un point : le joueur automatique s'en sert.
+- **Scénarios** : attendre avec `wait()` ou `wait_until()` du niveau, jamais
+  avec un minuteur de l'arbre, pour que tout s'arrête si le niveau est
+  rechargé.
+- **Sol** : `pave()` dessine tous les carreaux en un seul appel. Ne pas
+  poser les carreaux un par un.
 - **Entrées** : le jeu ne lit que `TouchControls.move`, `rite_held` et les
   signaux `attack_pressed` et `dodge_pressed`.
 
@@ -130,11 +144,14 @@ Godot 4.7.2 est installé et accessible par la commande `godot`.
 # Réimporter après un ajout de fichiers
 godot --headless --path . --import
 
-# Test automatique : un joueur automatique livre un vrai combat
+# Test automatique : combats d'essai dans l'arène, puis traversée de la
+# Grille, avec une chute volontaire pour vérifier la reprise
 godot --headless --path . --fixed-fps 60 -- --selftest
 
 # Voir le rendu : ouvre une fenêtre, enregistre des images, puis quitte
 godot --path . --resolution 1280x720 -- --capture=/chemin/vers/un/dossier
+# … en commençant à un point de reprise
+godot --path . --resolution 1280x720 -- --capture=/chemin --checkpoint=2
 ```
 
 - Le test doit se terminer par `SELFTEST OK`. Il est aussi exécuté par le

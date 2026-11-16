@@ -11,6 +11,7 @@ dépôt.
 | KayKit : Adventurers Character Pack 1.0 | Kay Lousberg | CC0 1.0 | https://github.com/KayKit-Game-Assets/KayKit-Character-Pack-Adventures-1.0 | `assets/kaykit/adventurers/` |
 | KayKit Character Pack : Skeletons 1.0 | Kay Lousberg | CC0 1.0 | https://github.com/KayKit-Game-Assets/KayKit-Character-Pack-Skeletons-1.0 | `assets/kaykit/skeletons/` |
 | KayKit : Dungeon Remastered 1.0 | Kay Lousberg | CC0 1.0 | https://github.com/KayKit-Game-Assets/KayKit-Dungeon-Remastered-1.0 | `assets/kaykit/dungeon/` |
+| KayKit : Halloween Bits 1.0 | Kay Lousberg | CC0 1.0 | https://github.com/KayKit-Game-Assets/KayKit-Halloween-Bits-1.0 | `assets/kaykit/halloween/` |
 
 Le texte de licence de chaque pack est conservé à côté de ses fichiers
 (`LICENSE.txt`). La licence CC0 n'impose pas de crédit ; Kay Lousberg

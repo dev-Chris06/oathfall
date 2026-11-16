@@ -38,6 +38,8 @@ var _attack_duration := 0.0
 var _knockback := Vector3.ZERO
 var _down_time := 0.0
 var _rise_duration := 0.0
+## Vrai pendant la première sortie de terre : le mort garde alors toute sa vie.
+var _emerging := false
 
 
 func setup(type_id: StringName, hero: Hero) -> void:
@@ -125,6 +127,11 @@ func body_position() -> Vector3:
 ## Vrai tant que le corps gît et peut recevoir le Repos.
 func is_down() -> bool:
 	return state == State.DOWN
+
+
+## Souvenirs rendus au héros quand ce mort reçoit le Repos.
+func memories_given() -> int:
+	return int(_type["memories"])
 
 
 ## Part du délai déjà écoulée avant le relèvement, de 0 à 1.
@@ -235,12 +242,24 @@ func _start_rising() -> void:
 	_rise_duration = length if length > 0.0 else 1.0
 
 
+## Fait sortir le mort de sa tombe : il se dresse avant d'attaquer, et ne
+## compte pas comme un mort relevé.
+func emerge() -> void:
+	remove_from_group(&"hittable")
+	_shape.set_deferred("disabled", true)
+	_emerging = true
+	_start_rising()
+
+
 func _finish_rising() -> void:
-	health = int(ceil(float(_type["health"]) * float(_type["rise_health"])))
 	state = State.CHASE
 	_cooldown = 0.6
 	_shape.set_deferred("disabled", false)
 	add_to_group(&"hittable")
+	if _emerging:
+		_emerging = false
+		return
+	health = int(ceil(float(_type["health"]) * float(_type["rise_health"])))
 	rose.emit(self)
 
 
