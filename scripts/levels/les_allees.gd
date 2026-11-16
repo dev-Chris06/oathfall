@@ -21,8 +21,7 @@ const EXIT := Vector3(0.0, 0.0, -77.0)
 
 func _init() -> void:
 	title = "Les Allées"
-	# La Chapelle des cendres (niveau 3) viendra s'intercaler ici.
-	next_level = &"l_ossuaire"
+	next_level = &"la_chapelle"
 
 
 func _checkpoint_position(index: int) -> Vector3:

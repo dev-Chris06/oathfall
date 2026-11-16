@@ -9,6 +9,8 @@ extends CharacterBody3D
 signal fell(enemy: Enemy)
 signal rose(enemy: Enemy)
 signal rested(enemy: Enemy)
+## La vie du mort change (barre du boss).
+signal health_changed(health: int, max_health: int)
 
 enum State { CHASE, WINDUP, STAGGER, DOWN, RISING, RESTED, SPECIAL }
 
@@ -19,6 +21,7 @@ const BEHAVIORS := {
 	"bell": "res://scripts/enemies/bell_ringer.gd",
 	"burrower": "res://scripts/enemies/burrower.gd",
 	"widow": "res://scripts/enemies/widow.gd",
+	"sonneur": "res://scripts/enemies/sonneur.gd",
 }
 ## Portée et force des cloches : chaque Porte-cloche debout dans ce rayon
 ## ajoute `BELL_BOOST` à la vitesse de relèvement d'un corps.
@@ -211,6 +214,7 @@ func take_hit(from: Vector3, damage: int) -> void:
 	if state == State.DOWN or state == State.RISING or state == State.RESTED:
 		return
 	health -= damage
+	health_changed.emit(health, int(_type["health"]))
 	var push := global_position - from
 	push.y = 0.0
 	_knockback = push.normalized() * 5.0
@@ -366,6 +370,7 @@ func _finish_rising() -> void:
 		_emerging = false
 		return
 	health = int(ceil(float(_type["health"]) * float(_type["rise_health"])))
+	health_changed.emit(health, int(_type["health"]))
 	rose.emit(self)
 
 

@@ -22,6 +22,8 @@ var rite_held := false
 ## Renseignés par le héros : le bouton du Repos n'apparaît que près d'un corps,
 ## et son anneau se remplit pendant le rite.
 var rite_available := false
+## Ce qu'écrit le bouton : « REPOS » près d'un corps, « GRIMPER » près d'une corde.
+var rite_label := "REPOS"
 var rite_progress := 0.0
 ## Vrai quand des points de compétence attendent : le bouton du carnet luit.
 var book_alert := false
@@ -155,7 +157,7 @@ func _draw_pad() -> void:
 	if rite_available:
 		var center := _rite_center()
 		var held := 1.0 if rite_held else 0.0
-		_draw_button(center, RITE_RADIUS, Color(0.6, 0.82, 1.0), held * 0.6, "REPOS", font)
+		_draw_button(center, RITE_RADIUS, Color(0.6, 0.82, 1.0), held * 0.6, rite_label, font)
 		if rite_progress > 0.0:
 			_pad.draw_arc(center, RITE_RADIUS + 9.0, -PI / 2.0, -PI / 2.0 + TAU * rite_progress,
 				48, Color(0.85, 0.95, 1.0, 0.95), 7.0, true)

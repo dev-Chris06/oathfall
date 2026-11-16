@@ -78,6 +78,16 @@ func _physics_process(delta: float) -> void:
 		_avoid_obstacles(hero, controls, delta)
 		return
 
+	var rope := _nearest(&"ropes", hero) as BellRope
+	if rope != null and _allow_rest and hero.global_position.distance_to(rope.global_position) < 14.0:
+		var to_rope := rope.global_position - hero.global_position
+		if Vector2(to_rope.x, to_rope.z).length() > 1.6:
+			controls.simulated_move = Vector2(to_rope.x, to_rope.z).normalized()
+			_avoid_obstacles(hero, controls, delta)
+		else:
+			controls.simulated_rite = true
+		return
+
 	var body := _nearest(&"bodies", hero) as Enemy if _allow_rest else null
 	if body != null:
 		var offset := body.body_position() - hero.global_position
@@ -106,7 +116,7 @@ func _dodge_if_needed(level: Level, hero: Hero, controls: TouchControls) -> void
 		elif enemy is Burrower and enemy.state == Enemy.State.SPECIAL:
 			threat = enemy._phase == Burrower.Phase.WARNING and enemy._state_time > 0.35
 		elif enemy.state == Enemy.State.WINDUP and not enemy._struck:
-			var close := enemy.global_position.distance_to(hero.global_position) < 2.6
+			var close := enemy.global_position.distance_to(hero.global_position) < maxf(2.6, float(enemy._type["attack_range"]) + 0.4)
 			threat = close and enemy._state_time > float(enemy._type["attack_windup"]) - 0.25 \
 				and enemy.get_instance_id() % 2 == 0
 		if threat:
@@ -141,10 +151,14 @@ func _avoid_obstacles(hero: Hero, controls: TouchControls, delta: float) -> void
 ## Veuve passent avant les Dépouilles, s'ils ne sont pas trop loin.
 func _choose_target(hero: Hero) -> Node3D:
 	var best: Node3D = null
+	var boss: Enemy = null
 	var best_score := INF
 	for node in get_tree().get_nodes_in_group(&"hittable"):
 		var enemy := node as Enemy
 		if enemy == null:
+			continue
+		if enemy is SonneurEnemy:
+			boss = enemy
 			continue
 		var score := hero.global_position.distance_to(enemy.global_position)
 		if enemy is ArcherEnemy or enemy is BellRinger or enemy is Widow:
@@ -152,6 +166,11 @@ func _choose_target(hero: Hero) -> Node3D:
 		if score < best_score:
 			best_score = score
 			best = enemy
+	# Le Sonneur ne se bat presque pas : on l'attaque quand il n'y a plus de
+	# corps à mettre au repos ni de corde à couper.
+	if best == null and boss != null and get_tree().get_nodes_in_group(&"bodies").is_empty() \
+			and get_tree().get_nodes_in_group(&"ropes").is_empty():
+		best = boss
 	return best
 
 
@@ -176,9 +195,13 @@ func _run() -> void:
 		return
 	if not await _bestiary_tests():
 		return
+	if not await _boss_tests():
+		return
 	if not await _grille_tests():
 		return
 	if not await _traverse(&"les_allees"):
+		return
+	if not await _traverse(&"la_chapelle"):
 		return
 	if not await _traverse(&"l_ossuaire"):
 		return
@@ -368,6 +391,90 @@ func _bestiary_tests() -> bool:
 	return true
 
 
+## Le Sonneur : son coup de cloche relève les corps, couper les cordes fait
+## tomber la cloche sur lui.
+func _boss_tests() -> bool:
+	var arena := _level() as Arena
+	var hero := arena.hero
+	hero.heal(1000)
+	hero.global_position = Vector3(0.0, 0.0, 3.0)
+	_passive = true
+	_allow_rest = false
+
+	var body := arena.spawn(&"depouille", Vector3(5.0, 0.0, 3.0), false)
+	body.take_hit(hero.global_position, 1000)
+	var sonneur := arena.spawn(&"sonneur", Vector3(0.0, 0.0, -7.0), false) as SonneurEnemy
+	var tolls := [-1]
+	sonneur.tolled.connect(func(raised: int) -> void: tolls[0] = raised)
+	if not await _until(func() -> bool: return tolls[0] >= 0, 60.0):
+		return _fail("le Sonneur n'a pas sonné la cloche")
+	if tolls[0] < 1:
+		return _fail("le coup de cloche n'a relevé aucun corps")
+	if body.state != Enemy.State.RISING and body.state != Enemy.State.CHASE:
+		return _fail("le corps ne se relève pas au coup de cloche (état %d)" % body.state)
+	print("test boss réussi : le coup de cloche relève %d corps" % tolls[0])
+
+	# Les trois cordes coupées : la cloche tombe, le boss perd 35 % et s'étourdit.
+	var bell := GreatBell.new()
+	bell.position = Vector3(0.0, 0.0, -2.0)
+	arena.add_child(bell)
+	await get_tree().process_frame
+	bell.rope_cut.connect(func(remaining: int) -> void: sonneur.on_rope_cut(bell.ropes.size() - remaining))
+	var fallen := [false]
+	bell.fell.connect(func() -> void:
+		sonneur.bell_fell()
+		fallen[0] = true)
+	var before := sonneur.health
+	for rope in bell.ropes:
+		rope.cut_now()
+	if bell.ropes_cut() != 3:
+		return _fail("les cordes n'ont pas cédé (%d sur 3)" % bell.ropes_cut())
+	if not await _until(func() -> bool: return fallen[0], 10.0):
+		return _fail("la cloche n'est pas tombée")
+	var lost := before - sonneur.health
+	var expected := int(320.0 * 0.35)
+	if absi(lost - expected) > 1:
+		return _fail("la cloche a coûté %d points au Sonneur au lieu de %d" % [lost, expected])
+	if sonneur.state != Enemy.State.SPECIAL:
+		return _fail("le Sonneur n'est pas étourdi par la chute")
+	var type := EnemyTypes.get_type(&"sonneur")
+	var wanted := float(type["toll_interval"]) + 3.0 * float(type["toll_rope_delay"])
+	if absf(sonneur.toll_interval() - wanted) > 0.01:
+		return _fail("les cordes coupées espacent les coups de %.1f s au lieu de %.1f s" % [sonneur.toll_interval(), wanted])
+	print("test boss réussi : la cloche tombée coûte %d points au Sonneur" % lost)
+
+	# Le boss tombe : il faut aussi lui donner le Repos.
+	bell.queue_free()
+	_passive = false
+	_allow_rest = true
+	sonneur.take_hit(hero.global_position, 100000)
+	if not sonneur.is_down():
+		return _fail("le Sonneur vaincu ne tombe pas")
+	if not await _until(func() -> bool: return arena.enemies_left() == 0, 120.0):
+		return _fail("le Sonneur n'a pas été mis au repos")
+	print("test boss réussi : le Sonneur reçoit le Repos")
+
+	# Grimper : le héros qui maintient le bouton près d'une corde la coupe.
+	var tower := GreatBell.new()
+	tower.position = Vector3.ZERO
+	arena.add_child(tower)
+	await get_tree().process_frame
+	var seen := [false]
+	var done := await _until(func() -> bool:
+		if arena.controls.rite_label == "GRIMPER":
+			seen[0] = true
+		return tower.ropes_cut() == 3, 60.0)
+	if not done:
+		return _fail("le héros n'a coupé que %d corde(s) sur 3 en grimpant" % tower.ropes_cut())
+	if not seen[0]:
+		return _fail("le bouton n'a jamais affiché GRIMPER près d'une corde")
+	if not await _until(func() -> bool: return tower.is_fallen, 10.0):
+		return _fail("la cloche n'est pas tombée après la troisième corde")
+	print("test boss réussi : le héros grimpe et coupe les trois cordes")
+	tower.queue_free()
+	return true
+
+
 func _grille_tests() -> bool:
 	main.load_level(&"la_grille")
 	_watch(_level())
@@ -457,10 +564,15 @@ func _map_tests() -> bool:
 	if map.state_of(&"la_grille") != "fait" or map.state_of(&"les_allees") != "ici":
 		return _fail("la Grille faite ne fait pas passer aux Allées")
 	Progress.mark_completed(&"les_allees")
-	# La Chapelle n'est pas construite : le prochain niveau est l'Ossuaire.
-	if map.state_of(&"la_chapelle") != "ferme" or map.state_of(&"l_ossuaire") != "ici":
-		return _fail("la Chapelle absente n'est pas sautée (%s, %s)" % [
-			map.state_of(&"la_chapelle"), map.state_of(&"l_ossuaire")])
+	# La Chapelle vient après les Allées ; la Fosse n'est pas construite.
+	if map.state_of(&"la_chapelle") != "ici" or map.state_of(&"l_ossuaire") != "ouvert" \
+			or map.state_of(&"la_fosse") != "ferme":
+		return _fail("états après les Allées : %s, %s, %s" % [
+			map.state_of(&"la_chapelle"), map.state_of(&"l_ossuaire"), map.state_of(&"la_fosse")])
+	Progress.mark_completed(&"la_chapelle")
+	if map.state_of(&"l_ossuaire") != "ici":
+		return _fail("l'Ossuaire ne devient pas le prochain niveau après la Chapelle")
+	Progress.completed.erase("la_chapelle")
 
 	# La progression terminée survit à la sauvegarde.
 	Progress.save()
@@ -475,7 +587,7 @@ func _map_tests() -> bool:
 	# Un niveau non construit ne s'ouvre pas ; un niveau construit, si.
 	var chosen := [&""]
 	map.level_chosen.connect(func(id: StringName) -> void: chosen[0] = id)
-	map.select_level(&"la_chapelle")
+	map.select_level(&"la_fosse")
 	map.enter_selected()
 	await get_tree().process_frame
 	if chosen[0] != &"" or main.level != null:

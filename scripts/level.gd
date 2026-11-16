@@ -109,9 +109,7 @@ func _process(delta: float) -> void:
 	_hud_timer -= delta
 	if _hud_timer <= 0.0:
 		_hud_timer = 0.25
-		hud.set_counts(
-			get_tree().get_nodes_in_group(&"hittable").size(),
-			get_tree().get_nodes_in_group(&"bodies").size())
+		hud.set_counts(standing_count(), get_tree().get_nodes_in_group(&"bodies").size())
 		hud.set_debug("Oathfall %s — %s — %d images/s" % [
 			ProjectSettings.get_setting("application/config/version", "?"),
 			title, Engine.get_frames_per_second()])
@@ -323,6 +321,11 @@ func _on_hit_landed(heavy: bool) -> void:
 	Engine.time_scale = 1.0
 
 
+## Secoue la caméra (coup de cloche, chute).
+func shake(amount: float) -> void:
+	_camera.shake(amount)
+
+
 func _on_hero_hurt() -> void:
 	_camera.shake(0.7)
 	hud.flash_damage()
@@ -423,6 +426,13 @@ func solid(center: Vector3, size: Vector3) -> CollisionShape3D:
 	shape.position = Vector3(center.x, size.y / 2.0, center.z)
 	_solids.add_child(shape)
 	return shape
+
+
+## Une torche accrochée au mur, tournée de `yaw_deg`, et sa flamme.
+func wall_torch(pos: Vector3, yaw_deg: float, energy := 2.8, reach_range := 12.0) -> void:
+	place("torch_mounted.glb", pos, yaw_deg)
+	var forward := Vector3(0.0, 0.0, 1.0).rotated(Vector3.UP, deg_to_rad(yaw_deg))
+	flame(pos + forward * 0.7 + Vector3(0.0, 0.6, 0.0), energy, reach_range)
 
 
 ## Une flamme qui vacille.

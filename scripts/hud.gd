@@ -12,6 +12,9 @@ var _message: Label
 var _debug: Label
 var _message_time := 0.0
 var _flash: ColorRect
+var _boss_box: Control
+var _boss_fill: ColorRect
+var _boss_label: Label
 
 
 func _ready() -> void:
@@ -68,6 +71,55 @@ func _ready() -> void:
 	_message.offset_top = 110.0
 	_message.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_message.modulate.a = 0.0
+	_build_boss_bar()
+
+
+## La barre du boss, en haut au centre : nom, puis vie.
+func _build_boss_bar() -> void:
+	_boss_box = Control.new()
+	_boss_box.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_boss_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_boss_box.visible = false
+	add_child(_boss_box)
+	var width := 520.0
+	var back := ColorRect.new()
+	back.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	back.offset_left = -width / 2.0 - 3.0
+	back.offset_right = width / 2.0 + 3.0
+	back.offset_top = 46.0
+	back.offset_bottom = 68.0
+	back.color = Color(0.0, 0.0, 0.0, 0.7)
+	back.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_boss_box.add_child(back)
+	_boss_fill = ColorRect.new()
+	_boss_fill.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	_boss_fill.offset_left = -width / 2.0
+	_boss_fill.offset_right = width / 2.0
+	_boss_fill.offset_top = 49.0
+	_boss_fill.offset_bottom = 65.0
+	_boss_fill.color = Color(0.55, 0.28, 0.1)
+	_boss_fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_boss_box.add_child(_boss_fill)
+	_boss_label = _make_label(24, Color(0.95, 0.85, 0.65))
+	_boss_label.reparent(_boss_box)
+	_boss_label.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
+	_boss_label.offset_top = 14.0
+	_boss_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+
+
+func show_boss(boss_name: String, health: int, max_health: int) -> void:
+	_boss_label.text = boss_name
+	_boss_box.visible = true
+	set_boss(health, max_health)
+
+
+func set_boss(health: int, max_health: int) -> void:
+	var ratio := clampf(float(health) / float(maxi(max_health, 1)), 0.0, 1.0)
+	_boss_fill.offset_right = -260.0 + 520.0 * ratio
+
+
+func hide_boss() -> void:
+	_boss_box.visible = false
 
 
 func _process(delta: float) -> void:

@@ -83,17 +83,17 @@ apprendre les compétences et quelques personnages à qui parler.
 | 4. Niveau 1, La Grille : décor, vagues scénarisées, fin de niveau | Fait |
 | 5. Progression : souvenirs, niveaux du héros, or, compétences, sauvegarde | Fait |
 | 6. Niveaux 2 et 4, et les quatre autres morts | Fait |
-| 7. Niveau 3 : le Sonneur | **À faire, c'est la suite** |
-| 8. Niveau 5 : la Fossoyeuse | À faire |
+| 7. Niveau 3 : le Sonneur | Fait |
+| 8. Niveau 5 : la Fossoyeuse | **À faire, c'est la suite** |
 | 9. Le refuge, le texte d'ouverture (la carte tient lieu de menu) | À faire |
 | 10. Finition : sons, musique, équilibrage, icône, APK signé | À faire |
 
 Le jeu s'ouvre sur **la carte d'Orvana** (`scripts/map/`), qui sert de menu :
 la capitale vue de face, en quatre étages, que la route en lacets gravit du
 fleuve au palais. On y choisit un niveau (toucher un point, puis « Entrer »).
-Trois niveaux sont construits : la Grille, les Allées, l'Ossuaire. Chacun
-compte trois parties séparées par des grilles qui s'ouvrent quand les morts
-reposent. La fin d'un niveau l'enregistre (`Progress.mark_completed`) et
+Quatre niveaux sont construits : la Grille, les Allées, la Chapelle des
+cendres, l'Ossuaire (il manque la Fosse). Chacun compte trois parties
+séparées par des grilles qui s'ouvrent quand les morts reposent. La fin d'un niveau l'enregistre (`Progress.mark_completed`) et
 ramène à la carte ; le carnet, ouvert en plein niveau, propose « Quitter le
 niveau ». Tout niveau construit reste jouable à tout moment (essais) ;
 « ici » désigne le premier non terminé. Le héros qui tombe se relève au
@@ -104,8 +104,18 @@ nuit bleue, braises et or pâle). Les couleurs et les boutons sont dans
 `Theatre`. Le chapitre 1 est écrit en chiffres romains dans les titres : le
 « 1 » de la police gothique se lit comme un « i ».
 
-Les cinq morts du chapitre existent. L'Ossuaire est souterrain
-(`underground`) : ni lune ni ombre portée.
+Les cinq morts du chapitre existent, et le premier boss, le Sonneur. La
+Chapelle et l'Ossuaire sont souterrains (`underground`) : ni lune ni ombre
+portée.
+
+Le Sonneur « ne se bat presque pas : il sonne » (scénario) : il reste sous sa
+cloche, ne repousse que celui qui se colle à lui, et sonne à rythme régulier ;
+chaque coup relève tous les corps sans repos. Réponses : le Repos entre deux
+coups, ou **grimper** couper les trois cordes (maintenir le bouton, qui
+affiche alors GRIMPER, près d'une corde : 1,5 s sans défense). La troisième
+corde fait tomber la cloche sur lui (35 % de sa vie, étourdi) et la cloche ne
+sonne plus. Tant qu'elle sonne, de nouveaux morts se couchent dans le chœur.
+Un boss tombé doit lui aussi recevoir le Repos.
 
 Progression : chaque Repos donné rend des souvenirs (l'expérience) et de
 l'or. Les paliers de niveau donnent de la vie et des points de compétence,
@@ -127,8 +137,9 @@ Retour de l'auteur encore attendu : les sensations de combat sur téléphone
 | `scripts/level.gd` | Base des niveaux : héros, caméra, HUD, apparition des morts, outils de scénario (`say`, `reach`, `until_peace`, `wait`) |
 | `scripts/levels/la_grille.gd` | Niveau 1 : décor, grilles, scénario |
 | `scripts/levels/les_allees.gd` | Niveau 2 : allée de mausolées, archers, Porte-cloche |
+| `scripts/levels/la_chapelle.gd` | Niveau 3 : porche, nef, chœur, combat du Sonneur |
 | `scripts/levels/l_ossuaire.gd` | Niveau 4 : couloirs et salles, Fouisseur, Veuve |
-| `scripts/enemies/` | Comportements propres : archer (et son carreau), Porte-cloche, Fouisseur, Veuve |
+| `scripts/enemies/` | Comportements propres : archer (et son carreau), Porte-cloche, Fouisseur, Veuve, Sonneur, et la grosse cloche avec ses cordes (`great_bell.gd`, `bell_rope.gd`) |
 | `scripts/fx.gd` | Effets partagés : ondes au sol, matériaux simples |
 | `scripts/map/` | La carte : `world_map.gd` (écran, défilement, choix), `map_scene.gd` (la ville dessinée par code) |
 | `scripts/data/world_data.gd` | Chapitres et niveaux dans l'ordre de la route |
@@ -164,10 +175,15 @@ Règles à garder :
   avec un minuteur de l'arbre, pour que tout s'arrête si le niveau est
   rechargé.
 - **Un type de mort** se déclare dans `enemy_types.gd` avec son `behavior`
-  (`melee`, `archer`, `bell`, `burrower`, `widow`) ; `Enemy.create()`
+  (`melee`, `archer`, `bell`, `burrower`, `widow`, `sonneur`) ; `Enemy.create()`
   choisit la classe. Un comportement écrit `_chase()` et, pour ses actions
   propres, `_special()` dans l'état SPECIAL. Frapper un mort en SPECIAL
   l'interrompt.
+- **Boss** : le type porte `"boss": true` ; le niveau affiche sa barre avec
+  `hud.show_boss()` / `hud.set_boss()` / `hud.hide_boss()`, alimentée par le
+  signal `Enemy.health_changed`. Un boss qui ne chasse personne garde un
+  minuteur qui court quel que soit son état (sinon un héros qui le harcèle
+  l'empêche d'agir).
 - **Grilles** : `add_gate(position, point_de_reprise)` ; au retour à un point
   de reprise, les grilles d'avant sont ouvertes.
 - **Corps et obstacles** : la chute projette le corps ; il peut finir derrière

@@ -29,6 +29,8 @@ const DODGE_COOLDOWN := 0.8
 const HIT_TIME := 0.3
 ## Le rite du Repos : il faut rester près du corps, sans défense, ce temps-là.
 const RITE_RANGE := 2.3
+## Secondes pour grimper couper une corde de cloche, sans défense.
+const CLIMB_TIME := 1.5
 const RITE_TIME := 1.0
 
 var controls: TouchControls
@@ -49,6 +51,7 @@ var _dodge_direction := Vector3.ZERO
 var _dodge_cooldown := 0.0
 var _knockback := Vector3.ZERO
 var _rite_target: Enemy
+var _climb_target: BellRope
 var _rite_progress := 0.0
 ## Caractéristiques que la progression peut changer (voir `apply_stats`).
 var damage_scale := 1.0
@@ -95,12 +98,15 @@ func _physics_process(delta: float) -> void:
 	_dodge_cooldown = maxf(0.0, _dodge_cooldown - delta)
 	var wish := _wish_direction()
 	var body := _nearest_body()
+	var rope: BellRope = _nearest_rope() if body == null else null
 
 	match state:
 		State.MOVE:
 			velocity = wish * float(_data["move_speed"])
 			if controls.rite_held and body != null:
 				_start_rite(body)
+			elif controls.rite_held and rope != null:
+				_start_climb(rope)
 			elif wish.length() > 0.1:
 				_facing = wish.normalized()
 				_loop(_animation("run"))
@@ -135,8 +141,9 @@ func _physics_process(delta: float) -> void:
 		State.DEAD:
 			velocity = Vector3.ZERO
 
-	# Le bouton du Repos n'apparaît que près d'un corps.
-	controls.rite_available = state != State.DEAD and (body != null or state == State.RITE)
+	# Le bouton du Repos n'apparaît que près d'un corps, ou d'une corde.
+	controls.rite_available = state != State.DEAD and (body != null or rope != null or state == State.RITE)
+	controls.rite_label = "GRIMPER" if (_climb_target != null or (body == null and rope != null)) else "REPOS"
 	controls.rite_progress = _rite_progress if state == State.RITE else 0.0
 
 	# Les modèles regardent vers +Z.
@@ -161,6 +168,7 @@ func take_damage(amount: int, from: Vector3) -> void:
 	health_changed.emit(health, max_health)
 	hurt.emit()
 	_rite_target = null
+	_climb_target = null
 	_rite_progress = 0.0
 	if health == 0:
 		state = State.DEAD
@@ -223,6 +231,7 @@ func _on_dodge_pressed() -> void:
 	_dodge_direction = wish.normalized() if wish.length() > 0.1 else _facing
 	_facing = _dodge_direction
 	_rite_target = null
+	_climb_target = null
 	_rite_progress = 0.0
 	state = State.DODGE
 	_state_time = 0.0
@@ -292,7 +301,55 @@ func _start_rite(body: Enemy) -> void:
 	_loop(_animation("rite"))
 
 
+## La corde de cloche la plus proche, si elle est à portée.
+func _nearest_rope() -> BellRope:
+	var best: BellRope = null
+	var best_distance := RITE_RANGE + 0.3
+	for node in get_tree().get_nodes_in_group(&"ropes"):
+		var rope := node as BellRope
+		if rope == null or rope.is_cut:
+			continue
+		var offset := rope.global_position - global_position
+		offset.y = 0.0
+		if offset.length() <= best_distance:
+			best_distance = offset.length()
+			best = rope
+	return best
+
+
+## Grimper le long d'une corde pour la couper : comme le Repos, il faut
+## rester sans défense jusqu'au bout.
+func _start_climb(rope: BellRope) -> void:
+	state = State.RITE
+	_state_time = 0.0
+	_climb_target = rope
+	_rite_progress = 0.0
+	var offset := rope.global_position - global_position
+	offset.y = 0.0
+	if offset.length() > 0.2:
+		_facing = offset.normalized()
+	_loop(_animation("rite"))
+
+
+func _update_climb(delta: float) -> void:
+	if not controls.rite_held or not is_instance_valid(_climb_target) or _climb_target.is_cut:
+		_climb_target = null
+		_rite_progress = 0.0
+		state = State.MOVE
+		return
+	_rite_progress += delta / CLIMB_TIME
+	if _rite_progress >= 1.0:
+		var rope := _climb_target
+		_climb_target = null
+		_rite_progress = 0.0
+		state = State.MOVE
+		rope.cut_now()
+
+
 func _update_rite(delta: float) -> void:
+	if _climb_target != null:
+		_update_climb(delta)
+		return
 	# Relâcher le bouton, ou voir le mort se relever, interrompt le rite.
 	if not controls.rite_held or not is_instance_valid(_rite_target) or not _rite_target.is_down():
 		_rite_target = null

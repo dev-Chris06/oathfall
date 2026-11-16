@@ -171,6 +171,52 @@ const TYPES := {
 			"rise": "Death_C_Skeletons_Resurrect",
 		},
 	},
+	# Le Sonneur, boss de la Chapelle des cendres. Chaque coup de sa cloche
+	# relève d'un coup tous les corps sans repos. Trois cordes retiennent la
+	# cloche : les couper la fait tomber sur lui.
+	&"sonneur": {
+		"name": "Le Sonneur",
+		"behavior": "sonneur",
+		"boss": true,
+		"model": "res://assets/kaykit/skeletons/Skeleton_Warrior.glb",
+		"tint": Color(0.62, 0.57, 0.52),
+		"scale": 1.7,
+		"props": [{"kind": "maul", "bone": "handslot.r"}],
+		"health": 320,
+		# Il ne poursuit personne : il regagne sa place sous la cloche. Son
+		# seul coup est un geste pour repousser celui qui se colle à lui.
+		"move_speed": 2.0,
+		"attack_range": 2.4,
+		"attack_damage": 8,
+		"attack_windup": 0.7,
+		"attack_cooldown": 3.0,
+		"attack_speed": 1.0,
+		# Secondes entre deux coups de cloche, préparation (le moment de
+		# réagir), et secondes de plus par corde coupée.
+		"toll_interval": 7.0,
+		"toll_windup": 1.7,
+		"toll_rope_delay": 3.5,
+		# Part de sa vie que lui coûte la chute de la cloche, et étourdissement.
+		"bell_fall_damage": 0.35,
+		"stun_time": 3.5,
+		# Après un coup qui l'ébranle, il n'est plus ébranlé pendant ce temps.
+		"poise_time": 2.5,
+		"rise_delay": 40.0,
+		"rise_health": 0.3,
+		"memories": 60,
+		"gold": 40,
+		"animations": {
+			"idle": "Idle_Combat",
+			"walk": "Walking_D_Skeletons",
+			"attack": "2H_Melee_Attack_Chop",
+			"toll": "Spellcast_Raise",
+			"toll_end": "Spellcast_Shoot",
+			"stun": "Hit_B",
+			"hit": "Hit_A",
+			"fall": "Death_C_Skeletons",
+			"rise": "Death_C_Skeletons_Resurrect",
+		},
+	},
 }
 
 
