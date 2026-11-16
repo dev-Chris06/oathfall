@@ -105,7 +105,7 @@ niveau ». Tout niveau construit reste jouable à tout moment (essais) ;
 dernier point de reprise. L'arène d'essai reste disponible (`-- --arena`).
 
 **Le refuge** (`refuge.gd`) est le moulin, hors des murs : un niveau calme, sans
-mort. Maud (boutique : améliorations permanentes payées en or, `Shop`), frère
+mort. Maud (boutique d'**équipement** payé en or, `Gear` et `ShopScreen`), frère
 Anselme (les rites s'apprennent dans le carnet, partout ; Anselme fait
 **désapprendre** tous les rites et rend les points) et Tibert (il pose des
 questions et ouvre **le bestiaire** : un portrait et une fiche par type de
@@ -116,6 +116,20 @@ héros ne parle pas. **Ces textes sont publics : rien qui touche au
 retournement du scénario.** Le mécanisme de textes secrets (fichier hors du
 dépôt injecté au build par un secret GitHub) n'existe pas encore ; le
 joueur a choisi de laisser la réplique de fin de la Fossoyeuse de côté.
+
+**L'équipement** (`scripts/data/gear.gd`) : deux emplacements, bouclier et arme,
+chacun avec des objets qui sont de **vraies pièces du modèle du chevalier**
+(quatre écus, une épée, une lame longue) ou un modèle posé à sa main (la
+hache, du pack squelettes). `Gear.apply()` montre exactement ce qui est porté
+sur le héros, dans l'aperçu du carnet (onglet Équipement), dans la boutique
+(on essaie l'objet avant de l'acheter) et en jeu. Les icônes sont des rendus
+des mêmes modèles (`PortraitTool --icons`, dans `assets/ui/icons/`) : **une
+icône ne doit jamais montrer autre chose que l'objet porté**. Effets : garde
+(dégâts évités à genoux : Repos, corde), pointes (dégâts rendus au corps à
+corps), vitesse des coups, vie, dégâts, esquive. Les anciens achats de la
+boutique (gambison, cotte, lame, bottes, bandages) sont remboursés au
+chargement d'une ancienne sauvegarde. Les packs ne contiennent ni cuirasse ni
+bottes séparées : ne pas en vendre sans modèle fidèle.
 
 Style de toute l'interface : « théâtre d'ombres » (silhouettes de papier noir,
 nuit bleue, braises et or pâle). Les couleurs et les boutons sont dans
@@ -175,7 +189,7 @@ Retour de l'auteur encore attendu : les sensations de combat sur téléphone
 | `scripts/levels/l_ossuaire.gd` | Niveau 4 : couloirs et salles, Fouisseur, Veuve |
 | `scripts/levels/la_fosse.gd` | Niveau 5 : le chemin, la fosse ronde, la Fossoyeuse |
 | `scripts/levels/refuge.gd`, `npc.gd` | Le moulin et ses personnages |
-| `scripts/data/refuge_texts.gd`, `shop.gd` | Conversations du refuge ; articles de la boutique |
+| `scripts/data/refuge_texts.gd`, `gear.gd` | Conversations du refuge ; équipement (objets, effets, `Gear.apply`) |
 | `scripts/dev/portrait_tool.gd` | Fabrique les portraits du bestiaire (`-- --portraits`), rendus des vrais modèles |
 | `scripts/enemies/` | Comportements propres : archer (et son carreau), Porte-cloche, Fouisseur, Veuve, Sonneur, la grosse cloche avec ses cordes (`great_bell.gd`, `bell_rope.gd`), Fossoyeuse et ses pierres (`fossoyeuse.gd`, `grave_stone.gd`) |
 | `scripts/fx.gd` | Effets partagés : ondes au sol, matériaux simples |
@@ -212,6 +226,9 @@ Règles à garder :
 - **Scénarios** : attendre avec `wait()` ou `wait_until()` du niveau, jamais
   avec un minuteur de l'arbre, pour que tout s'arrête si le niveau est
   rechargé.
+- **Icônes d'objets** : `assets/ui/icons/<objet>.png`, générées par
+  `godot --path . --resolution 800x600 -- --icons` ; un nouvel objet de `Gear`
+  relance l'outil, et le test vérifie qu'elles existent.
 - **Portraits** : `assets/ui/portraits/<type>.png`, versionnés, rendus par
   `PortraitTool` à partir des vrais modèles. Un nouveau type de mort ajoute
   sa fiche `bestiary` dans `enemy_types.gd` et relance l'outil ; le test

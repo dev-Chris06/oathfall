@@ -61,6 +61,11 @@ var rite_time := RITE_TIME
 var dodge_cooldown := DODGE_COOLDOWN
 var rest_heal := 0
 var speed_scale := 1.0
+var attack_speed_scale := 1.0
+## Part des dégâts évitée quand le héros est agenouillé (Repos, corde).
+var guard := 0.0
+## Dégâts rendus à celui qui frappe le héros de près.
+var thorns := 0
 ## Ce qu'on peut faire ici sans que ce soit le Repos (parler, partir) : le
 ## niveau y met le libellé du bouton, vide quand il n'y a rien à faire.
 var interaction_label := ""
@@ -174,10 +179,16 @@ func is_dead() -> bool:
 	return state == State.DEAD
 
 
-func take_damage(amount: int, from: Vector3) -> void:
+func take_damage(amount: int, from: Vector3, attacker: Node = null) -> void:
 	if state == State.DODGE or state == State.DEAD:
 		return
+	# Agenouillé (Repos, corde), le bouclier couvre une part des coups.
+	if state == State.RITE and guard > 0.0:
+		amount = maxi(1, int(round(float(amount) * (1.0 - guard))))
 	health = maxi(0, health - amount)
+	# Les pointes blessent celui qui frappe de près.
+	if thorns > 0 and attacker is Enemy and (attacker as Enemy).is_standing():
+		(attacker as Enemy).take_hit(global_position, thorns)
 	health_changed.emit(health, max_health)
 	hurt.emit()
 	_rite_target = null
@@ -205,11 +216,20 @@ func apply_stats(stats: Dictionary) -> void:
 	dodge_cooldown = float(stats.get("dodge_cooldown", DODGE_COOLDOWN))
 	rest_heal = int(stats.get("rest_heal", 0))
 	speed_scale = float(stats.get("speed_scale", 1.0))
+	attack_speed_scale = float(stats.get("attack_speed", 1.0))
+	guard = float(stats.get("guard", 0.0))
+	thorns = int(stats.get("thorns", 0))
 	var new_max := int(stats.get("max_health", max_health))
 	if new_max != max_health:
 		health = clampi(health + new_max - max_health, 1, new_max)
 		max_health = new_max
 		health_changed.emit(health, max_health)
+
+
+## Montre sur le modèle exactement l'équipement porté (voir `Gear.apply`).
+func apply_gear(equipped: Dictionary) -> void:
+	if _model != null:
+		Gear.apply(_model, equipped)
 
 
 func heal(amount: int) -> void:
@@ -260,7 +280,7 @@ func _start_attack(index: int) -> void:
 	_hit_done = false
 	state = State.ATTACK
 	_state_time = 0.0
-	var speed := float(attack["speed"])
+	var speed := float(attack["speed"]) * attack_speed_scale
 	var length := _once(attack["animation"], speed)
 	_attack_duration = length / speed * RECOVERY_CUT if length > 0.0 else 0.4
 

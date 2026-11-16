@@ -9,6 +9,7 @@ extends Node
 ##                         traverse les niveaux et essaie la carte
 ##   --capture=DOSSIER     même chose, en enregistrant des images
 ##   --portraits           fabrique les portraits du bestiaire (outil)
+##   --icons               fabrique les icônes des objets (outil)
 ##   --map                 avec --capture : photographie la carte
 ##   --arena               lance la salle d'essai au lieu de l'écran-titre
 ##   --level=ID            lance ce niveau (la_grille, les_allees…)
@@ -51,10 +52,10 @@ func _ready() -> void:
 			capture_dir = arg.trim_prefix("--capture=")
 		elif arg == "--map":
 			capture_map = true
-		elif arg == "--portraits":
+		elif arg == "--portraits" or arg == "--icons":
 			var tool := PortraitTool.new()
 			add_child(tool)
-			tool.run.call_deferred()
+			tool.call_deferred("run" if arg == "--portraits" else "run_icons")
 			return
 		elif arg == "--arena":
 			level_id = &"arena"

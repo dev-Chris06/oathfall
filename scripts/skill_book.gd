@@ -14,6 +14,8 @@ signal leave_requested
 ## Vrai quand le carnet est ouvert en plein niveau : il propose alors de le
 ## quitter.
 var can_leave := false
+## L'onglet de la page de droite : « rites » ou « equipement ».
+var tab := &"rites"
 
 var _left: CutPage
 var _right: CutPage
@@ -141,12 +143,90 @@ func _fill_left() -> void:
 
 # --- Page de droite : les rites -----------------------------------------------
 
+func show_tab(new_tab: StringName) -> void:
+	tab = new_tab
+	_refresh()
+
+
+## Équipe un objet depuis le carnet, comme si le joueur avait touché son icône.
+func equip(item_id: StringName) -> bool:
+	var done := Progress.equip(item_id)
+	_refresh()
+	return done
+
+
 func _fill_right() -> void:
 	var page := _right.column
-	page.add_child(Theatre.label("Rites", 50, Theatre.AMBER, GameFonts.title()))
+	var head := HBoxContainer.new()
+	head.add_theme_constant_override("separation", 10)
+	head.add_child(Theatre.label("Rites" if tab == &"rites" else "Équipement", 50, Theatre.AMBER, GameFonts.title()))
+	var spacer := Control.new()
+	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	head.add_child(spacer)
+	for entry: Array in [[&"rites", "Rites"], [&"equipement", "Équipement"]]:
+		var button := Button.new()
+		button.text = entry[1]
+		Theatre.pill(button, 18, Theatre.AMBER if tab == entry[0] else Theatre.MUTED)
+		button.pressed.connect(show_tab.bind(entry[0]))
+		head.add_child(button)
+	page.add_child(head)
 	page.add_child(_rule())
+	if tab == &"equipement":
+		_fill_equipment(page)
+		return
 	for skill: Dictionary in Progression.skills_for(Progress.class_id):
 		page.add_child(_skill_entry(skill))
+
+
+## L'équipement porté : le héros qui tourne, et ce qu'on possède par emplacement.
+func _fill_equipment(page: VBoxContainer) -> void:
+	var body := HBoxContainer.new()
+	body.add_theme_constant_override("separation", 14)
+	page.add_child(body)
+	var preview := HeroPreview.new(Vector2(215.0, 330.0))
+	body.add_child(preview)
+	preview.show_gear(Progress.equipped_map())
+	var shelves := VBoxContainer.new()
+	shelves.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	shelves.add_theme_constant_override("separation", 6)
+	body.add_child(shelves)
+	for slot in Gear.SLOTS:
+		shelves.add_child(Theatre.label(Gear.SLOT_NAMES[slot], 22, Theatre.AMBER))
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 6)
+		shelves.add_child(row)
+		for id in Gear.items_in(slot):
+			if not Progress.owns(id):
+				continue
+			var button := Button.new()
+			button.custom_minimum_size = Vector2(66.0, 66.0)
+			button.expand_icon = true
+			var path := "res://assets/ui/icons/%s.png" % id
+			button.icon = load(path) as Texture2D if ResourceLoader.exists(path) else null
+			var worn := Progress.equipped_id(slot) == id
+			for state in ["normal", "hover", "pressed"]:
+				button.add_theme_stylebox_override(state, _icon_cell(worn))
+			button.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+			button.pressed.connect(equip.bind(id))
+			row.add_child(button)
+		var current: StringName = Progress.equipped_id(slot)
+		shelves.add_child(Theatre.label(Gear.ITEMS[current]["name"], 19))
+		for line in Gear.describe(current):
+			var effect := Theatre.label(line, 16, Theatre.EMBER, GameFonts.italic())
+			effect.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			shelves.add_child(effect)
+	var hint := Theatre.label("Maud vend d'autres équipements, au moulin.", 17, Theatre.MUTED, GameFonts.italic())
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	page.add_child(hint)
+
+
+func _icon_cell(worn: bool) -> StyleBoxFlat:
+	var box := StyleBoxFlat.new()
+	box.bg_color = Color(Theatre.DEEP, 0.9)
+	box.border_color = Color(Theatre.AMBER, 0.95 if worn else 0.3)
+	box.set_border_width_all(3 if worn else 2)
+	box.set_corner_radius_all(4)
+	return box
 
 
 

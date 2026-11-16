@@ -323,7 +323,7 @@ func _strike() -> void:
 		return
 	if offset.length() > 0.3 and _facing.angle_to(offset) > deg_to_rad(70.0):
 		return
-	_hero.take_damage(int(_type["attack_damage"]), global_position)
+	_hero.take_damage(int(_type["attack_damage"]), global_position, self)
 
 
 func _fall() -> void:

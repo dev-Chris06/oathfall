@@ -302,6 +302,7 @@ func _on_leave() -> void:
 func _refresh_progress() -> void:
 	# Un achat ou un rite appris change les caractéristiques tout de suite.
 	hero.apply_stats(Progress.hero_stats())
+	hero.apply_gear(Progress.equipped_map())
 	hud.set_progress(Progress.hero_level, Progress.level_progress(), Progress.gold)
 	controls.book_alert = Progress.skill_points > 0
 

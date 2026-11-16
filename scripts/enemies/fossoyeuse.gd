@@ -287,7 +287,7 @@ func _in_arc(reach: float, arc_deg: float) -> bool:
 func _hurt_hero(damage: int) -> bool:
 	if _hero == null or _hero.is_dead() or _hero.is_dodging():
 		return false
-	_hero.take_damage(damage, global_position)
+	_hero.take_damage(damage, global_position, self)
 	return true
 
 

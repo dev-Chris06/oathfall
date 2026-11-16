@@ -24,8 +24,13 @@ const BASE_STATS := {
 	"dodge_cooldown": 0.8,
 	# Vie rendue au héros à chaque Repos donné.
 	"rest_heal": 0,
-	# Multiplie la vitesse de course.
+	# Multiplie la vitesse de course et celle des coups.
 	"speed_scale": 1.0,
+	"attack_speed": 1.0,
+	# Part des dégâts évitée quand le héros est agenouillé (Repos, corde).
+	"guard": 0.0,
+	# Dégâts rendus à celui qui frappe le héros de près.
+	"thorns": 0,
 }
 
 ## Compétences de chaque classe. Chaque rang donne la valeur finale des

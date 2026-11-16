@@ -27,8 +27,10 @@ var level_id: StringName = &"la_grille"
 var checkpoint := 0
 ## Les niveaux terminés (identifiant → vrai). Ils restent rejouables.
 var completed := {}
-## Les achats de la boutique (identifiant → rang acheté).
-var purchases := {}
+## L'équipement : les objets achetés (identifiant → vrai ; ceux de base sont
+## toujours possédés) et celui qu'on porte dans chaque emplacement.
+var owned := {}
+var equipped := {}
 ## Les conversations du refuge déjà entendues (identifiant → vrai).
 var heard := {}
 ## Les types de morts rencontrés (identifiant → vrai), et combien de chacun
@@ -47,7 +49,8 @@ func reset() -> void:
 	level_id = &"la_grille"
 	checkpoint = 0
 	completed = {}
-	purchases = {}
+	owned = {}
+	equipped = {}
 	heard = {}
 	met = {}
 	rests = {}
@@ -62,7 +65,7 @@ func new_game() -> void:
 
 ## Vrai s'il y a une partie à continuer.
 func has_progress() -> bool:
-	return memories > 0 or gold > 0 or not completed.is_empty() or not purchases.is_empty()
+	return memories > 0 or gold > 0 or not completed.is_empty() or not owned.is_empty()
 
 
 func is_completed(id: StringName) -> bool:
@@ -171,48 +174,53 @@ func hear(conversation_id: StringName) -> void:
 	save()
 
 
-# --- La boutique --------------------------------------------------------------
+# --- L'équipement ---------------------------------------------------------------
 
-func shop_rank(item_id: StringName) -> int:
-	return int(purchases.get(String(item_id), 0))
-
-
-## Le prochain rang d'un article, ou un dictionnaire vide s'il n'y en a plus.
-func shop_next(item_id: StringName) -> Dictionary:
-	var item := Shop.find(item_id)
-	if item.is_empty():
-		return {}
-	var ranks: Array = item["ranks"]
-	var rank := shop_rank(item_id)
-	return ranks[rank] if rank < ranks.size() else {}
+func owns(item_id: StringName) -> bool:
+	return int(Gear.ITEMS[item_id]["cost"]) == 0 or owned.has(String(item_id))
 
 
-## Pourquoi on ne peut pas acheter : « », « maitrise », « prerequis » ou « or ».
-func shop_blocker(item_id: StringName) -> String:
-	var next := shop_next(item_id)
-	if next.is_empty():
-		return "maitrise"
-	var item := Shop.find(item_id)
-	var needs: Dictionary = item.get("requires", {})
-	for needed: String in needs:
-		if shop_rank(StringName(needed)) < int(needs[needed]):
-			return "prerequis"
-	if gold < int(next["cost"]):
+func equipped_id(slot: StringName) -> StringName:
+	return StringName(equipped.get(String(slot), String(Gear.DEFAULTS[slot])))
+
+
+## L'équipement porté : {emplacement → objet}.
+func equipped_map() -> Dictionary:
+	var map := {}
+	for slot in Gear.SLOTS:
+		map[slot] = equipped_id(slot)
+	return map
+
+
+## Pourquoi on ne peut pas acheter : « », « possede » ou « or ».
+func gear_blocker(item_id: StringName) -> String:
+	if owns(item_id):
+		return "possede"
+	if gold < int(Gear.ITEMS[item_id]["cost"]):
 		return "or"
 	return ""
 
 
-func buy(item_id: StringName) -> bool:
-	if shop_blocker(item_id) != "":
+## Achète un objet et l'équipe tout de suite.
+func buy_gear(item_id: StringName) -> bool:
+	if gear_blocker(item_id) != "":
 		return false
-	gold -= int(shop_next(item_id)["cost"])
-	purchases[String(item_id)] = shop_rank(item_id) + 1
+	gold -= int(Gear.ITEMS[item_id]["cost"])
+	owned[String(item_id)] = true
+	equip(item_id)
+	return true
+
+
+func equip(item_id: StringName) -> bool:
+	if not owns(item_id):
+		return false
+	equipped[String(Gear.ITEMS[item_id]["slot"])] = String(item_id)
 	changed.emit()
 	save()
 	return true
 
 
-## Les caractéristiques du héros, compétences, achats et niveau compris.
+## Les caractéristiques du héros : niveau, rites et équipement porté.
 func hero_stats() -> Dictionary:
 	var stats := Progression.BASE_STATS.duplicate()
 	var data := HeroClasses.get_class_data(class_id)
@@ -223,13 +231,11 @@ func hero_stats() -> Dictionary:
 		if rank > 0:
 			var rank_data: Dictionary = skill["ranks"][rank - 1]
 			stats.merge(rank_data["stats"], true)
-	# Les achats de la boutique s'ajoutent.
-	for item: Dictionary in Shop.ITEMS:
-		var owned := shop_rank(item["id"])
-		for i in owned:
-			var bonus: Dictionary = item["ranks"][i]["bonus"]
-			for key: String in bonus:
-				stats[key] = stats.get(key, 0) + bonus[key]
+	# L'équipement porté s'ajoute.
+	for slot in Gear.SLOTS:
+		var bonus: Dictionary = Gear.ITEMS[equipped_id(slot)]["stats"]
+		for key: String in bonus:
+			stats[key] = stats.get(key, 0) + bonus[key]
 	return stats
 
 
@@ -254,7 +260,8 @@ func save() -> bool:
 		"level_id": String(level_id),
 		"checkpoint": checkpoint,
 		"completed": completed.keys(),
-		"purchases": purchases,
+		"owned": owned.keys(),
+		"equipped": equipped,
 		"heard": heard.keys(),
 		"met": met.keys(),
 		"rests": rests,
@@ -295,11 +302,19 @@ func load_save() -> bool:
 	if typeof(saved_done) == TYPE_ARRAY:
 		for id in saved_done:
 			completed[String(id)] = true
-	purchases = {}
-	var saved_purchases = data.get("purchases", {})
-	if typeof(saved_purchases) == TYPE_DICTIONARY:
-		for key in saved_purchases:
-			purchases[String(key)] = int(saved_purchases[key])
+	owned = {}
+	var saved_owned = data.get("owned", [])
+	if typeof(saved_owned) == TYPE_ARRAY:
+		for id in saved_owned:
+			if Gear.ITEMS.has(StringName(id)):
+				owned[String(id)] = true
+	equipped = {}
+	var saved_equipped = data.get("equipped", {})
+	if typeof(saved_equipped) == TYPE_DICTIONARY:
+		for slot in saved_equipped:
+			if Gear.ITEMS.has(StringName(saved_equipped[slot])) and owns(StringName(saved_equipped[slot])):
+				equipped[String(slot)] = String(saved_equipped[slot])
+	_refund_old_purchases(data.get("purchases", {}))
 	heard = {}
 	var saved_heard = data.get("heard", [])
 	if typeof(saved_heard) == TYPE_ARRAY:
@@ -317,6 +332,22 @@ func load_save() -> bool:
 			rests[String(key)] = int(saved_rests[key])
 	changed.emit()
 	return true
+
+
+## Les anciens achats de la boutique (gambison, cotte, lame, bottes, bandages)
+## n'existent plus : leur prix est rendu en or.
+const OLD_PRICES := {
+	"gambison": [100], "cotte": [260], "lame": [120, 320], "bottes": [160], "bandages": [150],
+}
+
+
+func _refund_old_purchases(old) -> void:
+	if typeof(old) != TYPE_DICTIONARY:
+		return
+	for key in old:
+		var prices: Array = OLD_PRICES.get(String(key), [])
+		for i in mini(int(old[key]), prices.size()):
+			gold += int(prices[i])
 
 
 func delete_save() -> void:

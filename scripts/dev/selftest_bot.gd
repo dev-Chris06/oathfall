@@ -212,6 +212,8 @@ func _run() -> void:
 		return
 	if not await _progress_tests():
 		return
+	if not await _gear_effect_tests():
+		return
 	if not await _bestiary_tests():
 		return
 	if not await _boss_tests():
@@ -747,6 +749,61 @@ func _check_blow(label: String, enemy: Enemy, windup: float, impact: float) -> b
 	return true
 
 
+## Les effets de l'équipement : garde à genoux, pointes, vitesse des coups.
+func _gear_effect_tests() -> bool:
+	var arena := _level() as Arena
+	var hero := arena.hero
+	_passive = true
+	hero.heal(1000)
+
+	# La garde ne joue qu'à genoux (Repos, corde).
+	hero.guard = 0.5
+	hero.state = Hero.State.MOVE
+	var before := hero.health
+	hero.take_damage(20, hero.global_position + Vector3.FORWARD)
+	if before - hero.health != 20:
+		return _fail("la garde réduit des dégâts reçus debout (%d)" % (before - hero.health))
+	hero.state = Hero.State.RITE
+	before = hero.health
+	hero.take_damage(20, hero.global_position + Vector3.FORWARD)
+	hero.state = Hero.State.MOVE
+	if before - hero.health != 10:
+		return _fail("la garde de 50 %% n'a pas réduit 20 dégâts à 10 (%d)" % (before - hero.health))
+	hero.guard = 0.0
+	print("test réussi : la garde réduit les dégâts reçus à genoux")
+
+	# Les pointes blessent celui qui frappe de près.
+	hero.heal(1000)
+	hero.thorns = 8
+	var attacker := arena.spawn(&"depouille", hero.global_position + Vector3(1.4, 0.0, 0.0), false)
+	var health := attacker.health
+	hero.take_damage(5, attacker.global_position, attacker)
+	hero.thorns = 0
+	if health - attacker.health != 8:
+		return _fail("les pointes n'ont pas rendu 8 dégâts (%d)" % (health - attacker.health))
+	attacker.take_hit(hero.global_position, 100000)
+	print("test réussi : les pointes blessent celui qui frappe de près")
+
+	# La hache ralentit les coups.
+	hero.attack_speed_scale = 1.0
+	hero.state = Hero.State.MOVE
+	hero._start_attack(0)
+	var fast: float = hero._attack_duration
+	hero.state = Hero.State.MOVE
+	hero.attack_speed_scale = 0.8
+	hero._start_attack(0)
+	var slow: float = hero._attack_duration
+	hero.attack_speed_scale = 1.0
+	hero.state = Hero.State.MOVE
+	if absf(slow / fast - 1.25) > 0.02:
+		return _fail("une vitesse de coups de 0,8 n'allonge pas le coup de 25 %% (%.2f)" % (slow / fast))
+	print("test réussi : la vitesse des coups suit l'équipement")
+	_passive = false
+	if not await _until(func() -> bool: return arena.enemies_left() == 0, 120.0):
+		return _fail("le mort de l'essai des pointes n'a pas été mis au repos")
+	return true
+
+
 func _grille_tests() -> bool:
 	main.load_level(&"la_grille")
 	_watch(_level())
@@ -917,38 +974,79 @@ func _frames(count: int) -> void:
 
 ## Le moulin : la boutique, les conversations, les rites, l'entrée et la sortie.
 func _refuge_tests() -> bool:
-	# --- La boutique, sans l'écran.
+	# --- L'équipement, sans l'écran.
 	Progress.reset()
-	Progress.add_gold(40)
-	if Progress.shop_blocker(&"gambison") != "or" or Progress.buy(&"gambison"):
+	Progress.add_gold(100)
+	if Progress.gear_blocker(&"rondache") != "or" or Progress.buy_gear(&"rondache"):
 		return _fail("on peut acheter sans avoir assez d'or")
-	if Progress.shop_blocker(&"cotte") != "prerequis":
-		return _fail("la cotte de mailles n'exige pas le gambison")
-	Progress.add_gold(1000)
-	if Progress.buy(&"cotte"):
-		return _fail("on a acheté la cotte de mailles sans le gambison")
+	if Progress.equipped_id(&"shield") != &"ecu_rectangle" or Progress.equipped_id(&"weapon") != &"epee":
+		return _fail("l'équipement de départ n'est pas l'écu rectangulaire et l'épée")
+	if Progress.gear_blocker(&"epee") != "possede":
+		return _fail("l'épée de base devrait déjà être possédée")
+	Progress.add_gold(2000)
 	var gold := Progress.gold
-	if not Progress.buy(&"gambison") or Progress.gold != gold - 100:
-		return _fail("l'achat du gambison n'a pas coûté 100 or")
-	Progress.buy(&"lame")
-	Progress.buy(&"bottes")
-	Progress.buy(&"bandages")
+	if not Progress.buy_gear(&"ecu_insigne") or Progress.gold != gold - 140:
+		return _fail("l'achat de l'écu à l'insigne n'a pas coûté 140 or")
+	if Progress.equipped_id(&"shield") != &"ecu_insigne":
+		return _fail("un objet acheté n'est pas équipé tout de suite")
+	if int(Progress.hero_stats()["max_health"]) != 100 + 25:
+		return _fail("l'écu à l'insigne n'ajoute pas 25 de vie")
+	Progress.equip(&"ecu_rectangle")
+	if int(Progress.hero_stats()["max_health"]) != 100 or absf(float(Progress.hero_stats()["guard"]) - 0.2) > 0.001:
+		return _fail("changer d'écu ne change pas les effets")
+	Progress.buy_gear(&"rondache")
+	Progress.buy_gear(&"ecu_pointes")
+	Progress.buy_gear(&"lame_longue")
+	Progress.buy_gear(&"hache")
 	var stats := Progress.hero_stats()
-	if int(stats["max_health"]) != 100 + 20:
-		return _fail("le gambison n'ajoute pas 20 de vie (vie maximale %d)" % int(stats["max_health"]))
-	if not is_equal_approx(float(stats["damage_scale"]), 1.10) or not is_equal_approx(float(stats["speed_scale"]), 1.08) \
-			or int(stats["rest_heal"]) != 3:
-		return _fail("les bonus de la boutique ne s'appliquent pas : %s" % [stats])
-	Progress.buy(&"lame")
-	if Progress.shop_blocker(&"lame") != "maitrise":
-		return _fail("la lame a plus de deux rangs")
+	if not is_equal_approx(float(stats["damage_scale"]), 1.45) or not is_equal_approx(float(stats["attack_speed"]), 0.8) \
+			or int(stats["thorns"]) != 8:
+		return _fail("les effets de la hache et de l'écu à pointes ne s'appliquent pas : %s" % [stats])
+	Progress.equip(&"rondache")
+	if absf(float(Progress.hero_stats()["guard"]) - 0.4) > 0.001 or not is_equal_approx(float(Progress.hero_stats()["speed_scale"]), 0.95):
+		return _fail("la rondache n'a pas ses effets")
 	Progress.save()
-	var kept := Progress.purchases.duplicate()
+	var kept := Progress.owned.duplicate()
+	var kept_equipped := Progress.equipped.duplicate()
 	Progress.reset()
 	Progress.load_save()
-	if Progress.purchases != kept:
-		return _fail("les achats ne sont pas relus de la sauvegarde")
-	print("test 13 réussi : boutique (prérequis, manque d'or, bonus, sauvegarde)")
+	if Progress.owned != kept or Progress.equipped != kept_equipped:
+		return _fail("l'équipement n'est pas relu de la sauvegarde")
+	print("test 13 réussi : équipement (achat, effets, sauvegarde)")
+
+	# Les anciens achats de la boutique sont remboursés.
+	Progress.reset()
+	var legacy := FileAccess.open(Progress.save_path, FileAccess.WRITE)
+	legacy.store_string(JSON.stringify({"version": 1, "gold": 10, "purchases": {"gambison": 1, "lame": 2, "bottes": 1}}))
+	legacy.close()
+	Progress.load_save()
+	if Progress.gold != 10 + 100 + 120 + 320 + 160:
+		return _fail("les anciens achats ne sont pas remboursés (or : %d)" % Progress.gold)
+	print("test 13 réussi : les anciens achats sont remboursés")
+
+	# Le modèle montre exactement ce qui est équipé.
+	var preview := Gear.PARTS
+	var knight := (load("res://assets/kaykit/adventurers/Knight.glb") as PackedScene).instantiate() as Node3D
+	add_child(knight)
+	Gear.apply(knight, {&"shield": &"ecu_pointes", &"weapon": &"hache"})
+	var shown: Array[String] = []
+	for part_name in preview:
+		if (knight.find_child(part_name, true, false) as Node3D).visible:
+			shown.append(part_name)
+	if shown != ["Spike_Shield"] or knight.find_child(Gear.EXTRA_NAME, true, false) == null:
+		return _fail("le chevalier ne montre pas l'écu à pointes et la hache (pièces : %s)" % [shown])
+	Gear.apply(knight, {&"shield": &"rondache", &"weapon": &"lame_longue"})
+	shown.clear()
+	for part_name in preview:
+		if (knight.find_child(part_name, true, false) as Node3D).visible:
+			shown.append(part_name)
+	if shown != ["Round_Shield", "2H_Sword"] or knight.find_child(Gear.EXTRA_NAME, true, false) != null:
+		return _fail("changer d'équipement ne remplace pas les pièces visibles (%s)" % [shown])
+	knight.queue_free()
+	for id: StringName in Gear.ITEMS:
+		if not ResourceLoader.exists(ShopScreen.ICONS + "%s.png" % id):
+			return _fail("l'icône de %s manque" % id)
+	print("test 13 réussi : les pièces visibles sur le héros suivent l'équipement, chaque objet a son icône")
 
 	# --- Les conversations : dans l'ordre, une seule fois chacune.
 	Progress.reset()
@@ -985,15 +1083,33 @@ func _refuge_tests() -> bool:
 	if level.shop == null:
 		return _fail("la boutique ne s'est pas ouverte")
 	var before := Progress.gold
-	if not level.shop.buy(&"gambison"):
+	if not level.shop.buy(&"ecu_insigne"):
 		return _fail("l'achat depuis l'écran de la boutique a échoué")
 	level.shop.close()
-	await _frames(2)
-	if Progress.gold != before - 100 or hero.max_health != int(Progress.hero_stats()["max_health"]):
+	await _frames(3)
+	if Progress.gold != before - 140 or hero.max_health != int(Progress.hero_stats()["max_health"]) or hero.max_health != 125:
 		return _fail("l'achat n'a pas changé la vie du héros (%d)" % hero.max_health)
+	if not (hero._model.find_child("Badge_Shield", true, false) as Node3D).visible \
+			or (hero._model.find_child("Rectangle_Shield", true, false) as Node3D).visible:
+		return _fail("le héros ne porte pas l'écu à l'insigne qu'il vient d'acheter")
 	if not Progress.has_heard(&"maud_1") or get_tree().paused:
 		return _fail("la conversation n'est pas marquée entendue, ou le jeu reste en pause")
 	print("test 13 réussi : on parle à Maud et on achète au moulin")
+
+	# L'onglet Équipement du carnet : on change d'écu, le héros le porte.
+	Progress.add_gold(2000)
+	Progress.buy_gear(&"rondache")
+	Progress.equip(&"ecu_rectangle")
+	await _frames(2)
+	level.open_book()
+	level.book.show_tab(&"equipement")
+	if not level.book.equip(&"rondache"):
+		return _fail("le carnet n'a pas équipé la rondache")
+	await _frames(3)
+	if not (hero._model.find_child("Round_Shield", true, false) as Node3D).visible or not is_equal_approx(hero.speed_scale, 0.95):
+		return _fail("le héros ne porte pas la rondache, ou n'en a pas la vitesse (%.2f)" % hero.speed_scale)
+	level.book.close_book()
+	print("test 13 réussi : le carnet change l'équipement, le héros le porte et en a les effets")
 
 	# Le carnet ordinaire apprend les rites, où que l'on soit.
 	Progress.skill_points = 3
@@ -1207,9 +1323,20 @@ func _capture_refuge() -> void:
 	await get_tree().create_timer(1.8).timeout
 	await _shoot("refuge_04_dialogue")
 	level.dialogue.close(&"shop")
-	await get_tree().create_timer(0.5).timeout
+	await get_tree().create_timer(0.8).timeout
+	level.shop.select(&"ecu_pointes")
+	await get_tree().create_timer(0.8).timeout
 	await _shoot("refuge_05_boutique")
+	level.shop.select(&"hache")
+	await get_tree().create_timer(0.8).timeout
+	await _shoot("refuge_05b_hache")
+	level.shop.buy(&"hache")
 	level.shop.close()
+	level.open_book()
+	level.book.show_tab(&"equipement")
+	await get_tree().create_timer(0.8).timeout
+	await _shoot("refuge_05c_carnet")
+	level.book.close_book()
 	level.objective = Vector3(-7.4, 0.0, -7.4)
 	await get_tree().create_timer(4.0).timeout
 	await _shoot("refuge_06_anselme")
