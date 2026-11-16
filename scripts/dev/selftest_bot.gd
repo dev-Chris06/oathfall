@@ -270,11 +270,18 @@ func _grille_tests() -> bool:
 		return _fail("le héros relevé n'a pas sa vie maximale")
 	print("test 10 réussi : le héros se relève au point de reprise")
 
-	# 11. La fin du niveau.
-	if not await _until(func() -> bool: return _completed, 600.0):
+	# 11. La fin du niveau. Le joueur automatique n'esquive pas : il peut
+	# tomber, et doit alors reprendre au point de reprise, comme un joueur.
+	var falls := [0]
+	main.level_loaded.connect(func(level: Level) -> void:
+		falls[0] += 1
+		_watch(level))
+	if not await _until(func() -> bool: return _completed or falls[0] > 6, 1200.0, false):
 		return _fail("la Grille n'a pas été terminée")
-	print("test 11 réussi : la Grille est terminée, vie %d, niveau %d, %d d'or" % [
-		grille.hero.health, Progress.hero_level, Progress.gold])
+	if not _completed:
+		return _fail("le joueur automatique est tombé plus de six fois")
+	print("test 11 réussi : la Grille est terminée, vie %d, niveau %d, %d d'or, %d chute(s)" % [
+		_level().hero.health, Progress.hero_level, Progress.gold, falls[0]])
 	return true
 
 
