@@ -86,7 +86,7 @@ apprendre les compétences et quelques personnages à qui parler.
 | 7. Niveau 3 : le Sonneur | Fait |
 | 8. Niveau 5 : la Fossoyeuse | Fait |
 | 9. Le refuge, le menu, le texte d'ouverture | Fait |
-| 10. Finition : sons, musique, équilibrage, icône, APK signé | **En cours** : sons et musiques faits ; restent icône, APK signé, équilibrage |
+| 10. Finition : sons, musique, équilibrage, icône, APK signé | **En cours** : sons, musiques et icône faits ; restent APK signé, équilibrage |
 
 Le jeu s'ouvre sur **l'écran-titre** (`TitleScreen` : Continuer s'il y a une
 partie, Nouvelle partie avec confirmation, Options avec crédits et effacement
