@@ -100,6 +100,21 @@ jobs:
           set -euo pipefail
           ~/godot-cache/godot --headless --path . --import
 
+      # Joue une courte démonstration sans affichage : course, enchaînement de
+      # trois coups, esquive. Le build échoue si le combat ne répond plus.
+      - name: Test automatique du combat
+        run: |
+          set -euo pipefail
+          ~/godot-cache/godot --headless --path . --fixed-fps 60 -- --selftest 2>&1 | tee selftest.log
+          if grep -E "ERROR|SCRIPT ERROR" selftest.log; then
+            echo "::error::Le test automatique a produit des erreurs."
+            exit 1
+          fi
+          grep -q "étape 6_fin .* coups portés 3" selftest.log || {
+            echo "::error::L'enchaînement de trois coups n'a pas porté."
+            exit 1
+          }
+
       - name: Exporter l'APK
         env:
           GODOT_ANDROID_KEYSTORE_DEBUG_PATH: ${{ runner.temp }}/debug.keystore

@@ -5,6 +5,10 @@ extends RefCounted
 ## Les quatre classes sont déclarées dès le départ pour que le reste du jeu
 ## soit écrit autour d'elles. Seul le Porte-glaive est jouable pour l'instant :
 ## les autres le deviendront une fois le chapitre 1 terminé.
+##
+## Chaque classe nomme ses animations ici, pour que le code du héros ne dépende
+## jamais des noms propres à un pack de modèles : changer de modèle revient à
+## changer ce tableau.
 
 const DEFAULT := &"porte_glaive"
 
@@ -15,6 +19,24 @@ const CLASSES := {
 		"summary": "Équilibré. Pare les coups, même pendant le rite du Repos.",
 		"model": "res://assets/kaykit/adventurers/Knight.glb",
 		"available": true,
+		# Le modèle porte toutes ses armes à la fois : on masque les autres.
+		"hidden_parts": ["1H_Sword_Offhand", "2H_Sword", "Badge_Shield", "Round_Shield", "Spike_Shield"],
+		"move_speed": 6.0,
+		"animations": {
+			"idle": "Idle",
+			"run": "Running_A",
+			"dodge": "Dodge_Forward",
+			"hit": "Hit_A",
+			"death": "Death_A",
+			"block": "Blocking",
+			"rite": "Interact",
+		},
+		# Enchaînement de base : chaque coup a ses dégâts et sa vitesse.
+		"attacks": [
+			{"animation": "1H_Melee_Attack_Slice_Diagonal", "damage": 10, "speed": 1.5},
+			{"animation": "1H_Melee_Attack_Slice_Horizontal", "damage": 12, "speed": 1.5},
+			{"animation": "1H_Melee_Attack_Chop", "damage": 20, "speed": 1.3},
+		],
 	},
 	&"briseur": {
 		"name": "Briseur",
