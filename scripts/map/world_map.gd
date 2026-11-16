@@ -15,8 +15,10 @@ const PICK_RADIUS := 52.0
 const PARALLAX := 0.35
 const FRICTION := 5.0
 ## Le moulin, sur la carte : le refuge, hors des murs.
-const MILL_POINT := Vector2(200.0, 2335.0)
-const MILL_RADIUS := 85.0
+## Sa zone tactile est petite et un niveau proche passe toujours avant lui :
+## la Grille est à 60 pixels de là.
+const MILL_POINT := Vector2(190.0, 2345.0)
+const MILL_RADIUS := 46.0
 
 ## Les niveaux construits, donnés par `Main`.
 var available: Array = []
@@ -357,11 +359,13 @@ class MapGlow extends Control:
 		if ici_index >= 0:
 			var p := scene.node_positions[ici_index]
 			var pulse := 0.5 + 0.5 * sin(time * 2.4)
+			# Le halo ne dépasse pas le rond de sélection : tous les niveaux
+			# choisis ont la même taille.
 			for k in 4:
-				draw_circle(p, 20.0 + 10.0 * k + 6.0 * pulse, Color(Theatre.EMBER, 0.13 - 0.025 * k))
+				draw_circle(p, 12.0 + 5.0 * k + 3.0 * pulse, Color(Theatre.EMBER, 0.16 - 0.03 * k))
 			draw_circle(p, 11.0, Color(1.0, 0.35, 0.19))
 			draw_circle(p, 5.0, Color(1.0, 0.86, 0.7))
 		if selected_index >= 0:
 			draw_arc(scene.node_positions[selected_index], 25.0 + 2.0 * sin(time * 3.0), 0.0, TAU, 40, Theatre.CREAM, 3.0)
 		if refuge_selected:
-			draw_arc(WorldMap.MILL_POINT, 66.0 + 3.0 * sin(time * 3.0), 0.0, TAU, 48, Theatre.CREAM, 3.0)
+			draw_arc(WorldMap.MILL_POINT, 28.0 + 2.0 * sin(time * 3.0), 0.0, TAU, 40, Theatre.CREAM, 3.0)

@@ -56,8 +56,8 @@ const NPCS := {
 	},
 	&"anselme": {
 		"name": "Frère Anselme",
-		"service": &"skills",
-		"service_label": "Apprendre un rite",
+		"service": &"forget",
+		"service_label": "Oublier mes rites",
 		"conversations": [
 			{
 				"id": &"anselme_1",
@@ -74,7 +74,7 @@ const NPCS := {
 				"lines": [
 					"Ils ne te haïssent pas, tu l'as vu. Ils défendent un serment qu'ils n'ont pas prêté.",
 					"Chaque corps que tu mets au repos te rend un peu de ce qu'il portait. Ce sont des souvenirs : ils ne sont pas à toi, mais ils t'apprennent.",
-					"Je peux t'enseigner ce que ces souvenirs t'ont déjà appris.",
+					"Si tu t'es trompé de rite, je peux t'aider à tout désapprendre : tu retrouveras tes points.",
 				],
 			},
 			{
@@ -101,15 +101,15 @@ const NPCS := {
 			},
 		],
 		"idle": [
-			"Veux-tu apprendre un rite ?",
+			"Un rite mal choisi peut se désapprendre. Dis-le-moi.",
 			"Tiens-toi près d'eux, et attends. C'est tout le secret.",
 			"Le Repos n'est pas un coup. C'est un adieu.",
 		],
 	},
 	&"tibert": {
 		"name": "Tibert",
-		"service": &"",
-		"service_label": "",
+		"service": &"bestiary",
+		"service_label": "Montrer ce que j'ai vu",
 		"conversations": [
 			{
 				"id": &"tibert_1",
@@ -117,6 +117,7 @@ const NPCS := {
 				"lines": [
 					"Tu es un soldat ? Un vrai ? Papa disait que la dernière légion ne rentrerait jamais.",
 					"Moi, je suis né après le serment. Je n'ai jamais vu personne mourir. Maud dit que c'est une chance. Frère Anselme dit que c'est le contraire.",
+					"Je note tout ce que tu rencontres, et Frère Anselme me répond. Viens me montrer ce que tu as vu : j'en ferai un livre.",
 				],
 			},
 			{

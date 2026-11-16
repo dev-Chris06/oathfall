@@ -257,6 +257,7 @@ func spawn(type_id: StringName, where: Vector3, from_grave := true) -> Enemy:
 	enemy.rested.connect(_on_enemy_rested)
 	enemy.rose.connect(_on_enemy_rose)
 	_enemies.append(enemy)
+	Progress.meet(type_id)
 	if from_grave:
 		enemy.emerge()
 	return enemy
@@ -276,6 +277,7 @@ func _on_enemy_rose(_enemy: Enemy) -> void:
 
 func _on_enemy_rested(enemy: Enemy) -> void:
 	_enemies.erase(enemy)
+	Progress.note_rest(enemy.type_id_name)
 	Progress.add_memories(enemy.memories_given())
 	Progress.add_gold(enemy.gold_given())
 

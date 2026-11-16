@@ -7,6 +7,11 @@ const TYPES := {
 	# La Dépouille : lente, au corps à corps, dangereuse en groupe.
 	&"depouille": {
 		"name": "Dépouille",
+		# La fiche du bestiaire de Tibert.
+		"bestiary": {
+			"text": "Un mort qui marche encore. Lent, il frappe au corps à corps et arrive en groupe.",
+			"tip": "Une fois tombée, elle se relève au bout d'un moment : tiens-toi près d'elle et maintiens REPOS.",
+		},
 		"behavior": "melee",
 		"model": "res://assets/kaykit/skeletons/Skeleton_Minion.glb",
 		"health": 40,
@@ -39,6 +44,11 @@ const TYPES := {
 	# L'Archer creux : fragile, tire de loin, recule quand on approche.
 	&"archer_creux": {
 		"name": "Archer creux",
+		# La fiche du bestiaire de Tibert.
+		"bestiary": {
+			"text": "Fragile, il tire de loin et recule quand on s'approche.",
+			"tip": "Un trait rouge le relie à toi avant qu'il tire : esquive, puis fonce sur lui.",
+		},
 		"behavior": "archer",
 		"model": "res://assets/kaykit/skeletons/Skeleton_Rogue.glb",
 		"props": [{"model": "res://assets/kaykit/skeletons/Skeleton_Crossbow.gltf", "bone": "handslot.r"}],
@@ -78,6 +88,11 @@ const TYPES := {
 	# les corps alentour de se relever.
 	&"porte_cloche": {
 		"name": "Porte-cloche",
+		# La fiche du bestiaire de Tibert.
+		"bestiary": {
+			"text": "Rare et robuste. Tant qu'il est debout, les corps se relèvent bien plus vite autour de lui.",
+			"tip": "Abats-le en premier, avant de t'occuper des corps.",
+		},
 		"behavior": "bell",
 		"model": "res://assets/kaykit/skeletons/Skeleton_Warrior.glb",
 		"hidden_parts": ["Skeleton_Warrior_Helmet"],
@@ -110,6 +125,11 @@ const TYPES := {
 	# Le Fouisseur : file sous terre et jaillit au pied du héros.
 	&"fouisseur": {
 		"name": "Fouisseur",
+		# La fiche du bestiaire de Tibert.
+		"bestiary": {
+			"text": "Il file sous terre : un monticule avance vers toi.",
+			"tip": "Quand le monticule s'arrête et tremble, esquive : il va jaillir à tes pieds.",
+		},
 		"behavior": "burrower",
 		"model": "res://assets/kaykit/skeletons/Skeleton_Minion.glb",
 		"tint": Color(0.62, 0.5, 0.38),
@@ -146,6 +166,11 @@ const TYPES := {
 	# La Veuve : ne frappe pas, mais relève tous les corps d'un cri.
 	&"veuve": {
 		"name": "Veuve",
+		# La fiche du bestiaire de Tibert.
+		"bestiary": {
+			"text": "Elle ne frappe pas. Son cri relève d'un coup tous les corps sans repos.",
+			"tip": "Frappe-la quand elle prend son souffle : cela interrompt son cri.",
+		},
 		"behavior": "widow",
 		"model": "res://assets/kaykit/skeletons/Skeleton_Mage.glb",
 		"hidden_parts": ["Skeleton_Mage_Hat"],
@@ -181,6 +206,11 @@ const TYPES := {
 	# cloche : les couper la fait tomber sur lui.
 	&"sonneur": {
 		"name": "Le Sonneur",
+		# La fiche du bestiaire de Tibert.
+		"bestiary": {
+			"text": "Il ne se bat presque pas : il sonne. Chaque coup de sa cloche relève tous les corps.",
+			"tip": "Donne le Repos entre deux coups, ou coupe les trois cordes de la cloche. Esquive l'onde de son maillet.",
+		},
 		"behavior": "sonneur",
 		"boss": true,
 		"model": "res://assets/kaykit/skeletons/Skeleton_Warrior.glb",
@@ -242,6 +272,11 @@ const TYPES := {
 	# tombales et les lance ; les corps sans repos se relèvent tous ensemble.
 	&"fossoyeuse": {
 		"name": "La Fossoyeuse",
+		# La fiche du bestiaire de Tibert.
+		"bestiary": {
+			"text": "Elle n'enterre plus, elle déterre. Trois phases : la pelle, la terre, les pierres.",
+			"tip": "Une zone rouge annonce chaque coup. Sous terre, elle est intouchable : mets au repos les morts qu'elle déterre.",
+		},
 		"behavior": "fossoyeuse",
 		"boss": true,
 		"model": "res://assets/kaykit/skeletons/Skeleton_Rogue.glb",

@@ -106,9 +106,10 @@ dernier point de reprise. L'arène d'essai reste disponible (`-- --arena`).
 
 **Le refuge** (`refuge.gd`) est le moulin, hors des murs : un niveau calme, sans
 mort. Maud (boutique : améliorations permanentes payées en or, `Shop`), frère
-Anselme (**les rites ne s'apprennent que chez lui** : le carnet ordinaire ne
-fait que les montrer, `SkillBook.can_learn`) et Tibert (il pose des
-questions). On touche PARLER près d'un personnage ; la route au sud, PARTIR,
+Anselme (les rites s'apprennent dans le carnet, partout ; Anselme fait
+**désapprendre** tous les rites et rend les points) et Tibert (il pose des
+questions et ouvre **le bestiaire** : un portrait et une fiche par type de
+mort rencontré, `BestiaryScreen`, les inconnus restent des silhouettes). On touche PARLER près d'un personnage ; la route au sud, PARTIR,
 ramène à la carte. Leurs conversations (`RefugeTexts`) s'ouvrent à mesure que
 des niveaux sont terminés et ne s'entendent qu'une fois, puis un repli. Le
 héros ne parle pas. **Ces textes sont publics : rien qui touche au
@@ -175,6 +176,7 @@ Retour de l'auteur encore attendu : les sensations de combat sur téléphone
 | `scripts/levels/la_fosse.gd` | Niveau 5 : le chemin, la fosse ronde, la Fossoyeuse |
 | `scripts/levels/refuge.gd`, `npc.gd` | Le moulin et ses personnages |
 | `scripts/data/refuge_texts.gd`, `shop.gd` | Conversations du refuge ; articles de la boutique |
+| `scripts/dev/portrait_tool.gd` | Fabrique les portraits du bestiaire (`-- --portraits`), rendus des vrais modèles |
 | `scripts/enemies/` | Comportements propres : archer (et son carreau), Porte-cloche, Fouisseur, Veuve, Sonneur, la grosse cloche avec ses cordes (`great_bell.gd`, `bell_rope.gd`), Fossoyeuse et ses pierres (`fossoyeuse.gd`, `grave_stone.gd`) |
 | `scripts/fx.gd` | Effets partagés : ondes au sol, matériaux simples |
 | `scripts/map/` | La carte : `world_map.gd` (écran, défilement, choix), `map_scene.gd` (la ville dessinée par code) |
@@ -210,6 +212,10 @@ Règles à garder :
 - **Scénarios** : attendre avec `wait()` ou `wait_until()` du niveau, jamais
   avec un minuteur de l'arbre, pour que tout s'arrête si le niveau est
   rechargé.
+- **Portraits** : `assets/ui/portraits/<type>.png`, versionnés, rendus par
+  `PortraitTool` à partir des vrais modèles. Un nouveau type de mort ajoute
+  sa fiche `bestiary` dans `enemy_types.gd` et relance l'outil ; le test
+  vérifie qu'ils existent tous.
 - **Interaction hors combat** : le niveau donne `hero.interaction_label`
   (« PARLER », « PARTIR »), le bouton du rite l'affiche, et le héros émet
   `interacted` à l'appui. Les corps et les cordes ont la priorité.

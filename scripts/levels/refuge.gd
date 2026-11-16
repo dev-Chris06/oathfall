@@ -110,17 +110,39 @@ func _talk(npc: Npc) -> void:
 		shop = ShopScreen.new()
 		add_child(shop)
 		await shop.closed
-	elif action == &"skills":
-		book = SkillBook.new()
-		book.can_learn = true
-		add_child(book)
-		await book.closed
+	elif action == &"forget":
+		await _forget_rites()
+	elif action == &"bestiary":
+		bestiary = BestiaryScreen.new()
+		add_child(bestiary)
+		await bestiary.closed
 	_busy = false
+
+
+## Frère Anselme aide à désapprendre : après confirmation, tous les rites
+## s'oublient et leurs points reviennent.
+func _forget_rites() -> void:
+	var ask := DialogueBox.new()
+	add_child(ask)
+	dialogue = ask
+	ask.open("Frère Anselme", ["Veux-tu vraiment oublier tout ce que tu as appris ? Tu retrouveras tous tes points, et tu pourras choisir autrement."],
+		[{"id": &"forget_yes", "label": "Oui, oublier"}, {"id": &"leave", "label": "Non"}])
+	var answer: StringName = await ask.finished
+	if answer != &"forget_yes":
+		return
+	var refunded := Progress.forget_skills()
+	var done := DialogueBox.new()
+	add_child(done)
+	dialogue = done
+	done.open("Frère Anselme", ["C'est fait. %d point%s te sont rendus. Ce qu'on oublie peut toujours s'apprendre de nouveau." % [
+		refunded, "s" if refunded > 1 else ""]])
+	await done.finished
 
 
 ## La boîte de dialogue et la boutique ouvertes, pour les essais.
 var dialogue: DialogueBox
 var shop: ShopScreen
+var bestiary: BestiaryScreen
 
 
 # --- Décor --------------------------------------------------------------------

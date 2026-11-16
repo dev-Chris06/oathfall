@@ -4,8 +4,8 @@ extends CanvasLayer
 ## qu'il est devenu (niveau, souvenirs, or), à droite les rites qu'il peut
 ## apprendre avec ses points. Le jeu est en pause tant qu'il est ouvert.
 ##
-## On y consulte ses rites ; on ne les apprend qu'auprès de Frère Anselme, au
-## moulin (`can_learn` est alors vrai).
+## On y apprend ses rites, où que l'on soit, avec les points gagnés. Frère
+## Anselme, au moulin, aide à les désapprendre.
 
 signal closed
 ## Le joueur veut quitter le niveau pour revenir à la carte.
@@ -14,9 +14,6 @@ signal leave_requested
 ## Vrai quand le carnet est ouvert en plein niveau : il propose alors de le
 ## quitter.
 var can_leave := false
-## Vrai quand le carnet est ouvert chez Frère Anselme : il propose alors
-## d'apprendre.
-var can_learn := false
 
 var _left: CutPage
 var _right: CutPage
@@ -150,14 +147,7 @@ func _fill_right() -> void:
 	page.add_child(_rule())
 	for skill: Dictionary in Progression.skills_for(Progress.class_id):
 		page.add_child(_skill_entry(skill))
-	if not can_learn:
-		var filler := Control.new()
-		filler.size_flags_vertical = Control.SIZE_EXPAND_FILL
-		filler.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		page.add_child(filler)
-		var hint := Theatre.label("Frère Anselme enseigne les rites, au moulin.", 19, Theatre.MUTED, GameFonts.italic())
-		hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		page.add_child(hint)
+
 
 
 func _skill_entry(skill: Dictionary) -> Control:
@@ -184,10 +174,6 @@ func _skill_entry(skill: Dictionary) -> Control:
 	var next := Progress.next_rank(skill_id)
 	if next.is_empty():
 		entry.add_child(Theatre.label("Maîtrisé.", 18, Theatre.AMBER, GameFonts.italic()))
-	elif not can_learn:
-		var cost_text := int(next["cost"])
-		entry.add_child(Theatre.label("Prochain rang : %s, %d point%s." % [
-			_lower_first(next["text"]), cost_text, "s" if cost_text > 1 else ""], 18, Theatre.MUTED))
 	else:
 		var cost := int(next["cost"])
 		var button := Button.new()

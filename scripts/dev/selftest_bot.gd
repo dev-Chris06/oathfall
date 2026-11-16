@@ -222,6 +222,14 @@ func _run() -> void:
 		return
 	if not await _blow_alignment_tests():
 		return
+	for type_id: StringName in EnemyTypes.TYPES:
+		if not Progress.has_met(type_id):
+			return _fail("%s a été vu mais n'est pas au bestiaire" % type_id)
+		if not ResourceLoader.exists(BestiaryScreen.PORTRAITS + "%s.png" % type_id):
+			return _fail("le portrait de %s manque" % type_id)
+		if not EnemyTypes.get_type(type_id).has("bestiary"):
+			return _fail("la fiche de %s manque" % type_id)
+	print("test réussi : les %d types de morts ont leur fiche et leur portrait, et sont au bestiaire" % EnemyTypes.TYPES.size())
 	if not await _grille_tests():
 		return
 	if not await _traverse(&"les_allees"):
@@ -877,8 +885,20 @@ func _map_tests() -> bool:
 		return _fail("quitter le niveau depuis le carnet ne ramène pas à la carte")
 	print("test 12 réussi : quitter le niveau ramène à la carte")
 
-	# Le moulin se choisit comme un niveau.
+	# Le moulin est petit et un niveau proche passe avant lui : un toucher sur
+	# la Grille, même à côté du point, ne choisit jamais le moulin.
 	map = main.world_map
+	var grille: Vector2 = map._scene.node_positions[0]
+	for offset: Vector2 in [Vector2.ZERO, Vector2(-45.0, 0.0), Vector2(0.0, 40.0), Vector2(30.0, -30.0)]:
+		map._tap(map._scene.position + grille + offset)
+		if map.selected_id() != &"la_grille":
+			return _fail("un toucher à %s de la Grille a choisi « %s »" % [offset, map.selected_id()])
+	map._tap(map._scene.position + WorldMap.MILL_POINT)
+	if map.selected_id() != &"refuge":
+		return _fail("un toucher sur le moulin ne le choisit pas")
+	print("test 12 réussi : la Grille et le moulin ne se disputent plus les touchers")
+
+	# Le moulin se choisit comme un niveau.
 	map.select_refuge()
 	if map.selected_id() != &"refuge":
 		return _fail("le moulin ne se choisit pas sur la carte")
@@ -975,24 +995,70 @@ func _refuge_tests() -> bool:
 		return _fail("la conversation n'est pas marquée entendue, ou le jeu reste en pause")
 	print("test 13 réussi : on parle à Maud et on achète au moulin")
 
-	# Les rites ne s'apprennent qu'auprès d'Anselme.
+	# Le carnet ordinaire apprend les rites, où que l'on soit.
+	Progress.skill_points = 3
 	level.open_book()
-	if level.book.can_learn:
-		return _fail("le carnet ordinaire propose d'apprendre des rites")
+	var learned: bool = level.book.learn(&"priere_breve")
 	level.book.close_book()
+	if not learned or Progress.rank_of(&"priere_breve") != 1:
+		return _fail("le carnet n'apprend plus de rite")
+	Progress.learn(&"tranchant")
+	if Progress.skill_points != 1:
+		return _fail("les points ne sont pas dépensés (%d)" % Progress.skill_points)
+
+	# Anselme fait désapprendre : tous les points reviennent.
 	hero.global_position = Vector3(-7.4, 0.0, -7.4)
 	await _frames(3)
 	if hero.interaction_label != "PARLER":
 		return _fail("le bouton ne propose pas PARLER près d'Anselme")
 	level.talk_to_nearest()
 	await _frames(2)
-	level.dialogue.close(&"skills")
+	level.dialogue.close(&"forget")
 	await _frames(2)
-	if level.book == null or not level.book.can_learn:
-		return _fail("chez Anselme, le carnet ne propose pas d'apprendre")
-	level.book.close_book()
+	level.dialogue.close(&"leave")
 	await _frames(2)
-	print("test 13 réussi : les rites s'apprennent seulement chez Anselme")
+	if Progress.rank_of(&"priere_breve") != 1:
+		return _fail("refuser d'oublier a pourtant effacé un rite")
+	level.talk_to_nearest()
+	await _frames(2)
+	level.dialogue.close(&"forget")
+	await _frames(2)
+	level.dialogue.close(&"forget_yes")
+	await _frames(2)
+	level.dialogue.close(&"leave")
+	await _frames(2)
+	if Progress.rank_of(&"priere_breve") != 0 or Progress.rank_of(&"tranchant") != 0 or Progress.skill_points != 3:
+		return _fail("oublier les rites ne rend pas tous les points (%d au lieu de 3)" % Progress.skill_points)
+	if get_tree().paused:
+		return _fail("le jeu est resté en pause après la conversation d'Anselme")
+	print("test 13 réussi : le carnet apprend partout, Anselme fait tout désapprendre")
+
+	# Tibert montre le bestiaire : seuls les morts rencontrés y figurent.
+	Progress.meet(&"depouille")
+	Progress.meet(&"sonneur")
+	hero.global_position = Vector3(-2.6, 0.0, -10.6)
+	await _frames(3)
+	if hero.interaction_label != "PARLER":
+		return _fail("le bouton ne propose pas PARLER près de Tibert")
+	level.talk_to_nearest()
+	await _frames(2)
+	level.dialogue.close(&"bestiary")
+	await _frames(2)
+	if level.bestiary == null:
+		return _fail("le bestiaire ne s'ouvre pas chez Tibert")
+	if level.bestiary.known_count() != 2:
+		return _fail("le bestiaire montre %d fiches au lieu de 2" % level.bestiary.known_count())
+	level.bestiary.select(&"sonneur")
+	if level.bestiary.shown_name() != "Le Sonneur":
+		return _fail("la fiche du Sonneur n'affiche pas son nom")
+	level.bestiary.select(&"veuve")
+	if level.bestiary.shown_name() != "???":
+		return _fail("un mort non rencontré apparaît dans le bestiaire")
+	level.bestiary.close()
+	await _frames(2)
+	if get_tree().paused:
+		return _fail("le jeu est resté en pause après le bestiaire")
+	print("test 13 réussi : Tibert montre le bestiaire, les inconnus restent des silhouettes")
 
 	# La route, au sud, ramène à la carte.
 	hero.global_position = Vector3(0.0, 0.0, 9.5)
@@ -1149,13 +1215,25 @@ func _capture_refuge() -> void:
 	await _shoot("refuge_06_anselme")
 	level.talk_to_nearest()
 	await get_tree().create_timer(0.3).timeout
-	level.dialogue.close(&"skills")
-	await get_tree().create_timer(0.5).timeout
-	await _shoot("refuge_07_rites")
-	level.book.close_book()
+	level.dialogue.close(&"forget")
+	await get_tree().create_timer(1.0).timeout
+	await _shoot("refuge_07_oublier")
+	level.dialogue.close(&"leave")
+	for type_id: StringName in [&"depouille", &"archer_creux", &"porte_cloche", &"fouisseur", &"sonneur"]:
+		Progress.meet(type_id)
+		Progress.rests[String(type_id)] = 7
 	level.objective = Vector3(-2.6, 0.0, -10.4)
 	await get_tree().create_timer(3.4).timeout
-	await _shoot("refuge_08_tibert")
+	level.talk_to_nearest()
+	await get_tree().create_timer(0.3).timeout
+	level.dialogue.close(&"bestiary")
+	await get_tree().create_timer(0.6).timeout
+	level.bestiary.select(&"sonneur")
+	await get_tree().create_timer(0.3).timeout
+	await _shoot("refuge_08_bestiaire")
+	level.bestiary.select(&"veuve")
+	await get_tree().create_timer(0.3).timeout
+	await _shoot("refuge_09_inconnu")
 	get_tree().quit(0)
 
 

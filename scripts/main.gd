@@ -8,6 +8,7 @@ extends Node
 ##   --selftest            un joueur automatique livre les combats d'essai,
 ##                         traverse les niveaux et essaie la carte
 ##   --capture=DOSSIER     même chose, en enregistrant des images
+##   --portraits           fabrique les portraits du bestiaire (outil)
 ##   --map                 avec --capture : photographie la carte
 ##   --arena               lance la salle d'essai au lieu de l'écran-titre
 ##   --level=ID            lance ce niveau (la_grille, les_allees…)
@@ -50,6 +51,11 @@ func _ready() -> void:
 			capture_dir = arg.trim_prefix("--capture=")
 		elif arg == "--map":
 			capture_map = true
+		elif arg == "--portraits":
+			var tool := PortraitTool.new()
+			add_child(tool)
+			tool.run.call_deferred()
+			return
 		elif arg == "--arena":
 			level_id = &"arena"
 			direct = true

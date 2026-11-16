@@ -31,6 +31,10 @@ var completed := {}
 var purchases := {}
 ## Les conversations du refuge déjà entendues (identifiant → vrai).
 var heard := {}
+## Les types de morts rencontrés (identifiant → vrai), et combien de chacun
+## ont reçu le Repos : c'est ce que le bestiaire de Tibert raconte.
+var met := {}
+var rests := {}
 
 
 func reset() -> void:
@@ -45,6 +49,8 @@ func reset() -> void:
 	completed = {}
 	purchases = {}
 	heard = {}
+	met = {}
+	rests = {}
 	changed.emit()
 
 
@@ -106,6 +112,21 @@ func next_rank(skill_id: StringName) -> Dictionary:
 	return rank_list[rank] if rank < rank_list.size() else {}
 
 
+## Désapprend tous les rites et rend leurs points. Renvoie le nombre de points
+## rendus.
+func forget_skills() -> int:
+	var refunded := 0
+	for skill: Dictionary in Progression.skills_for(class_id):
+		var rank := rank_of(skill["id"])
+		for i in rank:
+			refunded += int(skill["ranks"][i]["cost"])
+	ranks = {}
+	skill_points += refunded
+	changed.emit()
+	save()
+	return refunded
+
+
 func can_learn(skill_id: StringName) -> bool:
 	var next := next_rank(skill_id)
 	return not next.is_empty() and skill_points >= int(next["cost"])
@@ -121,6 +142,24 @@ func learn(skill_id: StringName) -> bool:
 	changed.emit()
 	save()
 	return true
+
+
+func has_met(type_id: StringName) -> bool:
+	return met.has(String(type_id))
+
+
+## Un type de mort apparaît : le bestiaire s'en souvient.
+func meet(type_id: StringName) -> void:
+	if not has_met(type_id):
+		met[String(type_id)] = true
+
+
+func note_rest(type_id: StringName) -> void:
+	rests[String(type_id)] = int(rests.get(String(type_id), 0)) + 1
+
+
+func rest_count(type_id: StringName) -> int:
+	return int(rests.get(String(type_id), 0))
 
 
 func has_heard(conversation_id: StringName) -> bool:
@@ -217,6 +256,8 @@ func save() -> bool:
 		"completed": completed.keys(),
 		"purchases": purchases,
 		"heard": heard.keys(),
+		"met": met.keys(),
+		"rests": rests,
 	}
 	var file := FileAccess.open(save_path, FileAccess.WRITE)
 	if file == null:
@@ -264,6 +305,16 @@ func load_save() -> bool:
 	if typeof(saved_heard) == TYPE_ARRAY:
 		for id in saved_heard:
 			heard[String(id)] = true
+	met = {}
+	var saved_met = data.get("met", [])
+	if typeof(saved_met) == TYPE_ARRAY:
+		for id in saved_met:
+			met[String(id)] = true
+	rests = {}
+	var saved_rests = data.get("rests", {})
+	if typeof(saved_rests) == TYPE_DICTIONARY:
+		for key in saved_rests:
+			rests[String(key)] = int(saved_rests[key])
 	changed.emit()
 	return true
 
