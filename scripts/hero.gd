@@ -50,6 +50,11 @@ var _dodge_cooldown := 0.0
 var _knockback := Vector3.ZERO
 var _rite_target: Enemy
 var _rite_progress := 0.0
+## Caractéristiques que la progression peut changer (voir `apply_stats`).
+var damage_scale := 1.0
+var rite_time := RITE_TIME
+var dodge_cooldown := DODGE_COOLDOWN
+var rest_heal := 0
 
 
 func setup(class_id: StringName, input: TouchControls) -> void:
@@ -171,6 +176,27 @@ func take_damage(amount: int, from: Vector3) -> void:
 	_once(_animation("hit"), 1.6)
 
 
+## Applique les caractéristiques données par la progression. Un gain de vie
+## maximale est aussi rendu au héros.
+func apply_stats(stats: Dictionary) -> void:
+	damage_scale = float(stats.get("damage_scale", 1.0))
+	rite_time = float(stats.get("rite_time", RITE_TIME))
+	dodge_cooldown = float(stats.get("dodge_cooldown", DODGE_COOLDOWN))
+	rest_heal = int(stats.get("rest_heal", 0))
+	var new_max := int(stats.get("max_health", max_health))
+	if new_max != max_health:
+		health = clampi(health + new_max - max_health, 1, new_max)
+		max_health = new_max
+		health_changed.emit(health, max_health)
+
+
+func heal(amount: int) -> void:
+	if state == State.DEAD:
+		return
+	health = mini(max_health, health + amount)
+	health_changed.emit(health, max_health)
+
+
 func _wish_direction() -> Vector3:
 	if controls == null:
 		return Vector3.ZERO
@@ -200,7 +226,7 @@ func _on_dodge_pressed() -> void:
 	_rite_progress = 0.0
 	state = State.DODGE
 	_state_time = 0.0
-	_dodge_cooldown = DODGE_COOLDOWN
+	_dodge_cooldown = dodge_cooldown
 	_once(_animation("dodge"), 1.4)
 
 
@@ -230,7 +256,7 @@ func _strike() -> void:
 			continue
 		if offset.length() > 0.3 and _facing.angle_to(offset) > ATTACK_ARC / 2.0:
 			continue
-		target.call(&"take_hit", global_position, int(attack["damage"]))
+		target.call(&"take_hit", global_position, int(round(float(attack["damage"]) * damage_scale)))
 		touched = true
 	if touched:
 		var attacks: Array = _data["attacks"]
@@ -273,13 +299,15 @@ func _update_rite(delta: float) -> void:
 		_rite_progress = 0.0
 		state = State.MOVE
 		return
-	_rite_progress += delta / RITE_TIME
+	_rite_progress += delta / rite_time
 	if _rite_progress >= 1.0:
 		var body := _rite_target
 		_rite_target = null
 		_rite_progress = 0.0
 		state = State.MOVE
 		body.give_rest()
+		if rest_heal > 0:
+			heal(rest_heal)
 		rest_given.emit(body)
 
 

@@ -23,11 +23,11 @@ var level_id := &"la_grille"
 var scripted := false
 
 var _checkpoint := 0
-var _memories_at_checkpoint := 0
 
 
 func _ready() -> void:
 	var capture_dir := ""
+	var forced_checkpoint := -1
 	for arg in OS.get_cmdline_user_args():
 		if arg == "--selftest":
 			scripted = true
@@ -37,17 +37,30 @@ func _ready() -> void:
 		elif arg == "--arena":
 			level_id = &"arena"
 		elif arg.begins_with("--checkpoint="):
-			_checkpoint = arg.trim_prefix("--checkpoint=").to_int()
+			forced_checkpoint = arg.trim_prefix("--checkpoint=").to_int()
 
 	if scripted:
+		# Les tests ne touchent pas à la vraie partie du joueur.
+		Progress.save_path = "user://essai.json"
+		Progress.delete_save()
+		Progress.reset()
 		# Le joueur automatique choisit lui-même les niveaux.
 		var bot := SelftestBot.new()
 		bot.main = self
 		bot.capture_dir = capture_dir
-		bot.start_checkpoint = _checkpoint
+		bot.start_checkpoint = maxi(forced_checkpoint, 0)
 		add_child(bot)
 		return
-	load_level(level_id, _checkpoint)
+
+	Progress.load_save()
+	if level_id == &"arena":
+		load_level(level_id, 0)
+	elif forced_checkpoint >= 0:
+		load_level(&"la_grille", forced_checkpoint)
+	elif LEVELS.has(Progress.level_id):
+		load_level(Progress.level_id, Progress.checkpoint)
+	else:
+		load_level(&"la_grille", 0)
 
 
 ## Charge un niveau, à partir d'un point de reprise.
@@ -61,7 +74,6 @@ func load_level(id: StringName, checkpoint := 0) -> void:
 
 	level = LEVELS[id].new()
 	level.start_checkpoint = checkpoint
-	level.memories = _memories_at_checkpoint
 	level.scripted = scripted
 	level.checkpoint_reached.connect(_on_checkpoint)
 	level.failed.connect(_on_failed)
@@ -72,7 +84,8 @@ func load_level(id: StringName, checkpoint := 0) -> void:
 
 func _on_checkpoint(index: int) -> void:
 	_checkpoint = index
-	_memories_at_checkpoint = level.memories
+	if level_id != &"arena":
+		Progress.set_resume_point(level_id, index)
 
 
 func _on_failed() -> void:
@@ -84,13 +97,14 @@ func _on_failed() -> void:
 
 func _on_completed() -> void:
 	var done := level
-	done.hud.show_message("%s\nLes morts de la cour reposent.\nSouvenirs : %d\n\nÀ suivre : les Allées." % [
-		done.title.to_upper(), done.memories], 8.0)
+	done.hud.show_message("%s\nLes morts de la cour reposent.\nNiveau %d — Or : %d\n\nÀ suivre : les Allées." % [
+		done.title.to_upper(), Progress.hero_level, Progress.gold], 8.0)
+	# Les Allées n'existent pas encore : la partie reprendra à la Grille.
+	Progress.set_resume_point(level_id, 0)
 	if scripted:
 		return
 	await _pause(9.0)
 	if level == done:
-		_memories_at_checkpoint = done.memories
 		load_level(level_id, 0)
 
 

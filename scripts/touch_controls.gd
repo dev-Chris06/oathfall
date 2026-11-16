@@ -7,11 +7,13 @@ extends CanvasLayer
 
 signal attack_pressed
 signal dodge_pressed
+signal book_pressed
 
 const STICK_RADIUS := 95.0
 const ATTACK_RADIUS := 88.0
 const DODGE_RADIUS := 62.0
 const RITE_RADIUS := 66.0
+const BOOK_RADIUS := 44.0
 
 ## Direction voulue, de longueur 0 à 1. x vers la droite, y vers le bas de l'écran.
 var move := Vector2.ZERO
@@ -21,6 +23,8 @@ var rite_held := false
 ## et son anneau se remplit pendant le rite.
 var rite_available := false
 var rite_progress := 0.0
+## Vrai quand des points de compétence attendent : le bouton du carnet luit.
+var book_alert := false
 ## Entrées imposées par un script (tests, démonstrations).
 var simulated_move := Vector2.ZERO
 var simulated_rite := false
@@ -64,7 +68,10 @@ func _input(event: InputEvent) -> void:
 	if event is InputEventScreenTouch:
 		var touch := event as InputEventScreenTouch
 		if touch.pressed:
-			if touch.position.distance_to(_attack_center()) <= ATTACK_RADIUS * 1.25:
+			if touch.position.distance_to(_book_center()) <= BOOK_RADIUS * 1.3:
+				_release_all()
+				book_pressed.emit()
+			elif touch.position.distance_to(_attack_center()) <= ATTACK_RADIUS * 1.25:
 				press_attack()
 			elif touch.position.distance_to(_dodge_center()) <= DODGE_RADIUS * 1.3:
 				press_dodge()
@@ -92,6 +99,9 @@ func _input(event: InputEvent) -> void:
 					press_attack()
 				KEY_K, KEY_SHIFT:
 					press_dodge()
+				KEY_C, KEY_TAB:
+					_release_all()
+					book_pressed.emit()
 
 
 func press_attack() -> void:
@@ -102,6 +112,17 @@ func press_attack() -> void:
 func press_dodge() -> void:
 	_dodge_flash = 1.0
 	dodge_pressed.emit()
+
+
+## Oublie les doigts posés : un menu va s'ouvrir par-dessus le jeu.
+func _release_all() -> void:
+	_stick_index = -1
+	_stick_vector = Vector2.ZERO
+	_rite_index = -1
+
+
+func _book_center() -> Vector2:
+	return Vector2(_pad.size.x - 80.0, 70.0)
 
 
 func _attack_center() -> Vector2:
@@ -127,6 +148,9 @@ func _draw_pad() -> void:
 
 	_draw_button(_attack_center(), ATTACK_RADIUS, Color(0.85, 0.25, 0.2), _attack_flash, "FRAPPER", font)
 	_draw_button(_dodge_center(), DODGE_RADIUS, Color(0.75, 0.7, 0.55), _dodge_flash, "ESQUIVE", font)
+
+	var glow := 0.5 + 0.5 * sin(Time.get_ticks_msec() / 220.0) if book_alert else 0.0
+	_draw_button(_book_center(), BOOK_RADIUS, Color(1.0, 0.85, 0.5), glow, "CARNET", font)
 
 	if rite_available:
 		var center := _rite_center()

@@ -27,8 +27,6 @@ const GRAVEYARD := "res://assets/kaykit/halloween/"
 var title := ""
 ## Point de reprise où commence le scénario.
 var start_checkpoint := 0
-## Souvenirs déjà portés par le héros.
-var memories := 0
 ## Vrai quand un joueur automatique tient les commandes : le niveau ne se
 ## recharge pas seul et laisse le test décider.
 var scripted := false
@@ -40,6 +38,8 @@ var hud: Hud
 ## Point que le héros doit rejoindre, s'il y en a un. Sert au joueur
 ## automatique et, plus tard, à un repère à l'écran.
 var objective = null
+## Le carnet des compétences, tant qu'il est ouvert.
+var book: SkillBook
 
 var _camera: GameCamera
 var _enemies: Array[Enemy] = []
@@ -64,7 +64,8 @@ func _ready() -> void:
 	hero = Hero.new()
 	hero.position = _checkpoint_position(start_checkpoint)
 	add_child(hero)
-	hero.setup(HeroClasses.DEFAULT, controls)
+	hero.setup(Progress.class_id, controls)
+	hero.apply_stats(Progress.hero_stats())
 
 	_camera = GameCamera.new()
 	add_child(_camera)
@@ -78,6 +79,11 @@ func _ready() -> void:
 	hero.health_changed.connect(hud.set_health)
 	hero.hurt.connect(_on_hero_hurt)
 	hero.died.connect(_on_hero_died)
+	controls.book_pressed.connect(open_book)
+	Progress.leveled_up.connect(_on_leveled_up)
+	Progress.skill_learned.connect(_on_skill_learned)
+	Progress.changed.connect(_refresh_progress)
+	_refresh_progress()
 
 	_run.call_deferred(start_checkpoint)
 
@@ -97,8 +103,7 @@ func _process(delta: float) -> void:
 		_hud_timer = 0.25
 		hud.set_counts(
 			get_tree().get_nodes_in_group(&"hittable").size(),
-			get_tree().get_nodes_in_group(&"bodies").size(),
-			memories)
+			get_tree().get_nodes_in_group(&"bodies").size())
 		hud.set_debug("Oathfall %s — %s — %d images/s" % [
 			ProjectSettings.get_setting("application/config/version", "?"),
 			title, Engine.get_frames_per_second()])
@@ -202,7 +207,32 @@ func _on_enemy_rose(_enemy: Enemy) -> void:
 
 func _on_enemy_rested(enemy: Enemy) -> void:
 	_enemies.erase(enemy)
-	memories += enemy.memories_given()
+	Progress.add_memories(enemy.memories_given())
+	Progress.add_gold(enemy.gold_given())
+
+
+# --- Progression --------------------------------------------------------------
+
+## Ouvre le carnet des compétences ; le jeu reste en pause tant qu'il est ouvert.
+func open_book() -> void:
+	if hero.is_dead() or _finished or get_tree().paused:
+		return
+	book = SkillBook.new()
+	add_child(book)
+
+
+func _refresh_progress() -> void:
+	hud.set_progress(Progress.hero_level, Progress.level_progress(), Progress.gold)
+	controls.book_alert = Progress.skill_points > 0
+
+
+func _on_leveled_up(level: int) -> void:
+	hero.apply_stats(Progress.hero_stats())
+	hud.show_message("Les souvenirs affluent. Niveau %d.\nUn point de compétence : ouvre le CARNET." % level, 3.5)
+
+
+func _on_skill_learned(_skill_id: StringName, _rank: int) -> void:
+	hero.apply_stats(Progress.hero_stats())
 
 
 # --- Réactions ----------------------------------------------------------------

@@ -81,8 +81,8 @@ apprendre les compétences et quelques personnages à qui parler.
 | 2. La Dépouille | Fait |
 | 3. Le Repos | Fait |
 | 4. Niveau 1, La Grille : décor, vagues scénarisées, fin de niveau | Fait |
-| 5. Progression : souvenirs, niveaux du héros, or, compétences, sauvegarde | **À faire, c'est la suite** |
-| 6. Niveaux 2 et 4, et les quatre autres morts | À faire |
+| 5. Progression : souvenirs, niveaux du héros, or, compétences, sauvegarde | Fait |
+| 6. Niveaux 2 et 4, et les quatre autres morts | **À faire, c'est la suite** |
 | 7. Niveau 3 : le Sonneur | À faire |
 | 8. Niveau 5 : la Fossoyeuse | À faire |
 | 9. Le refuge, le menu, le texte d'ouverture | À faire |
@@ -93,6 +93,15 @@ ouverte quand ses morts reposent, puis la sortie derrière le caveau. Le
 héros qui tombe se relève au dernier point de reprise, avec les souvenirs
 qu'il y portait. La fin du niveau affiche un bilan puis relance la Grille,
 en attendant les Allées. L'arène d'essai reste disponible (`-- --arena`).
+
+Progression : chaque Repos donné rend des souvenirs (l'expérience) et de
+l'or. Les paliers de niveau donnent de la vie et des points de compétence,
+dépensés dans le CARNET (bouton en haut à droite, jeu en pause). Au refuge
+(étape 9), Frère Anselme enseignera les compétences et Maud vendra contre
+l'or ; le carnet restera pour consulter. La partie est sauvegardée dans
+`user://sauvegarde.json` aux points de reprise, en fin de niveau et à chaque
+compétence apprise ; le jeu reprend là où on l'a laissé. Mourir ne fait rien
+perdre : on reprend la cour au début.
 
 Retour de l'auteur encore attendu : les sensations de combat sur téléphone
 (poids des coups, vitesse, difficulté, confort des boutons).
@@ -105,6 +114,8 @@ Retour de l'auteur encore attendu : les sensations de combat sur téléphone
 | `scripts/level.gd` | Base des niveaux : héros, caméra, HUD, apparition des morts, outils de scénario (`say`, `reach`, `until_peace`, `wait`) |
 | `scripts/levels/la_grille.gd` | Niveau 1 : décor, grilles, scénario |
 | `scripts/levels/arena.gd` | Salle d'essai, utilisée par le test automatique |
+| `scripts/progress.gd` | Chargé en permanence (`Progress`) : souvenirs, niveau, or, compétences, sauvegarde |
+| `scripts/skill_book.gd` | Le carnet : écran des compétences |
 | `scripts/hero.gd` | Le héros : états MOVE, ATTACK, DODGE, HIT, RITE, DEAD |
 | `scripts/enemy.gd` | Un mort : CHASE, WINDUP, STAGGER, DOWN, RISING, RESTED |
 | `scripts/touch_controls.gd` | Joystick, boutons tactiles, clavier |
@@ -112,6 +123,7 @@ Retour de l'auteur encore attendu : les sensations de combat sur téléphone
 | `scripts/hud.gd` | Barre de vie, compteurs, messages |
 | `scripts/data/hero_classes.gd` | Valeurs et animations des classes |
 | `scripts/data/enemy_types.gd` | Valeurs et animations des types de morts |
+| `scripts/data/progression.gd` | Paliers de niveau, caractéristiques de base, compétences |
 | `scripts/dev/selftest_bot.gd` | Joueur automatique pour les tests |
 
 Règles à garder :
@@ -134,7 +146,12 @@ Règles à garder :
 - **Sol** : `pave()` dessine tous les carreaux en un seul appel. Ne pas
   poser les carreaux un par un.
 - **Entrées** : le jeu ne lit que `TouchControls.move`, `rite_held` et les
-  signaux `attack_pressed` et `dodge_pressed`.
+  signaux `attack_pressed`, `dodge_pressed` et `book_pressed`.
+- **Caractéristiques du héros** : la progression les calcule
+  (`Progress.hero_stats()`) et le niveau les applique avec
+  `hero.apply_stats()`. Le héros ne lit jamais `Progress` lui-même.
+- **Tests et sauvegarde** : en mode test ou capture, `Main` écrit dans
+  `user://essai.json`, jamais dans la vraie sauvegarde du joueur.
 
 ## Vérifier son travail
 

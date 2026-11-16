@@ -134,6 +134,11 @@ func memories_given() -> int:
 	return int(_type["memories"])
 
 
+## Or laissé par ce mort quand il reçoit le Repos.
+func gold_given() -> int:
+	return int(_type.get("gold", 0))
+
+
 ## Part du délai déjà écoulée avant le relèvement, de 0 à 1.
 func rise_progress() -> float:
 	return clampf(_down_time / maxf(rise_delay, 0.01), 0.0, 1.0)

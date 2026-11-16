@@ -5,6 +5,8 @@ extends CanvasLayer
 const BAR_SIZE := Vector2(300.0, 18.0)
 
 var _health_fill: ColorRect
+var _memory_fill: ColorRect
+var _level_label: Label
 var _info: Label
 var _message: Label
 var _debug: Label
@@ -36,11 +38,29 @@ func _ready() -> void:
 	_health_fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_health_fill)
 
+	# Sous la vie, la jauge des souvenirs : elle mène au niveau suivant.
+	var memory_back := ColorRect.new()
+	memory_back.position = Vector2(22.0, 48.0)
+	memory_back.size = Vector2(BAR_SIZE.x + 6.0, 9.0)
+	memory_back.color = Color(0.0, 0.0, 0.0, 0.6)
+	memory_back.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(memory_back)
+
+	_memory_fill = ColorRect.new()
+	_memory_fill.position = Vector2(25.0, 50.0)
+	_memory_fill.size = Vector2(0.0, 5.0)
+	_memory_fill.color = Color(0.62, 0.78, 1.0)
+	_memory_fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_memory_fill)
+
+	_level_label = _make_label(18, Color(1.0, 0.93, 0.78))
+	_level_label.position = Vector2(BAR_SIZE.x + 40.0, 18.0)
+
 	_info = _make_label(18, Color(0.85, 0.9, 1.0))
-	_info.position = Vector2(24.0, 50.0)
+	_info.position = Vector2(24.0, 64.0)
 
 	_debug = _make_label(13, Color(1.0, 1.0, 1.0, 0.5))
-	_debug.position = Vector2(24.0, 78.0)
+	_debug.position = Vector2(24.0, 92.0)
 
 	_message = _make_label(30, Color(1.0, 0.93, 0.78))
 	# Toute la largeur de l'écran : le texte se centre quelle que soit sa longueur.
@@ -66,8 +86,14 @@ func flash_damage() -> void:
 
 
 ## `standing` : morts debout. `down` : corps au sol, qui vont se relever.
-func set_counts(standing: int, down: int, memories: int) -> void:
-	_info.text = "Debout : %d    Au sol : %d    Souvenirs : %d" % [standing, down, memories]
+func set_counts(standing: int, down: int) -> void:
+	_info.text = "Debout : %d    Au sol : %d" % [standing, down]
+
+
+## Niveau du héros, part de la jauge des souvenirs remplie, or porté.
+func set_progress(level: int, progress: float, gold: int) -> void:
+	_memory_fill.size.x = BAR_SIZE.x * progress
+	_level_label.text = "Niv. %d    Or : %d" % [level, gold]
 
 
 func set_debug(text: String) -> void:
