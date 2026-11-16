@@ -26,10 +26,23 @@ const CHAPTER_1 := {
 	],
 }
 
+const CHAPTER_2 := {
+	"title": "Le Marché aux absents",
+	"levels": [
+		{"id": &"la_porte_des_halles", "name": "La Porte des halles"},
+		{"id": &"les_etals", "name": "Les Étals"},
+		{"id": &"la_balance", "name": "La Balance"},
+		{"id": &"les_caves", "name": "Les Caves du marché"},
+		{"id": &"la_halle_du_prevot", "name": "La Halle du Prévôt"},
+	],
+}
+
+const CHAPTERS := [CHAPTER_1, CHAPTER_2]
+
 
 ## Le niveau placé au `index`-ième point de la route, ou un dictionnaire vide.
 static func level_at(index: int) -> Dictionary:
-	var levels: Array = CHAPTER_1["levels"]
+	var levels := chapter_levels()
 	if index < 0 or index >= levels.size():
 		return {}
 	return levels[index]
@@ -37,7 +50,7 @@ static func level_at(index: int) -> Dictionary:
 
 ## Place d'un niveau sur la route, ou -1 s'il n'y figure pas.
 static func level_index(id: StringName) -> int:
-	var levels: Array = CHAPTER_1["levels"]
+	var levels := chapter_levels()
 	for i in levels.size():
 		if levels[i]["id"] == id:
 			return i
@@ -56,5 +69,20 @@ static func roman(number: int) -> String:
 	return text
 
 
+## Tous les niveaux construits, chapitre après chapitre, dans l'ordre de la route.
 static func chapter_levels() -> Array:
-	return CHAPTER_1["levels"]
+	var all: Array = []
+	for chapter: Dictionary in CHAPTERS:
+		all.append_array(chapter["levels"])
+	return all
+
+
+## Numéro (à partir de 1) du chapitre où se trouve le `index`-ième niveau.
+static func chapter_of(index: int) -> int:
+	return clampi(index / LEVELS_PER_CHAPTER + 1, 1, CHAPTERS.size())
+
+
+static func chapter_title(number: int) -> String:
+	if number < 1 or number > CHAPTERS.size():
+		return ""
+	return CHAPTERS[number - 1]["title"]

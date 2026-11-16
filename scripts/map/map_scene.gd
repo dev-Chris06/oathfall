@@ -286,8 +286,9 @@ func _draw_labels() -> void:
 		draw_string(font, Vector2(W - 600.0, y), String(act["name"]).to_upper(), HORIZONTAL_ALIGNMENT_RIGHT, 400.0, 26, Theatre.MUTED)
 		draw_string(font, Vector2(W - 600.0, y + 28.0), act["title"], HORIZONTAL_ALIGNMENT_RIGHT, 400.0, 19, Color(Theatre.MUTED, 0.8))
 	draw_string(GameFonts.italic(), Vector2(60.0, 2440.0), "le moulin, refuge", HORIZONTAL_ALIGNMENT_LEFT, 300.0, 20, Color(Theatre.MUTED, 0.9))
-	var p0 := node_positions[0]
-	_outlined(Vector2(p0.x - 190.0, p0.y - 46.0), "Chapitre %s" % WorldData.roman(1), 24, Theatre.EMBER, 300.0)
+	for c in WorldData.CHAPTERS.size():
+		var p0 := node_positions[c * WorldData.LEVELS_PER_CHAPTER]
+		_outlined(Vector2(p0.x - 190.0, p0.y - 46.0), "Chapitre %s" % WorldData.roman(c + 1), 24, Theatre.EMBER, 300.0)
 	var levels := WorldData.chapter_levels()
 	for i in levels.size():
 		var p := node_positions[i]

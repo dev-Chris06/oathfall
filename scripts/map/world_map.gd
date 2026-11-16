@@ -35,6 +35,8 @@ var _selected := -1
 var _refuge_selected := false
 var _time := 0.0
 
+var _chapter_label: Label
+var _chapter_title: Label
 var _progress_label: Label
 var _stats_label: Label
 var _book_button: Button
@@ -124,6 +126,10 @@ func refresh() -> void:
 			done += 1
 	_scene.set_states(new_states, flags)
 	_glow.ici_index = WorldData.level_index(current_id())
+	var focus := WorldData.level_index(current_id())
+	var chapter := WorldData.chapter_of(maxi(focus, 0) if focus >= 0 else levels.size() - 1)
+	_chapter_label.text = "Chapitre %s" % WorldData.roman(chapter)
+	_chapter_title.text = WorldData.chapter_title(chapter)
 	_progress_label.text = "%d sur %d niveaux terminés" % [done, levels.size()]
 	_stats_label.text = "Niv. %d    Or : %d" % [Progress.hero_level, Progress.gold]
 	_book_button.text = "Carnet !" if Progress.skill_points > 0 else "Carnet"
@@ -277,8 +283,10 @@ func _build_ui() -> void:
 	var card_column := VBoxContainer.new()
 	card_column.add_theme_constant_override("separation", 0)
 	card.add_child(card_column)
-	card_column.add_child(Theatre.label("Chapitre %s" % WorldData.roman(1), 38, Theatre.AMBER, GameFonts.title()))
-	card_column.add_child(Theatre.label(WorldData.CHAPTER_1["title"], 21, Theatre.CREAM, GameFonts.italic()))
+	_chapter_label = Theatre.label("", 38, Theatre.AMBER, GameFonts.title())
+	card_column.add_child(_chapter_label)
+	_chapter_title = Theatre.label("", 21, Theatre.CREAM, GameFonts.italic())
+	card_column.add_child(_chapter_title)
 	_progress_label = Theatre.label("", 17, Theatre.MUTED)
 	card_column.add_child(_progress_label)
 	add_child(card)
