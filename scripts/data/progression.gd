@@ -24,6 +24,8 @@ const BASE_STATS := {
 	"dodge_cooldown": 0.8,
 	# Vie rendue au héros à chaque Repos donné.
 	"rest_heal": 0,
+	# Multiplie la vitesse de course.
+	"speed_scale": 1.0,
 }
 
 ## Compétences de chaque classe. Chaque rang donne la valeur finale des

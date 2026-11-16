@@ -21,6 +21,10 @@ extends Node
 ##  11. il termine le niveau, et la fin est enregistrée.
 ## Enfin la carte :
 ##  12. états des niveaux, entrée dans un niveau, abandon depuis le carnet.
+## Enfin le moulin et les menus :
+##  13. boutique (achats, prérequis, bonus), conversations, rites appris
+##      seulement chez Anselme, entrée et sortie du moulin ;
+##  14. écran-titre, nouvelle partie, texte d'ouverture, retour à la carte.
 ## Avec `capture_dir`, il ne joue que la Grille et enregistre des images.
 
 var main: Node
@@ -229,6 +233,10 @@ func _run() -> void:
 	if not await _traverse(&"la_fosse"):
 		return
 	if not await _map_tests():
+		return
+	if not await _refuge_tests():
+		return
+	if not await _menu_tests():
 		return
 	print("SELFTEST OK")
 	get_tree().quit(0)
@@ -868,6 +876,175 @@ func _map_tests() -> bool:
 	if main.level != null or main.world_map == null or get_tree().paused:
 		return _fail("quitter le niveau depuis le carnet ne ramène pas à la carte")
 	print("test 12 réussi : quitter le niveau ramène à la carte")
+
+	# Le moulin se choisit comme un niveau.
+	map = main.world_map
+	map.select_refuge()
+	if map.selected_id() != &"refuge":
+		return _fail("le moulin ne se choisit pas sur la carte")
+	map.enter_selected()
+	await get_tree().process_frame
+	if main.level == null or main.level.title != "Le moulin":
+		return _fail("le moulin ne s'ouvre pas depuis la carte")
+	print("test 12 réussi : le moulin s'ouvre depuis la carte")
+	return true
+
+
+func _frames(count: int) -> void:
+	for i in count:
+		await get_tree().physics_frame
+
+
+## Le moulin : la boutique, les conversations, les rites, l'entrée et la sortie.
+func _refuge_tests() -> bool:
+	# --- La boutique, sans l'écran.
+	Progress.reset()
+	Progress.add_gold(40)
+	if Progress.shop_blocker(&"gambison") != "or" or Progress.buy(&"gambison"):
+		return _fail("on peut acheter sans avoir assez d'or")
+	if Progress.shop_blocker(&"cotte") != "prerequis":
+		return _fail("la cotte de mailles n'exige pas le gambison")
+	Progress.add_gold(1000)
+	if Progress.buy(&"cotte"):
+		return _fail("on a acheté la cotte de mailles sans le gambison")
+	var gold := Progress.gold
+	if not Progress.buy(&"gambison") or Progress.gold != gold - 100:
+		return _fail("l'achat du gambison n'a pas coûté 100 or")
+	Progress.buy(&"lame")
+	Progress.buy(&"bottes")
+	Progress.buy(&"bandages")
+	var stats := Progress.hero_stats()
+	if int(stats["max_health"]) != 100 + 20:
+		return _fail("le gambison n'ajoute pas 20 de vie (vie maximale %d)" % int(stats["max_health"]))
+	if not is_equal_approx(float(stats["damage_scale"]), 1.10) or not is_equal_approx(float(stats["speed_scale"]), 1.08) \
+			or int(stats["rest_heal"]) != 3:
+		return _fail("les bonus de la boutique ne s'appliquent pas : %s" % [stats])
+	Progress.buy(&"lame")
+	if Progress.shop_blocker(&"lame") != "maitrise":
+		return _fail("la lame a plus de deux rangs")
+	Progress.save()
+	var kept := Progress.purchases.duplicate()
+	Progress.reset()
+	Progress.load_save()
+	if Progress.purchases != kept:
+		return _fail("les achats ne sont pas relus de la sauvegarde")
+	print("test 13 réussi : boutique (prérequis, manque d'or, bonus, sauvegarde)")
+
+	# --- Les conversations : dans l'ordre, une seule fois chacune.
+	Progress.reset()
+	if RefugeTexts.next_conversation(&"anselme").get("id", &"") != &"anselme_1":
+		return _fail("la première conversation d'Anselme n'est pas la première")
+	Progress.hear(&"anselme_1")
+	if not RefugeTexts.next_conversation(&"anselme").is_empty():
+		return _fail("Anselme a une conversation avant que le joueur ait avancé")
+	Progress.mark_completed(&"la_grille")
+	if RefugeTexts.next_conversation(&"anselme").get("id", &"") != &"anselme_2":
+		return _fail("Anselme ne réagit pas à la Grille terminée")
+	if RefugeTexts.idle_line(&"maud", 0) == RefugeTexts.idle_line(&"maud", 1):
+		return _fail("la phrase de repli de Maud ne change pas")
+	print("test 13 réussi : conversations ouvertes par les niveaux, entendues une fois")
+
+	# --- Dans le moulin.
+	Progress.add_gold(500)
+	main.load_level(&"refuge")
+	var level := _level() as Refuge
+	await _frames(4)
+	var hero := level.hero
+	if hero.interaction_label != "":
+		return _fail("une interaction est proposée au départ (« %s »)" % hero.interaction_label)
+	hero.global_position = Vector3(7.0, 0.0, -7.0)
+	await _frames(3)
+	if hero.interaction_label != "PARLER" or level.controls.rite_label != "PARLER":
+		return _fail("le bouton ne propose pas PARLER près de Maud")
+	level.talk_to_nearest()
+	await _frames(2)
+	if level.dialogue == null or not get_tree().paused:
+		return _fail("la conversation n'a pas ouvert la boîte de dialogue")
+	level.dialogue.close(&"shop")
+	await _frames(2)
+	if level.shop == null:
+		return _fail("la boutique ne s'est pas ouverte")
+	var before := Progress.gold
+	if not level.shop.buy(&"gambison"):
+		return _fail("l'achat depuis l'écran de la boutique a échoué")
+	level.shop.close()
+	await _frames(2)
+	if Progress.gold != before - 100 or hero.max_health != int(Progress.hero_stats()["max_health"]):
+		return _fail("l'achat n'a pas changé la vie du héros (%d)" % hero.max_health)
+	if not Progress.has_heard(&"maud_1") or get_tree().paused:
+		return _fail("la conversation n'est pas marquée entendue, ou le jeu reste en pause")
+	print("test 13 réussi : on parle à Maud et on achète au moulin")
+
+	# Les rites ne s'apprennent qu'auprès d'Anselme.
+	level.open_book()
+	if level.book.can_learn:
+		return _fail("le carnet ordinaire propose d'apprendre des rites")
+	level.book.close_book()
+	hero.global_position = Vector3(-7.4, 0.0, -7.4)
+	await _frames(3)
+	if hero.interaction_label != "PARLER":
+		return _fail("le bouton ne propose pas PARLER près d'Anselme")
+	level.talk_to_nearest()
+	await _frames(2)
+	level.dialogue.close(&"skills")
+	await _frames(2)
+	if level.book == null or not level.book.can_learn:
+		return _fail("chez Anselme, le carnet ne propose pas d'apprendre")
+	level.book.close_book()
+	await _frames(2)
+	print("test 13 réussi : les rites s'apprennent seulement chez Anselme")
+
+	# La route, au sud, ramène à la carte.
+	hero.global_position = Vector3(0.0, 0.0, 9.5)
+	await _frames(3)
+	if hero.interaction_label != "PARTIR":
+		return _fail("le bouton ne propose pas PARTIR sur la route")
+	hero.interacted.emit()
+	await _frames(2)
+	if main.level != null or main.world_map == null:
+		return _fail("la route ne ramène pas à la carte")
+	print("test 13 réussi : la route du moulin ramène à la carte")
+	return true
+
+
+## L'écran-titre, la nouvelle partie, le texte d'ouverture.
+func _menu_tests() -> bool:
+	Progress.reset()
+	main.show_title()
+	await get_tree().process_frame
+	var title: TitleScreen = main.title_screen
+	if title == null:
+		return _fail("l'écran-titre ne s'affiche pas")
+	if title.has_continue():
+		return _fail("« Continuer » est proposé sans partie")
+	Progress.add_gold(10)
+	title.refresh()
+	if not title.has_continue():
+		return _fail("« Continuer » n'est pas proposé avec une partie")
+	title.press_new_game()
+	if not title.is_confirming() or Progress.gold != 10:
+		return _fail("« Nouvelle partie » n'a pas demandé confirmation, ou a effacé avant")
+	title.confirm_new_game()
+	await get_tree().process_frame
+	if Progress.has_progress():
+		return _fail("la nouvelle partie n'a pas remis la progression à zéro")
+	if main.opening == null or main.title_screen != null:
+		return _fail("le texte d'ouverture ne se lance pas après « Nouvelle partie »")
+	main.opening.skip_all()
+	await get_tree().process_frame
+	if main.world_map == null or main.opening != null:
+		return _fail("la carte n'apparaît pas après le texte d'ouverture")
+	main.world_map.menu_requested.emit()
+	await get_tree().process_frame
+	if main.title_screen == null:
+		return _fail("le bouton Menu de la carte ne ramène pas à l'écran-titre")
+	Progress.add_gold(5)
+	main.title_screen.refresh()
+	main.title_screen.press_continue()
+	await get_tree().process_frame
+	if main.world_map == null or Progress.gold != 5:
+		return _fail("« Continuer » ne reprend pas la partie")
+	print("test 14 réussi : écran-titre, nouvelle partie confirmée, ouverture, menu, continuer")
 	return true
 
 
@@ -929,6 +1106,59 @@ func _capture_map() -> void:
 	get_tree().quit(0)
 
 
+## L'écran-titre, la demande de confirmation, le texte d'ouverture.
+func _capture_title() -> void:
+	Progress.mark_completed(&"la_grille")
+	Progress.mark_completed(&"les_allees")
+	Progress.add_memories(120)
+	main.show_title()
+	await get_tree().create_timer(0.6).timeout
+	await _shoot("titre_01")
+	main.title_screen.press_new_game()
+	await get_tree().create_timer(0.4).timeout
+	await _shoot("titre_02_confirmation")
+	main.title_screen.confirm_new_game()
+	await get_tree().create_timer(2.2).timeout
+	await _shoot("titre_03_ouverture")
+	get_tree().quit(0)
+
+
+## Une visite du moulin : l'arrivée, chaque personnage, la boutique, le carnet.
+func _capture_refuge() -> void:
+	Progress.mark_completed(&"la_grille")
+	Progress.mark_completed(&"les_allees")
+	Progress.add_gold(700)
+	Progress.add_memories(300)
+	main.load_level(&"refuge")
+	var level := _level() as Refuge
+	await get_tree().create_timer(0.8).timeout
+	await _shoot("refuge_01_arrivee")
+	for stop in [[Vector3(0.0, 0.0, -6.5), "refuge_02_cour"], [Vector3(6.6, 0.0, -7.0), "refuge_03_maud"]]:
+		level.objective = stop[0]
+		await get_tree().create_timer(2.6).timeout
+		await _shoot(stop[1])
+	level.talk_to_nearest()
+	await get_tree().create_timer(1.8).timeout
+	await _shoot("refuge_04_dialogue")
+	level.dialogue.close(&"shop")
+	await get_tree().create_timer(0.5).timeout
+	await _shoot("refuge_05_boutique")
+	level.shop.close()
+	level.objective = Vector3(-7.4, 0.0, -7.4)
+	await get_tree().create_timer(4.0).timeout
+	await _shoot("refuge_06_anselme")
+	level.talk_to_nearest()
+	await get_tree().create_timer(0.3).timeout
+	level.dialogue.close(&"skills")
+	await get_tree().create_timer(0.5).timeout
+	await _shoot("refuge_07_rites")
+	level.book.close_book()
+	level.objective = Vector3(-2.6, 0.0, -10.4)
+	await get_tree().create_timer(3.4).timeout
+	await _shoot("refuge_08_tibert")
+	get_tree().quit(0)
+
+
 func _shoot(file: String) -> void:
 	await RenderingServer.frame_post_draw
 	get_viewport().get_texture().get_image().save_png("%s/%s.png" % [capture_dir, file])
@@ -949,6 +1179,12 @@ func _capture_book() -> void:
 func _capture() -> void:
 	if capture_map:
 		await _capture_map()
+		return
+	if main.level_id == &"refuge":
+		await _capture_refuge()
+		return
+	if main.level_id == &"title":
+		await _capture_title()
 		return
 	main.load_level(main.level_id, start_checkpoint)
 	_watch(_level())

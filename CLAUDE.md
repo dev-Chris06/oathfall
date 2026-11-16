@@ -85,12 +85,16 @@ apprendre les compétences et quelques personnages à qui parler.
 | 6. Niveaux 2 et 4, et les quatre autres morts | Fait |
 | 7. Niveau 3 : le Sonneur | Fait |
 | 8. Niveau 5 : la Fossoyeuse | Fait |
-| 9. Le refuge, le menu, le texte d'ouverture | **À faire, c'est la suite** |
-| 10. Finition : sons, musique, équilibrage, icône, APK signé | À faire |
+| 9. Le refuge, le menu, le texte d'ouverture | Fait |
+| 10. Finition : sons, musique, équilibrage, icône, APK signé | **À faire, c'est la suite** |
 
-Le jeu s'ouvre sur **la carte d'Orvana** (`scripts/map/`), qui sert de menu :
-la capitale vue de face, en quatre étages, que la route en lacets gravit du
-fleuve au palais. On y choisit un niveau (toucher un point, puis « Entrer »).
+Le jeu s'ouvre sur **l'écran-titre** (`TitleScreen` : Continuer s'il y a une
+partie, Nouvelle partie avec confirmation, Options avec crédits et effacement
+de la sauvegarde). Une partie neuve passe par le texte d'ouverture
+(`OpeningScreen`), puis **la carte d'Orvana** (`scripts/map/`) : la capitale
+vue de face, en quatre étages, que la route en lacets gravit du fleuve au
+palais. On y choisit un niveau (toucher un point, puis « Entrer ») ou le
+**moulin** (le refuge, en bas à gauche) ; le bouton Menu ramène au titre.
 Les cinq niveaux du chapitre 1 sont construits : la Grille, les Allées, la
 Chapelle des cendres, l'Ossuaire, la Fosse. Chacun compte trois parties
 séparées par des grilles qui s'ouvrent quand les morts reposent (la Fosse :
@@ -99,6 +103,18 @@ ramène à la carte ; le carnet, ouvert en plein niveau, propose « Quitter le
 niveau ». Tout niveau construit reste jouable à tout moment (essais) ;
 « ici » désigne le premier non terminé. Le héros qui tombe se relève au
 dernier point de reprise. L'arène d'essai reste disponible (`-- --arena`).
+
+**Le refuge** (`refuge.gd`) est le moulin, hors des murs : un niveau calme, sans
+mort. Maud (boutique : améliorations permanentes payées en or, `Shop`), frère
+Anselme (**les rites ne s'apprennent que chez lui** : le carnet ordinaire ne
+fait que les montrer, `SkillBook.can_learn`) et Tibert (il pose des
+questions). On touche PARLER près d'un personnage ; la route au sud, PARTIR,
+ramène à la carte. Leurs conversations (`RefugeTexts`) s'ouvrent à mesure que
+des niveaux sont terminés et ne s'entendent qu'une fois, puis un repli. Le
+héros ne parle pas. **Ces textes sont publics : rien qui touche au
+retournement du scénario.** Le mécanisme de textes secrets (fichier hors du
+dépôt injecté au build par un secret GitHub) n'existe pas encore ; le
+joueur a choisi de laisser la réplique de fin de la Fossoyeuse de côté.
 
 Style de toute l'interface : « théâtre d'ombres » (silhouettes de papier noir,
 nuit bleue, braises et or pâle). Les couleurs et les boutons sont dans
@@ -157,11 +173,13 @@ Retour de l'auteur encore attendu : les sensations de combat sur téléphone
 | `scripts/levels/la_chapelle.gd` | Niveau 3 : porche, nef, chœur, combat du Sonneur |
 | `scripts/levels/l_ossuaire.gd` | Niveau 4 : couloirs et salles, Fouisseur, Veuve |
 | `scripts/levels/la_fosse.gd` | Niveau 5 : le chemin, la fosse ronde, la Fossoyeuse |
+| `scripts/levels/refuge.gd`, `npc.gd` | Le moulin et ses personnages |
+| `scripts/data/refuge_texts.gd`, `shop.gd` | Conversations du refuge ; articles de la boutique |
 | `scripts/enemies/` | Comportements propres : archer (et son carreau), Porte-cloche, Fouisseur, Veuve, Sonneur, la grosse cloche avec ses cordes (`great_bell.gd`, `bell_rope.gd`), Fossoyeuse et ses pierres (`fossoyeuse.gd`, `grave_stone.gd`) |
 | `scripts/fx.gd` | Effets partagés : ondes au sol, matériaux simples |
 | `scripts/map/` | La carte : `world_map.gd` (écran, défilement, choix), `map_scene.gd` (la ville dessinée par code) |
 | `scripts/data/world_data.gd` | Chapitres et niveaux dans l'ordre de la route |
-| `scripts/ui/` | Polices, thème « théâtre d'ombres » (`Theatre`), page découpée du carnet |
+| `scripts/ui/` | Polices, thème « théâtre d'ombres » (`Theatre`), page découpée du carnet, ciel de nuit, boîte de dialogue, boutique, écran-titre, ouverture |
 | `scripts/levels/arena.gd` | Salle d'essai, utilisée par le test automatique |
 | `scripts/progress.gd` | Chargé en permanence (`Progress`) : souvenirs, niveau, or, compétences, sauvegarde |
 | `scripts/skill_book.gd` | Le carnet : écran des compétences |
@@ -192,6 +210,9 @@ Règles à garder :
 - **Scénarios** : attendre avec `wait()` ou `wait_until()` du niveau, jamais
   avec un minuteur de l'arbre, pour que tout s'arrête si le niveau est
   rechargé.
+- **Interaction hors combat** : le niveau donne `hero.interaction_label`
+  (« PARLER », « PARTIR »), le bouton du rite l'affiche, et le héros émet
+  `interacted` à l'appui. Les corps et les cordes ont la priorité.
 - **Un type de mort** se déclare dans `enemy_types.gd` avec son `behavior`
   (`melee`, `archer`, `bell`, `burrower`, `widow`, `sonneur`, `fossoyeuse`) ; `Enemy.create()`
   choisit la classe. Un comportement écrit `_chase()` et, pour ses actions

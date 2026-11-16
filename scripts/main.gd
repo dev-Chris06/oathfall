@@ -1,6 +1,7 @@
 extends Node
-## Point d'entrée. Le jeu s'ouvre sur la carte d'Orvana, où l'on choisit un
-## niveau ; la fin d'un niveau, ou son abandon depuis le carnet, ramène à la
+## Point d'entrée. Le jeu s'ouvre sur l'écran-titre (continuer, nouvelle
+## partie, options), puis sur la carte d'Orvana, où l'on choisit un niveau ou
+## le refuge ; la fin d'un niveau, ou son abandon depuis le carnet, ramène à la
 ## carte. Un héros qui tombe se relève au dernier point de reprise du niveau.
 ##
 ## Arguments, après `--` :
@@ -8,7 +9,7 @@ extends Node
 ##                         traverse les niveaux et essaie la carte
 ##   --capture=DOSSIER     même chose, en enregistrant des images
 ##   --map                 avec --capture : photographie la carte
-##   --arena               lance la salle d'essai au lieu de la carte
+##   --arena               lance la salle d'essai au lieu de l'écran-titre
 ##   --level=ID            lance ce niveau (la_grille, les_allees…)
 ##   --checkpoint=N        commence au point de reprise N
 ##
@@ -23,10 +24,13 @@ const LEVELS := {
 	&"la_chapelle": preload("res://scripts/levels/la_chapelle.gd"),
 	&"l_ossuaire": preload("res://scripts/levels/l_ossuaire.gd"),
 	&"la_fosse": preload("res://scripts/levels/la_fosse.gd"),
+	&"refuge": preload("res://scripts/levels/refuge.gd"),
 }
 
 var level: Level
 var world_map: WorldMap
+var title_screen: TitleScreen
+var opening: OpeningScreen
 var level_id := &"la_grille"
 var scripted := false
 
@@ -78,7 +82,7 @@ func _ready() -> void:
 	if direct and LEVELS.has(level_id):
 		load_level(level_id, maxi(forced_checkpoint, 0))
 	else:
-		show_map()
+		show_title()
 
 
 ## Les niveaux construits, hors salle d'essai.
@@ -90,15 +94,40 @@ func ready_levels() -> Array:
 	return ids
 
 
+## L'écran-titre : continuer, nouvelle partie, options.
+func show_title() -> void:
+	_drop_level()
+	_drop_map()
+	_drop_screens()
+	Engine.time_scale = 1.0
+	get_tree().paused = false
+	title_screen = TitleScreen.new()
+	title_screen.continue_pressed.connect(show_map)
+	title_screen.new_game_pressed.connect(start_new_game)
+	add_child(title_screen)
+
+
+## Une partie neuve : tout est remis à zéro, puis le texte d'ouverture, puis la
+## carte.
+func start_new_game() -> void:
+	Progress.new_game()
+	_drop_screens()
+	opening = OpeningScreen.new()
+	opening.finished.connect(show_map)
+	add_child(opening)
+
+
 ## Affiche la carte. Le niveau en cours, s'il y en a un, est abandonné.
 func show_map() -> void:
 	_drop_level()
 	_drop_map()
+	_drop_screens()
 	Engine.time_scale = 1.0
 	get_tree().paused = false
 	world_map = WorldMap.new()
 	world_map.available = ready_levels()
 	world_map.level_chosen.connect(_on_level_chosen)
+	world_map.menu_requested.connect(show_title)
 	add_child(world_map)
 
 
@@ -106,6 +135,7 @@ func show_map() -> void:
 func load_level(id: StringName, checkpoint := 0) -> void:
 	_drop_level()
 	_drop_map()
+	_drop_screens()
 	level_id = id
 	_checkpoint = checkpoint
 	Engine.time_scale = 1.0
@@ -126,6 +156,17 @@ func _drop_level() -> void:
 		remove_child(level)
 		level.queue_free()
 		level = null
+
+
+func _drop_screens() -> void:
+	if title_screen != null:
+		remove_child(title_screen)
+		title_screen.queue_free()
+		title_screen = null
+	if opening != null:
+		remove_child(opening)
+		opening.queue_free()
+		opening = null
 
 
 func _drop_map() -> void:

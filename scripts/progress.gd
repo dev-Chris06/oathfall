@@ -27,6 +27,10 @@ var level_id: StringName = &"la_grille"
 var checkpoint := 0
 ## Les niveaux terminés (identifiant → vrai). Ils restent rejouables.
 var completed := {}
+## Les achats de la boutique (identifiant → rang acheté).
+var purchases := {}
+## Les conversations du refuge déjà entendues (identifiant → vrai).
+var heard := {}
 
 
 func reset() -> void:
@@ -39,7 +43,20 @@ func reset() -> void:
 	level_id = &"la_grille"
 	checkpoint = 0
 	completed = {}
+	purchases = {}
+	heard = {}
 	changed.emit()
+
+
+## Une partie neuve : tout est remis à zéro, et la sauvegarde écrasée.
+func new_game() -> void:
+	reset()
+	save()
+
+
+## Vrai s'il y a une partie à continuer.
+func has_progress() -> bool:
+	return memories > 0 or gold > 0 or not completed.is_empty() or not purchases.is_empty()
 
 
 func is_completed(id: StringName) -> bool:
@@ -106,7 +123,57 @@ func learn(skill_id: StringName) -> bool:
 	return true
 
 
-## Les caractéristiques du héros, compétences et niveau compris.
+func has_heard(conversation_id: StringName) -> bool:
+	return heard.has(String(conversation_id))
+
+
+func hear(conversation_id: StringName) -> void:
+	heard[String(conversation_id)] = true
+	save()
+
+
+# --- La boutique --------------------------------------------------------------
+
+func shop_rank(item_id: StringName) -> int:
+	return int(purchases.get(String(item_id), 0))
+
+
+## Le prochain rang d'un article, ou un dictionnaire vide s'il n'y en a plus.
+func shop_next(item_id: StringName) -> Dictionary:
+	var item := Shop.find(item_id)
+	if item.is_empty():
+		return {}
+	var ranks: Array = item["ranks"]
+	var rank := shop_rank(item_id)
+	return ranks[rank] if rank < ranks.size() else {}
+
+
+## Pourquoi on ne peut pas acheter : « », « maitrise », « prerequis » ou « or ».
+func shop_blocker(item_id: StringName) -> String:
+	var next := shop_next(item_id)
+	if next.is_empty():
+		return "maitrise"
+	var item := Shop.find(item_id)
+	var needs: Dictionary = item.get("requires", {})
+	for needed: String in needs:
+		if shop_rank(StringName(needed)) < int(needs[needed]):
+			return "prerequis"
+	if gold < int(next["cost"]):
+		return "or"
+	return ""
+
+
+func buy(item_id: StringName) -> bool:
+	if shop_blocker(item_id) != "":
+		return false
+	gold -= int(shop_next(item_id)["cost"])
+	purchases[String(item_id)] = shop_rank(item_id) + 1
+	changed.emit()
+	save()
+	return true
+
+
+## Les caractéristiques du héros, compétences, achats et niveau compris.
 func hero_stats() -> Dictionary:
 	var stats := Progression.BASE_STATS.duplicate()
 	var data := HeroClasses.get_class_data(class_id)
@@ -117,6 +184,13 @@ func hero_stats() -> Dictionary:
 		if rank > 0:
 			var rank_data: Dictionary = skill["ranks"][rank - 1]
 			stats.merge(rank_data["stats"], true)
+	# Les achats de la boutique s'ajoutent.
+	for item: Dictionary in Shop.ITEMS:
+		var owned := shop_rank(item["id"])
+		for i in owned:
+			var bonus: Dictionary = item["ranks"][i]["bonus"]
+			for key: String in bonus:
+				stats[key] = stats.get(key, 0) + bonus[key]
 	return stats
 
 
@@ -141,6 +215,8 @@ func save() -> bool:
 		"level_id": String(level_id),
 		"checkpoint": checkpoint,
 		"completed": completed.keys(),
+		"purchases": purchases,
+		"heard": heard.keys(),
 	}
 	var file := FileAccess.open(save_path, FileAccess.WRITE)
 	if file == null:
@@ -178,6 +254,16 @@ func load_save() -> bool:
 	if typeof(saved_done) == TYPE_ARRAY:
 		for id in saved_done:
 			completed[String(id)] = true
+	purchases = {}
+	var saved_purchases = data.get("purchases", {})
+	if typeof(saved_purchases) == TYPE_DICTIONARY:
+		for key in saved_purchases:
+			purchases[String(key)] = int(saved_purchases[key])
+	heard = {}
+	var saved_heard = data.get("heard", [])
+	if typeof(saved_heard) == TYPE_ARRAY:
+		for id in saved_heard:
+			heard[String(id)] = true
 	changed.emit()
 	return true
 

@@ -13,6 +13,8 @@ signal hurt
 signal died
 ## Émis quand un mort reçoit le Repos des mains du héros.
 signal rest_given(enemy: Enemy)
+## Le joueur appuie sur le bouton alors qu'une interaction est possible.
+signal interacted
 
 enum State { MOVE, ATTACK, DODGE, HIT, RITE, DEAD }
 
@@ -58,6 +60,11 @@ var damage_scale := 1.0
 var rite_time := RITE_TIME
 var dodge_cooldown := DODGE_COOLDOWN
 var rest_heal := 0
+var speed_scale := 1.0
+## Ce qu'on peut faire ici sans que ce soit le Repos (parler, partir) : le
+## niveau y met le libellé du bouton, vide quand il n'y a rien à faire.
+var interaction_label := ""
+var _interact_was_held := false
 
 
 func setup(class_id: StringName, input: TouchControls) -> void:
@@ -102,7 +109,10 @@ func _physics_process(delta: float) -> void:
 
 	match state:
 		State.MOVE:
-			velocity = wish * float(_data["move_speed"])
+			velocity = wish * float(_data["move_speed"]) * speed_scale
+			if controls.rite_held and not _interact_was_held and body == null and rope == null \
+					and interaction_label != "":
+				interacted.emit()
 			if controls.rite_held and body != null:
 				_start_rite(body)
 			elif controls.rite_held and rope != null:
@@ -142,8 +152,11 @@ func _physics_process(delta: float) -> void:
 			velocity = Vector3.ZERO
 
 	# Le bouton du Repos n'apparaît que près d'un corps, ou d'une corde.
-	controls.rite_available = state != State.DEAD and (body != null or rope != null or state == State.RITE)
-	controls.rite_label = "COUPER" if (_cut_target != null or (body == null and rope != null)) else "REPOS"
+	var can_interact := interaction_label != "" and body == null and rope == null
+	controls.rite_available = state != State.DEAD and (body != null or rope != null or can_interact or state == State.RITE)
+	controls.rite_label = "COUPER" if (_cut_target != null or (body == null and rope != null)) \
+		else (interaction_label if can_interact else "REPOS")
+	_interact_was_held = controls.rite_held
 	controls.rite_progress = _rite_progress if state == State.RITE else 0.0
 
 	# Les modèles regardent vers +Z.
@@ -191,6 +204,7 @@ func apply_stats(stats: Dictionary) -> void:
 	rite_time = float(stats.get("rite_time", RITE_TIME))
 	dodge_cooldown = float(stats.get("dodge_cooldown", DODGE_COOLDOWN))
 	rest_heal = int(stats.get("rest_heal", 0))
+	speed_scale = float(stats.get("speed_scale", 1.0))
 	var new_max := int(stats.get("max_health", max_health))
 	if new_max != max_health:
 		health = clampi(health + new_max - max_health, 1, new_max)

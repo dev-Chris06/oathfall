@@ -7,17 +7,22 @@ extends Control
 ## (construit, jouable quand on veut) ou « ferme » (pas encore construit).
 
 signal level_chosen(id: StringName)
+## Le joueur veut revenir à l'écran-titre.
+signal menu_requested
 
 const TAP_SLOP := 14.0
 const PICK_RADIUS := 52.0
 const PARALLAX := 0.35
 const FRICTION := 5.0
+## Le moulin, sur la carte : le refuge, hors des murs.
+const MILL_POINT := Vector2(200.0, 2335.0)
+const MILL_RADIUS := 85.0
 
 ## Les niveaux construits, donnés par `Main`.
 var available: Array = []
 
 var _view: Control
-var _sky: MapSky
+var _sky: NightSky
 var _scene: MapScene
 var _glow: MapGlow
 var _scroll := 0.0
@@ -25,6 +30,7 @@ var _velocity := 0.0
 var _dragging := false
 var _moved := 0.0
 var _selected := -1
+var _refuge_selected := false
 var _time := 0.0
 
 var _progress_label: Label
@@ -48,7 +54,7 @@ func _ready() -> void:
 	_view.gui_input.connect(_on_view_input)
 	add_child(_view)
 
-	_sky = MapSky.new()
+	_sky = NightSky.new()
 	_view.add_child(_sky)
 	_scene = MapScene.new()
 	_view.add_child(_scene)
@@ -130,6 +136,8 @@ func select_level(id: StringName) -> void:
 
 
 func selected_id() -> StringName:
+	if _refuge_selected:
+		return &"refuge"
 	var level := WorldData.level_at(_selected)
 	return level["id"] if not level.is_empty() else &""
 
@@ -143,13 +151,29 @@ func enter_selected() -> void:
 
 func _select_index(index: int) -> void:
 	_selected = index
+	_refuge_selected = false
 	_glow.selected_index = index
+	_glow.refuge_selected = false
+	_show_selection()
+
+
+## Choisit le moulin, le refuge.
+func select_refuge() -> void:
+	_selected = -1
+	_refuge_selected = true
+	_glow.selected_index = -1
+	_glow.refuge_selected = true
 	_show_selection()
 
 
 func _show_selection() -> void:
 	var level := WorldData.level_at(_selected)
-	_bottom.visible = _selected >= 0
+	_bottom.visible = _selected >= 0 or _refuge_selected
+	if _refuge_selected:
+		_bottom_title.text = "Le moulin"
+		_bottom_text.text = "Le refuge, hors des murs. Maud, frère Anselme et Tibert y vivent encore : on y achète, on y apprend."
+		_enter_button.visible = is_ready(&"refuge")
+		return
 	if _selected < 0:
 		return
 	if level.is_empty():
@@ -237,6 +261,8 @@ func _tap(at: Vector2) -> void:
 			best = i
 	if best >= 0:
 		_select_index(best)
+	elif local.distance_to(MILL_POINT) <= MILL_RADIUS:
+		select_refuge()
 
 
 # --- Interface ----------------------------------------------------------------
@@ -265,6 +291,11 @@ func _build_ui() -> void:
 	top.offset_top = 22.0
 	_stats_label = Theatre.label("", 21)
 	top.add_child(_stats_label)
+	var menu_button := Button.new()
+	menu_button.text = "Menu"
+	Theatre.pill(menu_button, 21, Theatre.MUTED)
+	menu_button.pressed.connect(func() -> void: menu_requested.emit())
+	top.add_child(menu_button)
 	_book_button = Button.new()
 	Theatre.pill(_book_button, 21)
 	_book_button.pressed.connect(open_book)
@@ -307,39 +338,13 @@ func open_book() -> void:
 	add_child(_book)
 
 
-## La nuit : un dégradé, des étoiles, la lune. Elle défile moins vite que la
-## ville, comme un décor plus lointain.
-class MapSky extends Control:
-	var shift := 0.0
-	var _stars: Array[Vector3] = []
-
-	func _init() -> void:
-		mouse_filter = Control.MOUSE_FILTER_IGNORE
-		size = Vector2(2600.0, 2000.0)
-		var rng := RandomNumberGenerator.new()
-		rng.seed = 9
-		for i in 170:
-			_stars.append(Vector3(rng.randf_range(0.0, 2600.0), rng.randf_range(0.0, 1900.0), rng.randf_range(0.6, 1.8)))
-
-	func _draw() -> void:
-		var top := Color(0.137, 0.165, 0.29)
-		var bottom := Color(0.043, 0.043, 0.078)
-		draw_polygon(PackedVector2Array([Vector2.ZERO, Vector2(size.x, 0.0), size, Vector2(0.0, size.y)]),
-			PackedColorArray([top, top, bottom, bottom]))
-		for star in _stars:
-			draw_circle(Vector2(star.x, star.y), star.z, Color(0.85, 0.82, 0.7, 0.55))
-		var moon := Vector2(1010.0 + 120.0, 230.0)
-		for k in 7:
-			draw_circle(moon, 150.0 - k * 16.0, Color(0.95, 0.92, 0.82, 0.03 + 0.012 * k))
-		draw_circle(moon, 62.0, Color(0.95, 0.92, 0.82))
-
-
 ## Ce qui bouge sur la carte : la braise du prochain niveau, l'anneau du
 ## niveau choisi.
 class MapGlow extends Control:
 	var scene: MapScene
 	var ici_index := -1
 	var selected_index := -1
+	var refuge_selected := false
 	var time := 0.0
 
 	func _init() -> void:
@@ -358,3 +363,5 @@ class MapGlow extends Control:
 			draw_circle(p, 5.0, Color(1.0, 0.86, 0.7))
 		if selected_index >= 0:
 			draw_arc(scene.node_positions[selected_index], 25.0 + 2.0 * sin(time * 3.0), 0.0, TAU, 40, Theatre.CREAM, 3.0)
+		if refuge_selected:
+			draw_arc(WorldMap.MILL_POINT, 66.0 + 3.0 * sin(time * 3.0), 0.0, TAU, 48, Theatre.CREAM, 3.0)

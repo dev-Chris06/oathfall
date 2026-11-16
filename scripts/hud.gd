@@ -107,6 +107,11 @@ func _build_boss_bar() -> void:
 	_boss_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 
 
+## Cache le compte des morts : au refuge, il n'y en a pas.
+func hide_counts() -> void:
+	_info.visible = false
+
+
 func show_boss(boss_name: String, health: int, max_health: int) -> void:
 	_boss_label.text = boss_name
 	_boss_box.visible = true
