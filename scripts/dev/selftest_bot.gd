@@ -115,6 +115,10 @@ func _dodge_if_needed(level: Level, hero: Hero, controls: TouchControls) -> void
 			threat = enemy._state_time > float(enemy._type["aim_time"]) - 0.2 and not enemy._fired
 		elif enemy is Burrower and enemy.state == Enemy.State.SPECIAL:
 			threat = enemy._phase == Burrower.Phase.WARNING and enemy._state_time > 0.35
+		elif enemy is SonneurEnemy and enemy.is_quaking():
+			# L'onde du Sonneur : on esquive quand son front arrive.
+			var gap := absf(enemy.wave_radius() - enemy.global_position.distance_to(hero.global_position))
+			threat = gap < 2.4
 		elif enemy.state == Enemy.State.WINDUP and not enemy._struck:
 			var close := enemy.global_position.distance_to(hero.global_position) < maxf(2.6, float(enemy._type["attack_range"]) + 0.4)
 			threat = close and enemy._state_time > float(enemy._type["attack_windup"]) - 0.25 \
@@ -196,6 +200,8 @@ func _run() -> void:
 	if not await _bestiary_tests():
 		return
 	if not await _boss_tests():
+		return
+	if not await _quake_tests():
 		return
 	if not await _grille_tests():
 		return
@@ -472,6 +478,66 @@ func _boss_tests() -> bool:
 		return _fail("la cloche n'est pas tombée après la troisième corde")
 	print("test boss réussi : le héros grimpe et coupe les trois cordes")
 	tower.queue_free()
+	return true
+
+
+## La frappe sismique : l'onde blesse celui qu'elle traverse, sauf s'il esquive.
+func _quake_tests() -> bool:
+	var arena := _level() as Arena
+	var hero := arena.hero
+	var type := EnemyTypes.get_type(&"sonneur")
+	hero.heal(1000)
+	hero.global_position = Vector3(0.0, 0.0, 2.0)
+	_passive = true
+
+	var sonneur := arena.spawn(&"sonneur", Vector3(0.0, 0.0, -5.0), false) as SonneurEnemy
+	var result := [-1]
+	sonneur.quaked.connect(func(hit: bool) -> void: result[0] = 1 if hit else 0)
+	sonneur._quake_timer = 0.2
+
+	# Un héros immobile reçoit l'onde.
+	var before := hero.health
+	if not await _until(func() -> bool: return result[0] >= 0, 30.0):
+		return _fail("le Sonneur n'a pas lancé la frappe sismique")
+	if result[0] != 1:
+		return _fail("l'onde n'a pas touché un héros immobile à portée")
+	var lost := before - hero.health
+	if lost != int(type["quake_damage"]):
+		return _fail("l'onde a coûté %d points au lieu de %d" % [lost, int(type["quake_damage"])])
+	print("test boss réussi : la frappe sismique coûte %d points à un héros immobile" % lost)
+
+	# Un héros qui esquive quand le front de l'onde arrive ne perd rien.
+	hero.heal(1000)
+	before = hero.health
+	result[0] = -1
+	sonneur._quake_timer = 0.2
+	var pressed := [false]
+	var finished := await _until(func() -> bool:
+		if sonneur.is_quaking() and not pressed[0]:
+			var gap := absf(sonneur.wave_radius() - sonneur.global_position.distance_to(hero.global_position))
+			if gap < 2.4:
+				arena.controls.press_dodge()
+				pressed[0] = true
+		return result[0] >= 0, 30.0)
+	if not finished:
+		return _fail("la seconde frappe sismique n'a pas eu lieu")
+	if result[0] != 0 or hero.health < before:
+		return _fail("l'esquive ne protège pas de l'onde (touché : %s, vie %d sur %d)" % [result[0] == 1, hero.health, before])
+	print("test boss réussi : l'esquive évite la frappe sismique")
+
+	# Hors de portée de l'onde, il ne la lance pas.
+	hero.global_position = Vector3(0.0, 0.0, 9.0)
+	result[0] = -1
+	sonneur._quake_timer = 0.2
+	await get_tree().create_timer(2.5).timeout
+	if result[0] != -1 or sonneur.is_quaking() or sonneur.state == Enemy.State.SPECIAL:
+		return _fail("le Sonneur lance la frappe sismique sur un héros hors de portée")
+	print("test boss réussi : pas de frappe sismique hors de portée")
+
+	_passive = false
+	sonneur.take_hit(hero.global_position, 100000)
+	if not await _until(func() -> bool: return arena.enemies_left() == 0, 120.0):
+		return _fail("le Sonneur de l'essai n'a pas été mis au repos")
 	return true
 
 

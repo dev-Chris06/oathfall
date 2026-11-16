@@ -18,8 +18,14 @@ extends Enemy
 signal tolled(raised: int)
 ## Il lève les bras : le coup de cloche arrive.
 signal tolling_soon
+## Il lève son maillet : la frappe sismique arrive.
+signal quaking_soon
+## Il frappe le sol : l'onde part.
+signal slammed
+## L'onde est retombée ; `hit` dit si elle a touché le héros.
+signal quaked(hit: bool)
 
-enum Phase { TELEGRAPH, TOLL, STUN }
+enum Phase { TELEGRAPH, TOLL, STUN, QUAKE_WINDUP, QUAKE }
 
 ## La cloche, donnée par le niveau.
 var bell: GreatBell
@@ -32,6 +38,10 @@ var _poise := 0.0
 var _bell_alive := true
 var _ropes_cut := 0
 var _glow: OmniLight3D
+var _quake_timer := 6.0
+var _quake_hit := false
+var _quake_marker: MeshInstance3D
+var _quake_material: StandardMaterial3D
 
 
 func setup(type_id: StringName, hero: Hero) -> void:
@@ -39,6 +49,7 @@ func setup(type_id: StringName, hero: Hero) -> void:
 	home = global_position
 	add_to_group(&"boss")
 	_toll_timer = float(_type["toll_interval"]) * 0.55
+	_quake_timer = float(_type["quake_interval"]) * 0.7
 	_glow = OmniLight3D.new()
 	_glow.light_color = Color(1.0, 0.7, 0.35)
 	_glow.light_energy = 0.0
@@ -54,6 +65,7 @@ func _physics_process(delta: float) -> void:
 	# presque jamais face à un héros qui le harcèle.
 	if state == State.CHASE or state == State.WINDUP or state == State.STAGGER:
 		_toll_timer = maxf(0.0, _toll_timer - delta)
+		_quake_timer = maxf(0.0, _quake_timer - delta)
 	super._physics_process(delta)
 
 
@@ -91,6 +103,69 @@ func _chase() -> void:
 		else:
 			# Rien à relever : la cloche se tait.
 			_toll_timer = 1.0
+	# La frappe sismique, si le héros est à portée de l'onde.
+	if state == State.CHASE and _quake_timer <= 0.0 \
+			and offset.length() <= float(_type["quake_radius"]) - 0.5:
+		_begin_quake()
+
+
+func _begin_quake() -> void:
+	_phase = Phase.QUAKE_WINDUP
+	_begin_special()
+	var windup := float(_type["quake_windup"])
+	var anim_name := _animation("quake")
+	var length := 1.2
+	if _anim != null and _anim.has_animation(anim_name):
+		length = _anim.get_animation(anim_name).length
+	_once(anim_name, length / (windup + 0.25))
+	# Un disque rouge au sol marque jusqu'où l'onde ira.
+	var radius := float(_type["quake_radius"])
+	var disc := CylinderMesh.new()
+	disc.top_radius = radius
+	disc.bottom_radius = radius
+	disc.height = 0.02
+	disc.radial_segments = 40
+	disc.rings = 1
+	_quake_material = Fx.glow(Color(1.0, 0.25, 0.1, 0.1))
+	_quake_marker = MeshInstance3D.new()
+	_quake_marker.mesh = disc
+	_quake_marker.material_override = _quake_material
+	_quake_marker.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_quake_marker.position.y = 0.09
+	add_child(_quake_marker)
+	quaking_soon.emit()
+
+
+func _slam() -> void:
+	_clear_quake_marker()
+	_phase = Phase.QUAKE
+	_state_time = 0.0
+	_quake_hit = false
+	var radius := float(_type["quake_radius"])
+	Fx.ring(get_parent(), global_position, Color(0.8, 0.5, 0.25, 0.8), radius, radius / float(_type["quake_speed"]), true)
+	slammed.emit()
+
+
+func _clear_quake_marker() -> void:
+	if _quake_marker != null and is_instance_valid(_quake_marker):
+		_quake_marker.queue_free()
+	_quake_marker = null
+
+
+## Rayon actuel de l'onde, ou -1 s'il n'y en a pas.
+func wave_radius() -> float:
+	if state != State.SPECIAL or _phase != Phase.QUAKE:
+		return -1.0
+	return minf(float(_type["quake_radius"]), float(_type["quake_speed"]) * _state_time)
+
+
+func is_quaking() -> bool:
+	return wave_radius() >= 0.0
+
+
+func quake_interval() -> float:
+	var interval := float(_type["quake_interval"])
+	return interval * 0.75 if is_enraged() else interval
 
 
 func _begin_telegraph() -> void:
@@ -121,6 +196,26 @@ func _special(_delta: float) -> void:
 			if _state_time >= float(_type["stun_time"]):
 				state = State.CHASE
 				_cooldown = 0.8
+		Phase.QUAKE_WINDUP:
+			var offset := _to_hero()
+			if offset.length() > 0.05:
+				_facing = offset.normalized()
+			var windup := float(_type["quake_windup"])
+			_quake_material.albedo_color.a = 0.1 + 0.35 * clampf(_state_time / windup, 0.0, 1.0)
+			if _state_time >= windup:
+				_slam()
+		Phase.QUAKE:
+			var radius := wave_radius()
+			var gap := absf(_to_hero().length() - radius)
+			if not _quake_hit and not _hero.is_dead() and not _hero.is_dodging() \
+					and gap <= float(_type["quake_width"]) / 2.0:
+				_quake_hit = true
+				_hero.take_damage(int(_type["quake_damage"]), global_position)
+			if radius >= float(_type["quake_radius"]):
+				state = State.CHASE
+				_cooldown = 0.6
+				_quake_timer = quake_interval()
+				quaked.emit(_quake_hit)
 
 
 func _toll() -> void:
@@ -173,6 +268,7 @@ func on_rope_cut(total_cut: int) -> void:
 func bell_fell() -> void:
 	_bell_alive = false
 	_glow.light_energy = 0.0
+	_clear_quake_marker()
 	if state == State.DOWN or state == State.RISING or state == State.RESTED:
 		return
 	var damage := int(float(_type["health"]) * float(_type["bell_fall_damage"]))
@@ -203,6 +299,7 @@ func take_hit(from: Vector3, damage: int) -> void:
 
 func _on_fall() -> void:
 	_glow.light_energy = 0.0
+	_clear_quake_marker()
 
 
 ## Le maillet : un manche et une tête de fer.

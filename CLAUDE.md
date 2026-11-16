@@ -117,6 +117,12 @@ corde fait tomber la cloche sur lui (35 % de sa vie, étourdi) et la cloche ne
 sonne plus. Tant qu'elle sonne, de nouveaux morts se couchent dans le chœur.
 Un boss tombé doit lui aussi recevoir le Repos.
 
+Il a aussi une **frappe sismique** : s'il est à portée, il lève son maillet
+(un disque rouge au sol avertit pendant 1,3 s), frappe, et une onde
+s'élargit à vitesse constante jusqu'à 9,5 de lui. Elle blesse (24) celui
+qu'elle traverse, sauf s'il esquive à ce moment. Le test automatique le
+vérifie : touché immobile, intact en esquivant, aucune frappe hors de portée.
+
 Progression : chaque Repos donné rend des souvenirs (l'expérience) et de
 l'or. Les paliers de niveau donnent de la vie et des points de compétence,
 dépensés dans le CARNET (bouton en haut à droite, jeu en pause). Au refuge

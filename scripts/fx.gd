@@ -4,7 +4,9 @@ extends RefCounted
 
 
 ## Une onde qui s'élargit au sol puis s'efface : coup de cloche, cri.
-static func ring(parent: Node, at: Vector3, color: Color, radius: float, duration := 0.9) -> void:
+## Avec `linear`, l'onde s'élargit à vitesse constante : c'est le cas de celles
+## qui blessent, dont le front doit correspondre à ce que voit le joueur.
+static func ring(parent: Node, at: Vector3, color: Color, radius: float, duration := 0.9, linear := false) -> void:
 	var torus := TorusMesh.new()
 	torus.inner_radius = 0.92
 	torus.outer_radius = 1.0
@@ -20,11 +22,14 @@ static func ring(parent: Node, at: Vector3, color: Color, radius: float, duratio
 	mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	parent.add_child(mesh)
 	mesh.global_position = at + Vector3(0.0, 0.15, 0.0)
-	mesh.scale = Vector3(0.5, 1.0, 0.5)
+	mesh.scale = Vector3(0.05, 1.0, 0.05) if linear else Vector3(0.5, 1.0, 0.5)
 	var tween := mesh.create_tween()
 	tween.set_parallel(true)
-	tween.tween_property(mesh, "scale", Vector3(radius, 1.0, radius), duration) \
-		.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
+	var growth := tween.tween_property(mesh, "scale", Vector3(radius, 1.0, radius), duration)
+	if linear:
+		growth.set_trans(Tween.TRANS_LINEAR)
+	else:
+		growth.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
 	tween.tween_property(material, "albedo_color:a", 0.0, duration).set_ease(Tween.EASE_IN)
 	tween.chain().tween_callback(mesh.queue_free)
 

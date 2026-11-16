@@ -31,6 +31,7 @@ var _bell: GreatBell
 var _tolls := 0
 var _enraged_said := false
 var _first_warning := true
+var _first_quake := true
 
 
 func _init() -> void:
@@ -101,6 +102,8 @@ func _boss_fight() -> void:
 	boss.health_changed.connect(_on_boss_health)
 	boss.tolling_soon.connect(_on_tolling_soon)
 	boss.tolled.connect(_on_tolled)
+	boss.quaking_soon.connect(_on_quaking_soon)
+	boss.slammed.connect(func() -> void: shake(1.2))
 	boss.fell.connect(_on_boss_fell)
 	_bell.rope_cut.connect(_on_rope_cut)
 	_bell.fell.connect(_on_bell_fell)
@@ -134,6 +137,12 @@ func _on_tolling_soon() -> void:
 	if _first_warning:
 		_first_warning = false
 		hud.show_message("La cloche va sonner.\nDonne le Repos aux corps, ou grimpe couper les cordes.", 5.5)
+
+
+func _on_quaking_soon() -> void:
+	if _first_quake:
+		_first_quake = false
+		hud.show_message("Il lève son maillet.\nEsquive quand l'onde t'atteint.", 4.0)
 
 
 func _on_tolled(raised: int) -> void:

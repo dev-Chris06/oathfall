@@ -133,7 +133,9 @@ func _fall() -> void:
 	is_fallen = true
 	_bell.rotation.z = 0.0
 	var tween := create_tween()
-	tween.tween_property(_bell, "position:y", 2.4, 0.55).set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_QUAD)
+	# Elle s'enfonce à moitié dans les dalles : tombée tout entière, elle
+	# cacherait la moitié de l'écran.
+	tween.tween_property(_bell, "position:y", 1.5, 0.55).set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_QUAD)
 	tween.tween_callback(func() -> void:
 		_flash.light_energy = 9.0
 		Fx.ring(get_parent(), global_position, Color(0.85, 0.62, 0.3, 0.7), 12.0, 0.9)

@@ -201,6 +201,16 @@ const TYPES := {
 		"stun_time": 3.5,
 		# Après un coup qui l'ébranle, il n'est plus ébranlé pendant ce temps.
 		"poise_time": 2.5,
+		# La frappe sismique : il lève son maillet (un disque rouge au sol
+		# avertit), frappe le sol, et une onde s'élargit jusqu'à `quake_radius`.
+		# Elle blesse celui qu'elle traverse, sauf s'il esquive. Il ne la lance
+		# que si le héros est à portée.
+		"quake_interval": 8.0,
+		"quake_windup": 1.3,
+		"quake_radius": 9.5,
+		"quake_speed": 14.0,
+		"quake_width": 1.8,
+		"quake_damage": 24,
 		"rise_delay": 40.0,
 		"rise_health": 0.3,
 		"memories": 60,
@@ -211,6 +221,7 @@ const TYPES := {
 			"attack": "2H_Melee_Attack_Chop",
 			"toll": "Spellcast_Raise",
 			"toll_end": "Spellcast_Shoot",
+			"quake": "2H_Melee_Attack_Chop",
 			"stun": "Hit_B",
 			"hit": "Hit_A",
 			"fall": "Death_C_Skeletons",
