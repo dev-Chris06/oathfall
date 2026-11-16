@@ -82,17 +82,21 @@ apprendre les compétences et quelques personnages à qui parler.
 | 3. Le Repos | Fait |
 | 4. Niveau 1, La Grille : décor, vagues scénarisées, fin de niveau | Fait |
 | 5. Progression : souvenirs, niveaux du héros, or, compétences, sauvegarde | Fait |
-| 6. Niveaux 2 et 4, et les quatre autres morts | **À faire, c'est la suite** |
-| 7. Niveau 3 : le Sonneur | À faire |
+| 6. Niveaux 2 et 4, et les quatre autres morts | Fait |
+| 7. Niveau 3 : le Sonneur | **À faire, c'est la suite** |
 | 8. Niveau 5 : la Fossoyeuse | À faire |
 | 9. Le refuge, le menu, le texte d'ouverture | À faire |
 | 10. Finition : sons, musique, équilibrage, icône, APK signé | À faire |
 
-Le jeu s'ouvre sur la Grille : trois cours séparées par des grilles, chacune
-ouverte quand ses morts reposent, puis la sortie derrière le caveau. Le
-héros qui tombe se relève au dernier point de reprise, avec les souvenirs
-qu'il y portait. La fin du niveau affiche un bilan puis relance la Grille,
-en attendant les Allées. L'arène d'essai reste disponible (`-- --arena`).
+Trois niveaux jouables s'enchaînent : la Grille, les Allées, l'Ossuaire.
+Chacun compte trois parties séparées par des grilles qui s'ouvrent quand
+les morts reposent. En attendant la Chapelle (étape 7), les Allées mènent
+directement à l'Ossuaire (`next_level`) ; l'Ossuaire se rejoue en attendant
+la Fosse. Le héros qui tombe se relève au dernier point de reprise. L'arène
+d'essai reste disponible (`-- --arena`).
+
+Les cinq morts du chapitre existent. L'Ossuaire est souterrain
+(`underground`) : ni lune ni ombre portée.
 
 Progression : chaque Repos donné rend des souvenirs (l'expérience) et de
 l'or. Les paliers de niveau donnent de la vie et des points de compétence,
@@ -114,6 +118,7 @@ Retour de l'auteur encore attendu : les sensations de combat sur téléphone
 | `scripts/level.gd` | Base des niveaux : héros, caméra, HUD, apparition des morts, outils de scénario (`say`, `reach`, `until_peace`, `wait`) |
 | `scripts/levels/la_grille.gd` | Niveau 1 : décor, grilles, scénario |
 | `scripts/levels/les_allees.gd` | Niveau 2 : allée de mausolées, archers, Porte-cloche |
+| `scripts/levels/l_ossuaire.gd` | Niveau 4 : couloirs et salles, Fouisseur, Veuve |
 | `scripts/enemies/` | Comportements propres : archer (et son carreau), Porte-cloche, Fouisseur, Veuve |
 | `scripts/fx.gd` | Effets partagés : ondes au sol, matériaux simples |
 | `scripts/ui/` | Polices du jeu, parchemin du carnet |
@@ -154,6 +159,12 @@ Règles à garder :
   l'interrompt.
 - **Grilles** : `add_gate(position, point_de_reprise)` ; au retour à un point
   de reprise, les grilles d'avant sont ouvertes.
+- **Corps et obstacles** : la chute projette le corps ; il peut finir derrière
+  une grille. Le rite se mesure donc avec `Enemy.distance_to_body()`, qui
+  accepte aussi le point de chute.
+- **Caméra et décor** : la caméra est à 6,6 de haut et 7,4 en arrière. Le
+  héros ne doit jamais pouvoir passer derrière un décor plus haut qu'elle
+  (les mausolées) : fermer ces recoins.
 - **Textes à l'écran** : polices de `GameFonts` (CC0). La gothique n'a pas
   d'accents : la réserver aux titres, avec la police de texte en secours.
 - **Sol** : `pave()` dessine tous les carreaux en un seul appel. Ne pas

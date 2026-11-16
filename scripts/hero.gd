@@ -273,7 +273,7 @@ func _nearest_body() -> Enemy:
 		var enemy := node as Enemy
 		if enemy == null or not enemy.is_down():
 			continue
-		var distance := global_position.distance_to(enemy.body_position())
+		var distance := enemy.distance_to_body(global_position)
 		if distance <= best_distance:
 			best_distance = distance
 			best = enemy

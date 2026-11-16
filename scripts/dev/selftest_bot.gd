@@ -78,6 +78,8 @@ func _physics_process(delta: float) -> void:
 	var body := _nearest(&"bodies", hero) as Enemy if _allow_rest else null
 	if body != null:
 		var offset := body.body_position() - hero.global_position
+		if body.global_position.distance_to(hero.global_position) < offset.length():
+			offset = body.global_position - hero.global_position
 		if offset.length() > 1.4:
 			controls.simulated_move = Vector2(offset.x, offset.z).normalized()
 		else:
@@ -174,6 +176,8 @@ func _run() -> void:
 	if not await _grille_tests():
 		return
 	if not await _traverse(&"les_allees"):
+		return
+	if not await _traverse(&"l_ossuaire"):
 		return
 	print("SELFTEST OK")
 	get_tree().quit(0)

@@ -179,6 +179,14 @@ func force_rise() -> void:
 		_start_rising()
 
 
+## Distance entre `point` et le corps : la plus courte entre l'endroit où
+## il gît et celui où il est tombé. Le corps peut avoir été projeté derrière
+## une grille ; on peut alors toujours lui donner le Repos d'où il est tombé.
+func distance_to_body(point: Vector3) -> float:
+	var flat := Vector3(point.x, global_position.y, point.z)
+	return minf(flat.distance_to(body_position()), flat.distance_to(global_position))
+
+
 ## Vrai si le mort est debout et peut agir.
 func is_standing() -> bool:
 	return state == State.CHASE or state == State.WINDUP or state == State.STAGGER or state == State.SPECIAL

@@ -18,6 +18,7 @@ const LEVELS := {
 	&"arena": preload("res://scripts/levels/arena.gd"),
 	&"la_grille": preload("res://scripts/levels/la_grille.gd"),
 	&"les_allees": preload("res://scripts/levels/les_allees.gd"),
+	&"l_ossuaire": preload("res://scripts/levels/l_ossuaire.gd"),
 }
 
 var level: Level

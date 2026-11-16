@@ -25,6 +25,8 @@ const GRAVEYARD := "res://assets/kaykit/halloween/"
 
 ## Nom affiché à l'entrée du niveau.
 var title := ""
+## Sous terre : ni lune ni ombre portée, la lumière vient des torches.
+var underground := false
 ## Niveau suivant, s'il existe déjà.
 var next_level: StringName = &""
 ## Point de reprise où commence le scénario.
@@ -205,9 +207,9 @@ func spawn_group(type_id: StringName, points: Array, rise_delay := -1.0) -> void
 ## reprise qui se trouve après elle : au retour à ce point, elle est ouverte.
 func add_gate(at: Vector3, checkpoint: int, model := "fence_gate", yaw_deg := 0.0, width := 4.2) -> int:
 	var node := grave_piece(model, at, yaw_deg)
-	var size := Vector3(width, 4.0, 0.8)
+	var size := Vector3(width, 4.0, 1.4)
 	if absf(yaw_deg) > 45.0:
-		size = Vector3(0.8, 4.0, width)
+		size = Vector3(1.4, 4.0, width)
 	_gates.append({
 		"open": false,
 		"leaves": [node.find_child("*_left", true, false), node.find_child("*_right", true, false)],
@@ -337,7 +339,7 @@ func _build_environment() -> void:
 	env.background_color = Color(0.015, 0.015, 0.03)
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	env.ambient_light_color = Color(0.22, 0.27, 0.42)
-	env.ambient_light_energy = 0.3
+	env.ambient_light_energy = 0.42 if underground else 0.3
 	env.fog_enabled = true
 	env.fog_light_color = Color(0.04, 0.05, 0.09)
 	env.fog_density = 0.025
@@ -347,6 +349,8 @@ func _build_environment() -> void:
 	world_env.environment = env
 	add_child(world_env)
 
+	if underground:
+		return
 	var moon := DirectionalLight3D.new()
 	moon.light_color = Color(0.55, 0.65, 1.0)
 	moon.light_energy = 0.22
