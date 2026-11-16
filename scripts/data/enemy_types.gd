@@ -228,6 +228,85 @@ const TYPES := {
 			"rise": "Death_C_Skeletons_Resurrect",
 		},
 	},
+	# La Fossoyeuse, boss de la Fosse, en trois phases (sa vie en fixe les
+	# seuils). Phase 1 : coups de pelle lents et lourds, larges balayages.
+	# Phase 2 : elle s'enfonce dans la terre, ressort ailleurs et déterre des
+	# Dépouilles pendant qu'elle charge. Phase 3 : elle arrache des pierres
+	# tombales et les lance ; les corps sans repos se relèvent tous ensemble.
+	&"fossoyeuse": {
+		"name": "La Fossoyeuse",
+		"behavior": "fossoyeuse",
+		"boss": true,
+		"model": "res://assets/kaykit/skeletons/Skeleton_Rogue.glb",
+		"tint": Color(0.6, 0.52, 0.45),
+		"scale": 1.85,
+		"props": [{"kind": "spade", "bone": "handslot.r"}],
+		"health": 800,
+		"move_speed": 2.4,
+		"attack_range": 3.0,
+		"attack_damage": 0,
+		"attack_windup": 1.0,
+		"attack_cooldown": 1.0,
+		"attack_speed": 1.0,
+		# Les seuils de phase, en part de vie restante.
+		"stage2_at": 0.66,
+		"stage3_at": 0.33,
+		# Un coup de pelle : lent, étroit, lourd. Un balayage : large.
+		"swing_windup": 1.15,
+		"swing_range": 3.1,
+		"swing_arc": 70.0,
+		"swing_damage": 26,
+		"sweep_windup": 1.45,
+		"sweep_range": 3.9,
+		"sweep_arc": 200.0,
+		"sweep_damage": 20,
+		"recover": 0.9,
+		"attack_gap": 0.7,
+		# Phase 2 : plongée, trajet sous terre, jaillissement (qui blesse), puis
+		# des charges en ligne droite après un temps d'annonce.
+		"dive_time": 1.0,
+		"burrow_speed": 9.0,
+		"emerge_time": 0.8,
+		"emerge_radius": 3.4,
+		"emerge_damage": 18,
+		"dig_count": 3,
+		"charges": 2,
+		"charge_windup": 0.95,
+		"charge_speed": 13.0,
+		"charge_max": 14.0,
+		"charge_width": 2.4,
+		"charge_damage": 28,
+		"charge_recover": 1.7,
+		# Phase 3 : des pierres lancées (leur chute est annoncée au sol), puis
+		# un cri qui relève tous les corps.
+		"throws": 3,
+		"throw_windup": 0.9,
+		"throw_flight": 1.15,
+		"throw_radius": 2.3,
+		"throw_damage": 22,
+		"raise_windup": 1.5,
+		"raise_interval": 14.0,
+		"poise_time": 2.0,
+		"rise_delay": 50.0,
+		"rise_health": 0.25,
+		"memories": 140,
+		"gold": 80,
+		"animations": {
+			"idle": "Idle_Combat",
+			"walk": "Walking_D_Skeletons",
+			"swing": "2H_Melee_Attack_Chop",
+			"sweep": "2H_Melee_Attack_Spin",
+			"charge": "Running_B",
+			"stun": "Hit_B",
+			"throw": "Throw",
+			"raise": "Spellcast_Raise",
+			"roar": "Taunt",
+			"emerge": "Spawn_Ground_Skeletons",
+			"hit": "Hit_A",
+			"fall": "Death_C_Skeletons",
+			"rise": "Death_C_Skeletons_Resurrect",
+		},
+	},
 }
 
 

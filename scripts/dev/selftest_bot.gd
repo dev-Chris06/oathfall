@@ -109,6 +109,14 @@ func _physics_process(delta: float) -> void:
 ## Esquive comme un joueur attentif : au tir d'un archer, au jaillissement
 ## d'un Fouisseur, et une fois sur deux devant un coup armé tout près.
 func _dodge_if_needed(level: Level, hero: Hero, controls: TouchControls) -> void:
+	# Une pierre lancée : on esquive juste avant qu'elle ne retombe sur soi.
+	for node in get_tree().get_nodes_in_group(&"stones"):
+		var stone := node as GraveStone
+		var landing := Vector3(stone.target.x - hero.global_position.x, 0.0, stone.target.z - hero.global_position.z)
+		if stone.time_left() < 0.3 and landing.length() < stone.radius + 0.6:
+			controls.simulated_move = Vector2(-landing.x, -landing.z).normalized()
+			controls.press_dodge()
+			return
 	for enemy in level.enemies():
 		var threat := false
 		if enemy is ArcherEnemy and enemy.state == Enemy.State.SPECIAL:
@@ -119,6 +127,9 @@ func _dodge_if_needed(level: Level, hero: Hero, controls: TouchControls) -> void
 			# L'onde du Sonneur : on esquive quand son front arrive.
 			var gap := absf(enemy.wave_radius() - enemy.global_position.distance_to(hero.global_position))
 			threat = gap < 2.4
+		elif enemy is FossoyeuseEnemy:
+			# Ses gestes sont annoncés : on esquive juste avant qu'ils ne portent.
+			threat = enemy.danger_time(hero.global_position) < 0.3
 		elif enemy.state == Enemy.State.WINDUP and not enemy._struck:
 			var close := enemy.global_position.distance_to(hero.global_position) < maxf(2.6, float(enemy._type["attack_range"]) + 0.4)
 			threat = close and enemy._state_time > float(enemy._type["attack_windup"]) - 0.25 \
@@ -203,6 +214,8 @@ func _run() -> void:
 		return
 	if not await _quake_tests():
 		return
+	if not await _fossoyeuse_tests():
+		return
 	if not await _grille_tests():
 		return
 	if not await _traverse(&"les_allees"):
@@ -210,6 +223,8 @@ func _run() -> void:
 	if not await _traverse(&"la_chapelle"):
 		return
 	if not await _traverse(&"l_ossuaire"):
+		return
+	if not await _traverse(&"la_fosse"):
 		return
 	if not await _map_tests():
 		return
@@ -541,6 +556,113 @@ func _quake_tests() -> bool:
 	return true
 
 
+## La Fossoyeuse : ses trois phases, une par une.
+func _fossoyeuse_tests() -> bool:
+	var arena := _level() as Arena
+	var hero := arena.hero
+	var type := EnemyTypes.get_type(&"fossoyeuse")
+	hero.heal(1000)
+	hero.global_position = Vector3(0.0, 0.0, 3.0)
+	_passive = true
+	_allow_rest = false
+
+	var damages: Array[int] = []
+	var last := [hero.health]
+	hero.health_changed.connect(func(health: int, _max: int) -> void:
+		if health < last[0]:
+			damages.append(last[0] - health)
+		last[0] = health)
+
+	var boss := arena.spawn(&"fossoyeuse", Vector3(0.0, 0.0, -7.0), false) as FossoyeuseEnemy
+	boss.mounds = [Vector3(-10.0, 0.0, -5.0), Vector3(10.0, 0.0, -5.0), Vector3(-10.0, 0.0, 5.0)]
+	var stage := [1]
+	boss.stage_changed.connect(func(value: int) -> void: stage[0] = value)
+
+	# Phase 1 : la pelle blesse un héros immobile (un coup de pelle ou un balayage).
+	if not await _until(func() -> bool:
+		hero.heal(1000)
+		return damages.has(int(type["swing_damage"])) or damages.has(int(type["sweep_damage"])), 40.0):
+		return _fail("la Fossoyeuse n'a pas touché un héros immobile à la pelle (dégâts : %s)" % [damages])
+	print("test fossoyeuse réussi : la pelle blesse (%s)" % [damages])
+
+	# Elle bascule en phase 2 quand sa vie passe sous le seuil.
+	boss.take_hit(hero.global_position, int(type["health"]) - int(float(type["health"]) * float(type["stage2_at"])) + 10)
+	if not await _until(func() -> bool:
+		hero.heal(1000)
+		return stage[0] == 2, 20.0):
+		return _fail("la Fossoyeuse n'est pas passée en phase 2 (phase %d, vie %d)" % [stage[0], boss.health])
+	print("test fossoyeuse réussi : phase 2 à %d points de vie" % boss.health)
+
+	# Phase 2 : elle plonge, ressort et déterre des Dépouilles.
+	var dug_points := [0]
+	boss.dug.connect(func(points: Array) -> void: dug_points[0] = points.size())
+	damages.clear()
+	if not await _until(func() -> bool:
+		hero.heal(1000)
+		return dug_points[0] > 0, 40.0):
+		return _fail("la Fossoyeuse n'a pas déterré de Dépouilles")
+	if dug_points[0] != int(type["dig_count"]):
+		return _fail("elle a déterré %d Dépouilles au lieu de %d" % [dug_points[0], int(type["dig_count"])])
+	print("test fossoyeuse réussi : elle jaillit du sol et déterre %d Dépouilles" % dug_points[0])
+
+	# Puis elle charge : un héros immobile dans la ligne est touché.
+	if not await _until(func() -> bool:
+		hero.heal(1000)
+		var line := boss.global_position - hero.global_position
+		if boss.state == Enemy.State.SPECIAL and line.length() > 8.0:
+			hero.global_position = boss.global_position + Vector3(0.0, 0.0, 6.0)
+		return damages.has(int(type["charge_damage"])), 60.0):
+		return _fail("la charge de la Fossoyeuse n'a pas touché le héros (dégâts : %s)" % [damages])
+	print("test fossoyeuse réussi : la charge blesse (%d)" % int(type["charge_damage"]))
+
+	# Phase 3 : à bas niveau de vie, elle arrache et lance des pierres.
+	boss.take_hit(hero.global_position, boss.health - int(float(type["health"]) * float(type["stage3_at"])) + 10)
+	var stones := [0]
+	var landed_hit := [-1]
+	boss.thrown.connect(func(stone: GraveStone) -> void:
+		stones[0] += 1
+		stone.landed.connect(func(hit: bool) -> void: landed_hit[0] = 1 if hit else 0))
+	if not await _until(func() -> bool:
+		hero.heal(1000)
+		return stage[0] == 3, 40.0):
+		return _fail("la Fossoyeuse n'est pas passée en phase 3 (phase %d, vie %d)" % [stage[0], boss.health])
+	hero.global_position = Vector3(0.0, 0.0, 8.0)
+	damages.clear()
+	if not await _until(func() -> bool:
+		hero.heal(1000)
+		return landed_hit[0] >= 0, 40.0):
+		return _fail("la Fossoyeuse n'a pas lancé de pierre")
+	if landed_hit[0] != 1 or not damages.has(int(type["throw_damage"])):
+		return _fail("la pierre n'a pas blessé le héros immobile (dégâts : %s)" % [damages])
+	print("test fossoyeuse réussi : une pierre lancée retombe et blesse (%d)" % int(type["throw_damage"]))
+
+	# Son cri relève tous les corps.
+	var body := arena.spawn(&"depouille", Vector3(-4.0, 0.0, 6.0), false)
+	body.take_hit(hero.global_position, 1000)
+	body.rise_delay = 90.0
+	var raised_count := [-1]
+	boss.raised.connect(func(count: int) -> void: raised_count[0] = count)
+	boss._raise_timer = 0.1
+	if not await _until(func() -> bool:
+		hero.heal(1000)
+		return raised_count[0] >= 0, 40.0):
+		return _fail("la Fossoyeuse n'a pas poussé son cri")
+	if raised_count[0] < 1:
+		return _fail("son cri n'a relevé aucun corps")
+	print("test fossoyeuse réussi : son cri relève %d corps" % raised_count[0])
+
+	# Elle tombe : il faut lui donner le Repos.
+	_passive = false
+	_allow_rest = true
+	boss.take_hit(hero.global_position, 100000)
+	if not boss.is_down():
+		return _fail("la Fossoyeuse vaincue ne tombe pas")
+	if not await _until(func() -> bool: return arena.enemies_left() == 0, 180.0):
+		return _fail("la Fossoyeuse n'a pas été mise au repos")
+	print("test fossoyeuse réussi : la Fossoyeuse reçoit le Repos")
+	return true
+
+
 func _grille_tests() -> bool:
 	main.load_level(&"la_grille")
 	_watch(_level())
@@ -630,9 +752,9 @@ func _map_tests() -> bool:
 	if map.state_of(&"la_grille") != "fait" or map.state_of(&"les_allees") != "ici":
 		return _fail("la Grille faite ne fait pas passer aux Allées")
 	Progress.mark_completed(&"les_allees")
-	# La Chapelle vient après les Allées ; la Fosse n'est pas construite.
+	# La Chapelle vient après les Allées ; les autres sont ouverts.
 	if map.state_of(&"la_chapelle") != "ici" or map.state_of(&"l_ossuaire") != "ouvert" \
-			or map.state_of(&"la_fosse") != "ferme":
+			or map.state_of(&"la_fosse") != "ouvert":
 		return _fail("états après les Allées : %s, %s, %s" % [
 			map.state_of(&"la_chapelle"), map.state_of(&"l_ossuaire"), map.state_of(&"la_fosse")])
 	Progress.mark_completed(&"la_chapelle")
@@ -650,7 +772,12 @@ func _map_tests() -> bool:
 		return _fail("un niveau non terminé est lu comme terminé")
 	print("test 12 réussi : états de la carte et sauvegarde des niveaux terminés")
 
-	# Un niveau non construit ne s'ouvre pas ; un niveau construit, si.
+	# Un niveau non construit ne s'ouvre pas ; un niveau construit, si. Tous
+	# ceux du chapitre existent : on en retire un de la carte pour l'essai.
+	map.available.erase(&"la_fosse")
+	map.refresh()
+	if map.state_of(&"la_fosse") != "ferme":
+		return _fail("un niveau absent n'est pas fermé sur la carte")
 	var chosen := [&""]
 	map.level_chosen.connect(func(id: StringName) -> void: chosen[0] = id)
 	map.select_level(&"la_fosse")

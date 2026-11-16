@@ -26,8 +26,7 @@ const EXIT := Vector3(0.0, 0.0, -86.0)
 func _init() -> void:
 	title = "L'Ossuaire"
 	underground = true
-	# La Fosse (niveau 5) viendra ici.
-	next_level = &""
+	next_level = &"la_fosse"
 
 
 func _checkpoint_position(index: int) -> Vector3:

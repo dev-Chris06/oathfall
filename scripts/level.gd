@@ -418,12 +418,13 @@ func pave(file: String, cells: Array[Vector2]) -> void:
 
 
 ## Ajoute un obstacle invisible. `size.y` vaut par défaut la hauteur d'un mur.
-func solid(center: Vector3, size: Vector3) -> CollisionShape3D:
+func solid(center: Vector3, size: Vector3, yaw_deg := 0.0) -> CollisionShape3D:
 	var shape := CollisionShape3D.new()
 	var box := BoxShape3D.new()
 	box.size = size
 	shape.shape = box
 	shape.position = Vector3(center.x, size.y / 2.0, center.z)
+	shape.rotation.y = deg_to_rad(yaw_deg)
 	_solids.add_child(shape)
 	return shape
 

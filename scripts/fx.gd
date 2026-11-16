@@ -51,3 +51,44 @@ static func glow(color: Color) -> StandardMaterial3D:
 	material.albedo_color = color
 	material.cull_mode = BaseMaterial3D.CULL_DISABLED
 	return material
+
+
+## Un secteur plat posé au sol, ouvert vers +Z : l'avertissement d'un coup qui
+## balaie. À orienter avec `rotation.y = atan2(direction.x, direction.z)`.
+static func sector(radius: float, angle_deg: float, color: Color) -> MeshInstance3D:
+	var steps := 20
+	var vertices := PackedVector3Array([Vector3.ZERO])
+	for i in steps + 1:
+		var a := deg_to_rad(-angle_deg / 2.0 + angle_deg * float(i) / float(steps))
+		vertices.append(Vector3(sin(a), 0.0, cos(a)) * radius)
+	var indices := PackedInt32Array()
+	for i in steps:
+		indices.append_array([0, i + 1, i + 2])
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = vertices
+	arrays[Mesh.ARRAY_INDEX] = indices
+	var mesh := ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	var node := MeshInstance3D.new()
+	node.mesh = mesh
+	node.material_override = glow(color)
+	node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	node.position.y = 0.09
+	return node
+
+
+## Un disque plat posé au sol : une zone qui va être frappée.
+static func disc(radius: float, color: Color) -> MeshInstance3D:
+	var cylinder := CylinderMesh.new()
+	cylinder.top_radius = radius
+	cylinder.bottom_radius = radius
+	cylinder.height = 0.02
+	cylinder.radial_segments = 36
+	cylinder.rings = 1
+	var node := MeshInstance3D.new()
+	node.mesh = cylinder
+	node.material_override = glow(color)
+	node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	node.position.y = 0.09
+	return node

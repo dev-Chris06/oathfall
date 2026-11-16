@@ -84,16 +84,17 @@ apprendre les compétences et quelques personnages à qui parler.
 | 5. Progression : souvenirs, niveaux du héros, or, compétences, sauvegarde | Fait |
 | 6. Niveaux 2 et 4, et les quatre autres morts | Fait |
 | 7. Niveau 3 : le Sonneur | Fait |
-| 8. Niveau 5 : la Fossoyeuse | **À faire, c'est la suite** |
-| 9. Le refuge, le texte d'ouverture (la carte tient lieu de menu) | À faire |
+| 8. Niveau 5 : la Fossoyeuse | Fait |
+| 9. Le refuge, le menu, le texte d'ouverture | **À faire, c'est la suite** |
 | 10. Finition : sons, musique, équilibrage, icône, APK signé | À faire |
 
 Le jeu s'ouvre sur **la carte d'Orvana** (`scripts/map/`), qui sert de menu :
 la capitale vue de face, en quatre étages, que la route en lacets gravit du
 fleuve au palais. On y choisit un niveau (toucher un point, puis « Entrer »).
-Quatre niveaux sont construits : la Grille, les Allées, la Chapelle des
-cendres, l'Ossuaire (il manque la Fosse). Chacun compte trois parties
-séparées par des grilles qui s'ouvrent quand les morts reposent. La fin d'un niveau l'enregistre (`Progress.mark_completed`) et
+Les cinq niveaux du chapitre 1 sont construits : la Grille, les Allées, la
+Chapelle des cendres, l'Ossuaire, la Fosse. Chacun compte trois parties
+séparées par des grilles qui s'ouvrent quand les morts reposent (la Fosse :
+un chemin, puis la fosse ronde du boss). La fin d'un niveau l'enregistre (`Progress.mark_completed`) et
 ramène à la carte ; le carnet, ouvert en plein niveau, propose « Quitter le
 niveau ». Tout niveau construit reste jouable à tout moment (essais) ;
 « ici » désigne le premier non terminé. Le héros qui tombe se relève au
@@ -104,9 +105,8 @@ nuit bleue, braises et or pâle). Les couleurs et les boutons sont dans
 `Theatre`. Le chapitre 1 est écrit en chiffres romains dans les titres : le
 « 1 » de la police gothique se lit comme un « i ».
 
-Les cinq morts du chapitre existent, et le premier boss, le Sonneur. La
-Chapelle et l'Ossuaire sont souterrains (`underground`) : ni lune ni ombre
-portée.
+Les cinq morts du chapitre existent, et les deux boss. La Chapelle et
+l'Ossuaire sont souterrains (`underground`) : ni lune ni ombre portée.
 
 Le Sonneur « ne se bat presque pas : il sonne » (scénario) : il reste sous sa
 cloche, ne repousse que celui qui se colle à lui, et sonne à rythme régulier ;
@@ -117,7 +117,18 @@ corde fait tomber la cloche sur lui (35 % de sa vie, étourdi) et la cloche ne
 sonne plus. Tant qu'elle sonne, de nouveaux morts se couchent dans le chœur.
 Un boss tombé doit lui aussi recevoir le Repos.
 
-Il a aussi une **frappe sismique** : s'il est à portée, il lève son maillet
+La **Fossoyeuse** (la Fosse, `fossoyeuse.gd`) a trois phases, selon sa vie :
+1. la pelle (coups lents et lourds, balayages), chaque coup annoncé par un
+   secteur rouge au sol ; 2. elle s'enfonce, file sous terre vers un monticule
+   (la zone est marquée), jaillit, déterre des Dépouilles, puis charge en
+   ligne droite ; 3. elle arrache des pierres tombales et les lance (leur
+   chute est marquée au sol), et un cri relève tous les corps sans repos.
+Intouchable sous terre et pendant le cri qui change de phase. **La réplique
+de fin que le scénario lui prête n'est volontairement écrite nulle part dans
+le dépôt** (indice d'un retournement) : le niveau se termine par un message
+neutre.
+
+Le Sonneur a aussi une **frappe sismique** : s'il est à portée, il lève son maillet
 (un disque rouge au sol avertit pendant 1,3 s), frappe, et une onde
 s'élargit à vitesse constante jusqu'à 9,5 de lui. Elle blesse (24) celui
 qu'elle traverse, sauf s'il esquive à ce moment. Le test automatique le
@@ -145,7 +156,8 @@ Retour de l'auteur encore attendu : les sensations de combat sur téléphone
 | `scripts/levels/les_allees.gd` | Niveau 2 : allée de mausolées, archers, Porte-cloche |
 | `scripts/levels/la_chapelle.gd` | Niveau 3 : porche, nef, chœur, combat du Sonneur |
 | `scripts/levels/l_ossuaire.gd` | Niveau 4 : couloirs et salles, Fouisseur, Veuve |
-| `scripts/enemies/` | Comportements propres : archer (et son carreau), Porte-cloche, Fouisseur, Veuve, Sonneur, et la grosse cloche avec ses cordes (`great_bell.gd`, `bell_rope.gd`) |
+| `scripts/levels/la_fosse.gd` | Niveau 5 : le chemin, la fosse ronde, la Fossoyeuse |
+| `scripts/enemies/` | Comportements propres : archer (et son carreau), Porte-cloche, Fouisseur, Veuve, Sonneur, la grosse cloche avec ses cordes (`great_bell.gd`, `bell_rope.gd`), Fossoyeuse et ses pierres (`fossoyeuse.gd`, `grave_stone.gd`) |
 | `scripts/fx.gd` | Effets partagés : ondes au sol, matériaux simples |
 | `scripts/map/` | La carte : `world_map.gd` (écran, défilement, choix), `map_scene.gd` (la ville dessinée par code) |
 | `scripts/data/world_data.gd` | Chapitres et niveaux dans l'ordre de la route |
@@ -181,7 +193,7 @@ Règles à garder :
   avec un minuteur de l'arbre, pour que tout s'arrête si le niveau est
   rechargé.
 - **Un type de mort** se déclare dans `enemy_types.gd` avec son `behavior`
-  (`melee`, `archer`, `bell`, `burrower`, `widow`, `sonneur`) ; `Enemy.create()`
+  (`melee`, `archer`, `bell`, `burrower`, `widow`, `sonneur`, `fossoyeuse`) ; `Enemy.create()`
   choisit la classe. Un comportement écrit `_chase()` et, pour ses actions
   propres, `_special()` dans l'état SPECIAL. Frapper un mort en SPECIAL
   l'interrompt.
