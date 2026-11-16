@@ -81,6 +81,9 @@ var _music: Array[AudioStreamPlayer] = []
 var _active := 0
 var _last_played := {}
 var _settings_path := SETTINGS_PATH
+## En test, les événements sont comptés mais rien n'est joué : le moteur garde
+## les lectures en cours à la fermeture et signale alors des fuites.
+var _silent := false
 
 
 func _ready() -> void:
@@ -105,6 +108,18 @@ func _ready() -> void:
 	load_settings()
 
 
+## À la fermeture, rien ne doit garder un son en mémoire (Godot signale sinon
+## des ressources encore utilisées, ce qui fait échouer le build).
+func _exit_tree() -> void:
+	for voice in _voices:
+		voice.stop()
+		voice.stream = null
+	for player in _music:
+		player.stop()
+		player.stream = null
+	_streams.clear()
+
+
 ## Joue un événement. `db` s'ajoute au volume de l'événement.
 func play(id: StringName, db := 0.0) -> void:
 	log.append(id)
@@ -114,6 +129,8 @@ func play(id: StringName, db := 0.0) -> void:
 	var event: Dictionary = EVENTS.get(id, {})
 	if event.is_empty():
 		push_warning("Son inconnu : %s" % id)
+		return
+	if _silent:
 		return
 	# Un même son ne se répète pas dans la même image (coups simultanés).
 	var now := Time.get_ticks_msec()
@@ -141,6 +158,8 @@ func music(id: StringName) -> void:
 	current_track = id
 	log.append(StringName("music:" + String(id)))
 	heard[StringName("music:" + String(id))] = int(heard.get(StringName("music:" + String(id)), 0)) + 1
+	if _silent:
+		return
 	var old := _music[_active]
 	var tween := create_tween().set_parallel(true)
 	tween.tween_property(old, "volume_db", -80.0, FADE)
@@ -192,6 +211,7 @@ func load_settings() -> void:
 ## Les tests écrivent ailleurs que dans les vrais réglages.
 func use_test_settings() -> void:
 	_settings_path = "user://reglages_essai.json"
+	_silent = true
 
 
 func _apply_volume(bus_name: String, value: float) -> void:
