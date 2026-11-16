@@ -85,15 +85,24 @@ apprendre les compétences et quelques personnages à qui parler.
 | 6. Niveaux 2 et 4, et les quatre autres morts | Fait |
 | 7. Niveau 3 : le Sonneur | **À faire, c'est la suite** |
 | 8. Niveau 5 : la Fossoyeuse | À faire |
-| 9. Le refuge, le menu, le texte d'ouverture | À faire |
+| 9. Le refuge, le texte d'ouverture (la carte tient lieu de menu) | À faire |
 | 10. Finition : sons, musique, équilibrage, icône, APK signé | À faire |
 
-Trois niveaux jouables s'enchaînent : la Grille, les Allées, l'Ossuaire.
-Chacun compte trois parties séparées par des grilles qui s'ouvrent quand
-les morts reposent. En attendant la Chapelle (étape 7), les Allées mènent
-directement à l'Ossuaire (`next_level`) ; l'Ossuaire se rejoue en attendant
-la Fosse. Le héros qui tombe se relève au dernier point de reprise. L'arène
-d'essai reste disponible (`-- --arena`).
+Le jeu s'ouvre sur **la carte d'Orvana** (`scripts/map/`), qui sert de menu :
+la capitale vue de face, en quatre étages, que la route en lacets gravit du
+fleuve au palais. On y choisit un niveau (toucher un point, puis « Entrer »).
+Trois niveaux sont construits : la Grille, les Allées, l'Ossuaire. Chacun
+compte trois parties séparées par des grilles qui s'ouvrent quand les morts
+reposent. La fin d'un niveau l'enregistre (`Progress.mark_completed`) et
+ramène à la carte ; le carnet, ouvert en plein niveau, propose « Quitter le
+niveau ». Tout niveau construit reste jouable à tout moment (essais) ;
+« ici » désigne le premier non terminé. Le héros qui tombe se relève au
+dernier point de reprise. L'arène d'essai reste disponible (`-- --arena`).
+
+Style de toute l'interface : « théâtre d'ombres » (silhouettes de papier noir,
+nuit bleue, braises et or pâle). Les couleurs et les boutons sont dans
+`Theatre`. Le chapitre 1 est écrit en chiffres romains dans les titres : le
+« 1 » de la police gothique se lit comme un « i ».
 
 Les cinq morts du chapitre existent. L'Ossuaire est souterrain
 (`underground`) : ni lune ni ombre portée.
@@ -121,7 +130,9 @@ Retour de l'auteur encore attendu : les sensations de combat sur téléphone
 | `scripts/levels/l_ossuaire.gd` | Niveau 4 : couloirs et salles, Fouisseur, Veuve |
 | `scripts/enemies/` | Comportements propres : archer (et son carreau), Porte-cloche, Fouisseur, Veuve |
 | `scripts/fx.gd` | Effets partagés : ondes au sol, matériaux simples |
-| `scripts/ui/` | Polices du jeu, parchemin du carnet |
+| `scripts/map/` | La carte : `world_map.gd` (écran, défilement, choix), `map_scene.gd` (la ville dessinée par code) |
+| `scripts/data/world_data.gd` | Chapitres et niveaux dans l'ordre de la route |
+| `scripts/ui/` | Polices, thème « théâtre d'ombres » (`Theatre`), page découpée du carnet |
 | `scripts/levels/arena.gd` | Salle d'essai, utilisée par le test automatique |
 | `scripts/progress.gd` | Chargé en permanence (`Progress`) : souvenirs, niveau, or, compétences, sauvegarde |
 | `scripts/skill_book.gd` | Le carnet : écran des compétences |
@@ -165,6 +176,9 @@ Règles à garder :
 - **Caméra et décor** : la caméra est à 6,6 de haut et 7,4 en arrière. Le
   héros ne doit jamais pouvoir passer derrière un décor plus haut qu'elle
   (les mausolées) : fermer ces recoins.
+- **Nouveau niveau** : l'ajouter à `Main.LEVELS` ; il est déjà nommé dans
+  `WorldData` (chapitre 1). Un autre chapitre demande d'abord d'écrire ses
+  niveaux dans `WorldData`.
 - **Textes à l'écran** : polices de `GameFonts` (CC0). La gothique n'a pas
   d'accents : la réserver aux titres, avec la police de texte en secours.
 - **Sol** : `pave()` dessine tous les carreaux en un seul appel. Ne pas
@@ -244,6 +258,13 @@ dans le dépôt.
 - **Téléphone de test** : puce Mali-G57 MC2, écran 60 Hz. La première salle y
   tournait vers 30 images par seconde avant l'allègement des ombres ; la
   mesure après correction reste à refaire.
+- **Interface sans parent Control** : un `Control` posé sous un `Node` ou un
+  `CanvasLayer` garde une taille nulle avec `set_anchors_preset` seul (tout
+  s'empile en haut à gauche, rien ne se dessine). Utiliser
+  `set_anchors_and_offsets_preset`.
+- **Modifications scriptées** : une modification faite par script qui ne
+  trouve pas son texte ne signale rien. Toujours vérifier qu'elle a porté
+  (`assert` avant de remplacer, ou relire le fichier).
 
 ## Économie de moyens
 

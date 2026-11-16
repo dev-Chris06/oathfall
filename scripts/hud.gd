@@ -93,7 +93,7 @@ func set_counts(standing: int, down: int) -> void:
 ## Niveau du héros, part de la jauge des souvenirs remplie, or porté.
 func set_progress(level: int, progress: float, gold: int) -> void:
 	_memory_fill.size.x = BAR_SIZE.x * progress
-	_level_label.text = "Niv. %d    Oboles : %d" % [level, gold]
+	_level_label.text = "Niv. %d    Or : %d" % [level, gold]
 
 
 func set_debug(text: String) -> void:

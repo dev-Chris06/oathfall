@@ -23,7 +23,7 @@ const TYPES := {
 		"rise_health": 0.6,
 		# Souvenirs rendus au héros quand le corps reçoit le Repos.
 		"memories": 5,
-		# Or laissé par le corps mis au repos : l'obole qu'on lui avait confiée.
+		# Or laissé par le corps mis au repos.
 		"gold": 3,
 		"animations": {
 			"idle": "Idle_Combat",

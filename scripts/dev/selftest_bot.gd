@@ -18,11 +18,14 @@ extends Node
 ## Puis il traverse la Grille :
 ##   9. il atteint le premier point de reprise, qui est sauvegardé ;
 ##  10. tombé exprès, le héros revient à ce point, sans rien perdre ;
-##  11. il termine le niveau.
+##  11. il termine le niveau, et la fin est enregistrée.
+## Enfin la carte :
+##  12. états des niveaux, entrée dans un niveau, abandon depuis le carnet.
 ## Avec `capture_dir`, il ne joue que la Grille et enregistre des images.
 
 var main: Node
 var capture_dir := ""
+var capture_map := false
 var start_checkpoint := 0
 
 var _allow_rest := true
@@ -178,6 +181,8 @@ func _run() -> void:
 	if not await _traverse(&"les_allees"):
 		return
 	if not await _traverse(&"l_ossuaire"):
+		return
+	if not await _map_tests():
 		return
 	print("SELFTEST OK")
 	get_tree().quit(0)
@@ -407,6 +412,8 @@ func _grille_tests() -> bool:
 		return _fail("la Grille n'a pas été terminée")
 	if not _completed:
 		return _fail("le joueur automatique est tombé plus de six fois")
+	if not Progress.is_completed(&"la_grille"):
+		return _fail("la fin de la Grille n'a pas été enregistrée")
 	print("test 11 réussi : la Grille est terminée, vie %d, niveau %d, %d d'or, %d chute(s)" % [
 		_level().hero.health, Progress.hero_level, Progress.gold, falls[0]])
 	return true
@@ -428,8 +435,66 @@ func _traverse(id: StringName) -> bool:
 	main.level_loaded.disconnect(on_load)
 	if not done or not _completed:
 		return _fail("%s n'a pas été terminé (%d chutes)" % [id, falls[0]])
-	print("test réussi : %s terminé, niveau %d, %d oboles, %d chute(s)" % [
+	if not Progress.is_completed(id):
+		return _fail("la fin de %s n'a pas été enregistrée" % id)
+	print("test réussi : %s terminé, niveau %d, %d d'or, %d chute(s)" % [
 		_level().title, Progress.hero_level, Progress.gold, falls[0]])
+	return true
+
+
+## La carte : états des niveaux, choix, entrée, abandon.
+func _map_tests() -> bool:
+	Progress.completed.clear()
+	main.show_map()
+	await get_tree().process_frame
+	var map: WorldMap = main.world_map
+	if map == null or main.level != null:
+		return _fail("la carte ne s'affiche pas")
+
+	if map.state_of(&"la_grille") != "ici" or map.state_of(&"les_allees") != "ouvert":
+		return _fail("états au départ : %s, %s" % [map.state_of(&"la_grille"), map.state_of(&"les_allees")])
+	Progress.mark_completed(&"la_grille")
+	if map.state_of(&"la_grille") != "fait" or map.state_of(&"les_allees") != "ici":
+		return _fail("la Grille faite ne fait pas passer aux Allées")
+	Progress.mark_completed(&"les_allees")
+	# La Chapelle n'est pas construite : le prochain niveau est l'Ossuaire.
+	if map.state_of(&"la_chapelle") != "ferme" or map.state_of(&"l_ossuaire") != "ici":
+		return _fail("la Chapelle absente n'est pas sautée (%s, %s)" % [
+			map.state_of(&"la_chapelle"), map.state_of(&"l_ossuaire")])
+
+	# La progression terminée survit à la sauvegarde.
+	Progress.save()
+	Progress.reset()
+	Progress.load_save()
+	if not Progress.is_completed(&"la_grille") or not Progress.is_completed(&"les_allees"):
+		return _fail("les niveaux terminés ne sont pas relus de la sauvegarde")
+	if Progress.is_completed(&"l_ossuaire"):
+		return _fail("un niveau non terminé est lu comme terminé")
+	print("test 12 réussi : états de la carte et sauvegarde des niveaux terminés")
+
+	# Un niveau non construit ne s'ouvre pas ; un niveau construit, si.
+	var chosen := [&""]
+	map.level_chosen.connect(func(id: StringName) -> void: chosen[0] = id)
+	map.select_level(&"la_chapelle")
+	map.enter_selected()
+	await get_tree().process_frame
+	if chosen[0] != &"" or main.level != null:
+		return _fail("un niveau pas encore construit s'est ouvert")
+	map.select_level(&"les_allees")
+	map.enter_selected()
+	await get_tree().process_frame
+	if chosen[0] != &"les_allees" or main.level == null or main.world_map != null:
+		return _fail("le niveau choisi sur la carte ne s'est pas ouvert")
+	print("test 12 réussi : la carte ouvre le niveau choisi, refuse celui qui n'existe pas")
+
+	# Abandon depuis le carnet : retour à la carte.
+	var level := _level()
+	level.open_book()
+	level.book.leave_requested.emit()
+	await get_tree().process_frame
+	if main.level != null or main.world_map == null or get_tree().paused:
+		return _fail("quitter le niveau depuis le carnet ne ramène pas à la carte")
+	print("test 12 réussi : quitter le niveau ramène à la carte")
 	return true
 
 
@@ -465,6 +530,37 @@ func _fail(reason: String) -> bool:
 	return false
 
 
+## Photographie la carte : le bas, un niveau choisi, le milieu, le haut, le carnet.
+func _capture_map() -> void:
+	Progress.mark_completed(&"la_grille")
+	Progress.mark_completed(&"les_allees")
+	Progress.add_memories(110)
+	main.show_map()
+	await get_tree().create_timer(0.6).timeout
+	var map: WorldMap = main.world_map
+	await _shoot("map_01_depart")
+	map.select_level(&"l_ossuaire")
+	await get_tree().create_timer(0.4).timeout
+	await _shoot("map_02_choix")
+	map.select_level(&"la_chapelle")
+	await get_tree().create_timer(0.3).timeout
+	await _shoot("map_03_ferme")
+	for step in [[1700.0, "map_04_citadelle"], [1100.0, "map_05_cathedrale"], [400.0, "map_06_palais"]]:
+		map.scroll_to(step[0], 0.5)
+		await get_tree().create_timer(0.3).timeout
+		await _shoot(step[1])
+	map.scroll_to(2300.0)
+	map.open_book()
+	await get_tree().create_timer(0.4).timeout
+	await _shoot("map_07_carnet")
+	get_tree().quit(0)
+
+
+func _shoot(file: String) -> void:
+	await RenderingServer.frame_post_draw
+	get_viewport().get_texture().get_image().save_png("%s/%s.png" % [capture_dir, file])
+
+
 ## Ouvre le carnet avec un point à dépenser, l'enregistre, puis le ferme.
 func _capture_book() -> void:
 	Progress.add_memories(Progression.threshold(Progress.hero_level + 1) - Progress.memories)
@@ -478,6 +574,9 @@ func _capture_book() -> void:
 
 ## Joue la Grille en enregistrant une image toutes les 1,3 seconde.
 func _capture() -> void:
+	if capture_map:
+		await _capture_map()
+		return
 	main.load_level(main.level_id, start_checkpoint)
 	_watch(_level())
 	for shot in range(1, 31):

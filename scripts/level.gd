@@ -16,6 +16,8 @@ signal completed
 signal checkpoint_reached(index: int)
 ## Le héros est tombé ; `Main` décide de la suite.
 signal failed
+## Le joueur quitte le niveau pour revenir à la carte.
+signal quit_requested
 ## Émis à chaque image de physique ; les scénarios l'attendent plutôt qu'un
 ## signal de l'arbre, pour s'arrêter net si le niveau est libéré.
 signal ticked
@@ -287,7 +289,14 @@ func open_book() -> void:
 	if hero.is_dead() or _finished or get_tree().paused:
 		return
 	book = SkillBook.new()
+	book.can_leave = true
+	book.leave_requested.connect(_on_leave)
 	add_child(book)
+
+
+func _on_leave() -> void:
+	book.close_book()
+	quit_requested.emit()
 
 
 func _refresh_progress() -> void:

@@ -25,6 +25,8 @@ var ranks := {}
 ## Où reprendre la partie.
 var level_id: StringName = &"la_grille"
 var checkpoint := 0
+## Les niveaux terminés (identifiant → vrai). Ils restent rejouables.
+var completed := {}
 
 
 func reset() -> void:
@@ -36,7 +38,18 @@ func reset() -> void:
 	ranks = {}
 	level_id = &"la_grille"
 	checkpoint = 0
+	completed = {}
 	changed.emit()
+
+
+func is_completed(id: StringName) -> bool:
+	return completed.has(String(id))
+
+
+func mark_completed(id: StringName) -> void:
+	completed[String(id)] = true
+	changed.emit()
+	save()
 
 
 func add_memories(amount: int) -> void:
@@ -127,6 +140,7 @@ func save() -> bool:
 		"ranks": ranks,
 		"level_id": String(level_id),
 		"checkpoint": checkpoint,
+		"completed": completed.keys(),
 	}
 	var file := FileAccess.open(save_path, FileAccess.WRITE)
 	if file == null:
@@ -159,6 +173,11 @@ func load_save() -> bool:
 			ranks[String(key)] = int(saved_ranks[key])
 	level_id = StringName(data.get("level_id", "la_grille"))
 	checkpoint = int(data.get("checkpoint", 0))
+	completed = {}
+	var saved_done = data.get("completed", [])
+	if typeof(saved_done) == TYPE_ARRAY:
+		for id in saved_done:
+			completed[String(id)] = true
 	changed.emit()
 	return true
 
