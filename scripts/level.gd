@@ -25,6 +25,8 @@ const GRAVEYARD := "res://assets/kaykit/halloween/"
 
 ## Nom affiché à l'entrée du niveau.
 var title := ""
+## Niveau suivant, s'il existe déjà.
+var next_level: StringName = &""
 ## Point de reprise où commence le scénario.
 var start_checkpoint := 0
 ## Vrai quand un joueur automatique tient les commandes : le niveau ne se
@@ -49,6 +51,8 @@ var _time := 0.0
 var _hud_timer := 0.0
 var _finished := false
 var _solids: StaticBody3D
+## Les vantaux de chaque grille, et l'obstacle qui la ferme.
+var _gates: Array[Dictionary] = []
 
 
 func _ready() -> void:
@@ -176,12 +180,75 @@ func finish() -> void:
 	completed.emit()
 
 
+## Morts encore debout, ou en train de sortir de terre.
+func standing_count() -> int:
+	var count := 0
+	for enemy in _enemies:
+		if not enemy.is_down():
+			count += 1
+	return count
+
+
+## Fait apparaître plusieurs morts du même type ; `rise_delay` positif
+## remplace leur délai de relèvement.
+func spawn_group(type_id: StringName, points: Array, rise_delay := -1.0) -> void:
+	for point: Vector3 in points:
+		var enemy := spawn(type_id, point)
+		if rise_delay > 0.0:
+			enemy.rise_delay = rise_delay
+
+
+# --- Grilles ------------------------------------------------------------------
+
+## Pose une grille fermée (modèle du pack de cimetière à deux vantaux).
+## Elle bloque le passage jusqu'à `open_gate`. `checkpoint` est le point de
+## reprise qui se trouve après elle : au retour à ce point, elle est ouverte.
+func add_gate(at: Vector3, checkpoint: int, model := "fence_gate", yaw_deg := 0.0, width := 4.2) -> int:
+	var node := grave_piece(model, at, yaw_deg)
+	var size := Vector3(width, 4.0, 0.8)
+	if absf(yaw_deg) > 45.0:
+		size = Vector3(0.8, 4.0, width)
+	_gates.append({
+		"open": false,
+		"leaves": [node.find_child("*_left", true, false), node.find_child("*_right", true, false)],
+		"blocker": solid(at, size),
+		"checkpoint": checkpoint,
+	})
+	return _gates.size() - 1
+
+
+func open_gate(index: int, instant := false) -> void:
+	var gate := _gates[index]
+	if gate["open"]:
+		return
+	gate["open"] = true
+	(gate["blocker"] as CollisionShape3D).set_deferred("disabled", true)
+	for side: int in [0, 1]:
+		var leaf := gate["leaves"][side] as Node3D
+		if leaf == null:
+			continue
+		var angle := deg_to_rad(105.0) * (1.0 if side == 0 else -1.0)
+		if instant:
+			leaf.rotation.y = angle
+		else:
+			var tween := create_tween()
+			tween.tween_property(leaf, "rotation:y", angle, 1.6) \
+				.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+
+
+## Au retour à un point de reprise, les grilles déjà franchies sont ouvertes.
+func open_gates_before(checkpoint: int) -> void:
+	for i in _gates.size():
+		if checkpoint > 0 and int(_gates[i]["checkpoint"]) <= checkpoint:
+			open_gate(i, true)
+
+
 # --- Les morts ----------------------------------------------------------------
 
 ## Fait apparaître un mort. Avec `from_grave`, il sort de terre avant
 ## d'attaquer.
 func spawn(type_id: StringName, where: Vector3, from_grave := true) -> Enemy:
-	var enemy := Enemy.new()
+	var enemy := Enemy.create(type_id)
 	enemy.position = Vector3(where.x, 0.0, where.z)
 	add_child(enemy)
 	enemy.setup(type_id, hero)
@@ -251,6 +318,12 @@ func _on_hero_hurt() -> void:
 
 
 func _on_hero_died() -> void:
+	if scripted:
+		var near := []
+		for enemy in _enemies:
+			if enemy.is_standing():
+				near.append("%s %.1f" % [enemy.type_id_name, enemy.global_position.distance_to(hero.global_position)])
+		print("chute du héros en %s, morts debout : %s" % [hero.global_position.snapped(Vector3.ONE * 0.1), near])
 	objective = null
 	hud.show_message("Nul ne meurt en Orvana.\nTu te relèves.", 3.5)
 	failed.emit()

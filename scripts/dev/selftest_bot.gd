@@ -58,8 +58,9 @@ func _physics_process(delta: float) -> void:
 	controls.simulated_rite = false
 	if hero.is_dead() or _passive:
 		return
+	_dodge_if_needed(level, hero, controls)
 
-	var target := _nearest(&"hittable", hero)
+	var target := _choose_target(hero)
 	if target != null:
 		var offset := target.global_position - hero.global_position
 		var direction := Vector2(offset.x, offset.z).normalized()
@@ -90,6 +91,27 @@ func _physics_process(delta: float) -> void:
 	_avoid_obstacles(hero, controls, delta)
 
 
+## Esquive comme un joueur attentif : au tir d'un archer, au jaillissement
+## d'un Fouisseur, et une fois sur deux devant un coup armé tout près.
+func _dodge_if_needed(level: Level, hero: Hero, controls: TouchControls) -> void:
+	for enemy in level.enemies():
+		var threat := false
+		if enemy is ArcherEnemy and enemy.state == Enemy.State.SPECIAL:
+			threat = enemy._state_time > float(enemy._type["aim_time"]) - 0.2 and not enemy._fired
+		elif enemy is Burrower and enemy.state == Enemy.State.SPECIAL:
+			threat = enemy._phase == Burrower.Phase.WARNING and enemy._state_time > 0.35
+		elif enemy.state == Enemy.State.WINDUP and not enemy._struck:
+			var close := enemy.global_position.distance_to(hero.global_position) < 2.6
+			threat = close and enemy._state_time > float(enemy._type["attack_windup"]) - 0.25 \
+				and enemy.get_instance_id() % 2 == 0
+		if threat:
+			var away := hero.global_position - enemy.global_position
+			var side := Vector2(away.x, away.z).normalized().orthogonal()
+			controls.simulated_move = side
+			controls.press_dodge()
+			return
+
+
 ## Un joueur qui bute contre une tombe la contourne : s'il n'avance plus, il
 ## part un moment de côté.
 func _avoid_obstacles(hero: Hero, controls: TouchControls, delta: float) -> void:
@@ -108,6 +130,24 @@ func _avoid_obstacles(hero: Hero, controls: TouchControls, delta: float) -> void
 			_detour_side = -_detour_side
 	else:
 		_stuck_time = 0.0
+
+
+## Comme un joueur qui a compris le niveau : l'archer, la cloche et la
+## Veuve passent avant les Dépouilles, s'ils ne sont pas trop loin.
+func _choose_target(hero: Hero) -> Node3D:
+	var best: Node3D = null
+	var best_score := INF
+	for node in get_tree().get_nodes_in_group(&"hittable"):
+		var enemy := node as Enemy
+		if enemy == null:
+			continue
+		var score := hero.global_position.distance_to(enemy.global_position)
+		if enemy is ArcherEnemy or enemy is BellRinger or enemy is Widow:
+			score -= 7.0
+		if score < best_score:
+			best_score = score
+			best = enemy
+	return best
 
 
 func _nearest(group: StringName, hero: Hero) -> Node3D:
@@ -129,7 +169,11 @@ func _run() -> void:
 		return
 	if not await _progress_tests():
 		return
+	if not await _bestiary_tests():
+		return
 	if not await _grille_tests():
+		return
+	if not await _traverse(&"les_allees"):
 		return
 	print("SELFTEST OK")
 	get_tree().quit(0)
@@ -239,6 +283,82 @@ func _progress_tests() -> bool:
 	return true
 
 
+## Chaque mort fait ce qu'il doit. Le héros reste passif le temps de la
+## vérification, puis abat et met au repos tout le monde.
+func _bestiary_tests() -> bool:
+	var arena := _level() as Arena
+	var hero := arena.hero
+
+	# Archer creux : son carreau touche un héros immobile.
+	hero.heal(1000)
+	hero.global_position = Vector3(0.0, 0.0, 3.0)
+	_passive = true
+	arena.spawn(&"archer_creux", Vector3(0.0, 0.0, -6.0), false)
+	if not await _until(func() -> bool: return hero.health < hero.max_health, 20.0):
+		return _fail("l'Archer creux n'a pas touché le héros")
+	print("test bestiaire réussi : l'Archer creux tire, vie %d" % hero.health)
+	_passive = false
+	if not await _until(func() -> bool: return arena.enemies_left() == 0, 120.0):
+		return _fail("l'Archer creux n'a pas été mis au repos")
+
+	# Porte-cloche : un corps à portée de sa cloche se relève plus vite.
+	hero.heal(1000)
+	hero.global_position = Vector3(0.0, 0.0, 3.0)
+	_passive = true
+	var body := arena.spawn(&"depouille", Vector3(4.0, 0.0, 3.0), false)
+	body.take_hit(hero.global_position, 1000)
+	var ringer := arena.spawn(&"porte_cloche", Vector3(-5.0, 0.0, 3.0), false)
+	await get_tree().physics_frame
+	if body.rise_rate() <= 1.0:
+		return _fail("la cloche n'accélère pas le relèvement (%.1f)" % body.rise_rate())
+	print("test bestiaire réussi : la cloche presse les corps (x%.1f)" % body.rise_rate())
+	ringer.take_hit(hero.global_position, 1000)
+	await get_tree().physics_frame
+	if body.rise_rate() > 1.0:
+		return _fail("la cloche sonne encore, Porte-cloche abattu")
+	_passive = false
+	if not await _until(func() -> bool: return arena.enemies_left() == 0, 120.0):
+		return _fail("le Porte-cloche n'a pas été mis au repos")
+
+	# Veuve : son cri relève un corps.
+	hero.heal(1000)
+	hero.global_position = Vector3(0.0, 0.0, 3.0)
+	_passive = true
+	_allow_rest = false
+	var fallen := arena.spawn(&"depouille", Vector3(3.0, 0.0, 5.0), false)
+	fallen.take_hit(hero.global_position, 1000)
+	var widow := arena.spawn(&"veuve", Vector3(-6.0, 0.0, -2.0), false) as Widow
+	var raised := [-1]
+	widow.screamed.connect(func(count: int) -> void: raised[0] = count)
+	if not await _until(func() -> bool: return raised[0] >= 0, 25.0):
+		return _fail("la Veuve n'a pas crié")
+	if raised[0] < 1:
+		return _fail("le cri de la Veuve n'a relevé aucun corps")
+	print("test bestiaire réussi : le cri de la Veuve relève %d corps" % raised[0])
+	_passive = false
+	_allow_rest = true
+	if not await _until(func() -> bool: return arena.enemies_left() == 0, 120.0):
+		return _fail("la Veuve n'a pas été mise au repos")
+
+	# Fouisseur : il file sous terre et jaillit près du héros.
+	hero.heal(1000)
+	hero.global_position = Vector3(0.0, 0.0, 3.0)
+	_passive = true
+	var burrower := arena.spawn(&"fouisseur", Vector3(8.0, 0.0, -4.0)) as Burrower
+	if not burrower.is_burrowed():
+		return _fail("le Fouisseur n'est pas parti sous terre")
+	if not await _until(func() -> bool: return not burrower.is_burrowed(), 20.0):
+		return _fail("le Fouisseur n'a pas jailli")
+	var distance := burrower.global_position.distance_to(hero.global_position)
+	if distance > 3.0:
+		return _fail("le Fouisseur a jailli loin du héros (%.1f)" % distance)
+	print("test bestiaire réussi : le Fouisseur jaillit à %.1f du héros" % distance)
+	_passive = false
+	if not await _until(func() -> bool: return arena.enemies_left() == 0, 120.0):
+		return _fail("le Fouisseur n'a pas été mis au repos")
+	return true
+
+
 func _grille_tests() -> bool:
 	main.load_level(&"la_grille")
 	_watch(_level())
@@ -273,15 +393,39 @@ func _grille_tests() -> bool:
 	# 11. La fin du niveau. Le joueur automatique n'esquive pas : il peut
 	# tomber, et doit alors reprendre au point de reprise, comme un joueur.
 	var falls := [0]
-	main.level_loaded.connect(func(level: Level) -> void:
+	var on_load := func(level: Level) -> void:
 		falls[0] += 1
-		_watch(level))
-	if not await _until(func() -> bool: return _completed or falls[0] > 6, 1200.0, false):
+		_watch(level)
+	main.level_loaded.connect(on_load)
+	var finished := await _until(func() -> bool: return _completed or falls[0] > 6, 1200.0, false)
+	main.level_loaded.disconnect(on_load)
+	if not finished:
 		return _fail("la Grille n'a pas été terminée")
 	if not _completed:
 		return _fail("le joueur automatique est tombé plus de six fois")
 	print("test 11 réussi : la Grille est terminée, vie %d, niveau %d, %d d'or, %d chute(s)" % [
 		_level().hero.health, Progress.hero_level, Progress.gold, falls[0]])
+	return true
+
+
+## Traverse un niveau de bout en bout. Le joueur automatique peut tomber :
+## il reprend alors au point de reprise, comme un joueur.
+func _traverse(id: StringName) -> bool:
+	_completed = false
+	_checkpoint = 0
+	var falls := [0]
+	var on_load := func(level: Level) -> void:
+		falls[0] += 1
+		_watch(level)
+	main.level_loaded.connect(on_load)
+	main.load_level(id)
+	falls[0] = 0
+	var done := await _until(func() -> bool: return _completed or falls[0] > 6, 1500.0, false)
+	main.level_loaded.disconnect(on_load)
+	if not done or not _completed:
+		return _fail("%s n'a pas été terminé (%d chutes)" % [id, falls[0]])
+	print("test réussi : %s terminé, niveau %d, %d oboles, %d chute(s)" % [
+		_level().title, Progress.hero_level, Progress.gold, falls[0]])
 	return true
 
 
@@ -310,6 +454,9 @@ func _fail(reason: String) -> bool:
 	if level != null:
 		print("  héros en %s, objectif %s, morts restants %d" % [
 			level.hero.global_position.snapped(Vector3.ONE * 0.1), level.objective, level.enemies_left()])
+		for enemy in level.enemies():
+			print("  %s en %s, état %d, vie %d" % [enemy.type_id_name,
+				enemy.global_position.snapped(Vector3.ONE * 0.1), enemy.state, enemy.health])
 	get_tree().quit(1)
 	return false
 
@@ -327,7 +474,7 @@ func _capture_book() -> void:
 
 ## Joue la Grille en enregistrant une image toutes les 1,3 seconde.
 func _capture() -> void:
-	main.load_level(&"la_grille", start_checkpoint)
+	main.load_level(main.level_id, start_checkpoint)
 	_watch(_level())
 	for shot in range(1, 31):
 		await get_tree().create_timer(1.3).timeout

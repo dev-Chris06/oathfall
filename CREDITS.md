@@ -9,7 +9,7 @@ dépôt.
 | Pack | Auteur | Licence | Source | Fichiers utilisés |
 |---|---|---|---|---|
 | KayKit : Adventurers Character Pack 1.0 | Kay Lousberg | CC0 1.0 | https://github.com/KayKit-Game-Assets/KayKit-Character-Pack-Adventures-1.0 | `assets/kaykit/adventurers/` |
-| KayKit Character Pack : Skeletons 1.0 | Kay Lousberg | CC0 1.0 | https://github.com/KayKit-Game-Assets/KayKit-Character-Pack-Skeletons-1.0 | `assets/kaykit/skeletons/` |
+| KayKit Character Pack : Skeletons 1.0 | Kay Lousberg | CC0 1.0 | https://github.com/KayKit-Game-Assets/KayKit-Character-Pack-Skeletons-1.0 | `assets/kaykit/skeletons/` (Minion, Warrior, Rogue, Mage, arbalète, carreau, carquois) |
 | KayKit : Dungeon Remastered 1.0 | Kay Lousberg | CC0 1.0 | https://github.com/KayKit-Game-Assets/KayKit-Dungeon-Remastered-1.0 | `assets/kaykit/dungeon/` |
 | KayKit : Halloween Bits 1.0 | Kay Lousberg | CC0 1.0 | https://github.com/KayKit-Game-Assets/KayKit-Halloween-Bits-1.0 | `assets/kaykit/halloween/` |
 

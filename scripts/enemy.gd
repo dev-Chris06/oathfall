@@ -10,12 +10,26 @@ signal fell(enemy: Enemy)
 signal rose(enemy: Enemy)
 signal rested(enemy: Enemy)
 
-enum State { CHASE, WINDUP, STAGGER, DOWN, RISING, RESTED }
+enum State { CHASE, WINDUP, STAGGER, DOWN, RISING, RESTED, SPECIAL }
+
+## Comportement de chaque type de mort (clé « behavior » des données).
+const BEHAVIORS := {
+	"melee": "res://scripts/enemy.gd",
+	"archer": "res://scripts/enemies/archer.gd",
+	"bell": "res://scripts/enemies/bell_ringer.gd",
+	"burrower": "res://scripts/enemies/burrower.gd",
+	"widow": "res://scripts/enemies/widow.gd",
+}
+## Portée et force des cloches : chaque Porte-cloche debout dans ce rayon
+## ajoute `BELL_BOOST` à la vitesse de relèvement d'un corps.
+const BELL_RADIUS := 15.0
+const BELL_BOOST := 1.5
 
 const TURN_SPEED := 9.0
 const STAGGER_TIME := 0.35
 
 var state := State.CHASE
+var type_id_name: StringName
 var health := 0
 ## Délai avant de se relever. Modifiable par ce qui l'entoure (Porte-cloche,
 ## sceaux brisés, tests).
@@ -42,7 +56,15 @@ var _rise_duration := 0.0
 var _emerging := false
 
 
+## Crée un mort du bon comportement pour ce type.
+static func create(type_id: StringName) -> Enemy:
+	var behavior: String = EnemyTypes.get_type(type_id).get("behavior", "melee")
+	var script := load(BEHAVIORS[behavior]) as GDScript
+	return script.new() as Enemy
+
+
 func setup(type_id: StringName, hero: Hero) -> void:
+	type_id_name = type_id
 	_type = EnemyTypes.get_type(type_id)
 	_hero = hero
 	health = int(_type["health"])
@@ -67,6 +89,15 @@ func setup(type_id: StringName, hero: Hero) -> void:
 	_skeleton = _model.find_child("Skeleton3D", true, false) as Skeleton3D
 	if _skeleton != null:
 		_hips = _skeleton.find_bone("hips")
+	_model.scale = Vector3.ONE * float(_type.get("scale", 1.0))
+	for part_name: String in _type.get("hidden_parts", []):
+		var part := _model.find_child(part_name, true, false) as Node3D
+		if part != null:
+			part.visible = false
+	for prop: Dictionary in _type.get("props", []):
+		_attach(prop)
+	if _type.has("tint"):
+		_tint(_type["tint"])
 
 	_build_marker()
 	_cooldown = randf_range(0.2, 0.9)
@@ -96,7 +127,7 @@ func _physics_process(delta: float) -> void:
 				state = State.CHASE
 		State.DOWN:
 			velocity = Vector3.ZERO
-			_down_time += delta
+			_down_time += delta * rise_rate()
 			_update_marker()
 			if _down_time >= rise_delay:
 				_start_rising()
@@ -106,8 +137,10 @@ func _physics_process(delta: float) -> void:
 				_finish_rising()
 		State.RESTED:
 			velocity = Vector3.ZERO
+		State.SPECIAL:
+			_special(delta)
 
-	if state == State.CHASE or state == State.WINDUP or state == State.STAGGER:
+	if state == State.CHASE or state == State.WINDUP or state == State.STAGGER or state == State.SPECIAL:
 		var target_yaw := atan2(_facing.x, _facing.z)
 		_model.rotation.y = lerp_angle(_model.rotation.y, target_yaw, minf(1.0, TURN_SPEED * delta))
 		move_and_slide()
@@ -127,6 +160,28 @@ func body_position() -> Vector3:
 ## Vrai tant que le corps gît et peut recevoir le Repos.
 func is_down() -> bool:
 	return state == State.DOWN
+
+
+## Vitesse à laquelle le corps approche de son relèvement : 1, plus chaque
+## cloche qui sonne à portée.
+func rise_rate() -> float:
+	var rate := 1.0
+	for node in get_tree().get_nodes_in_group(&"bells"):
+		var bell := node as Node3D
+		if bell != null and bell.global_position.distance_to(body_position()) <= BELL_RADIUS:
+			rate += BELL_BOOST
+	return rate
+
+
+## Relève le corps sur-le-champ (cri de la Veuve, cloche du Sonneur).
+func force_rise() -> void:
+	if state == State.DOWN:
+		_start_rising()
+
+
+## Vrai si le mort est debout et peut agir.
+func is_standing() -> bool:
+	return state == State.CHASE or state == State.WINDUP or state == State.STAGGER or state == State.SPECIAL
 
 
 ## Souvenirs rendus au héros quand ce mort reçoit le Repos.
@@ -184,6 +239,43 @@ func give_rest() -> void:
 	rested.emit(self)
 
 
+## Action propre à un type (viser, sonner, crier, fouir). À écrire par les
+## comportements qui en ont besoin.
+func _special(_delta: float) -> void:
+	state = State.CHASE
+
+
+## Entre dans l'action propre au type.
+func _begin_special() -> void:
+	state = State.SPECIAL
+	_state_time = 0.0
+	velocity = Vector3.ZERO
+
+
+## Distance au héros sur le sol, et direction vers lui.
+func _to_hero() -> Vector3:
+	var offset := _hero.global_position - global_position
+	offset.y = 0.0
+	return offset
+
+
+## Garde le héros entre `keep_min` et `keep_max` : recule face à lui s'il
+## approche, le suit s'il s'éloigne. Renvoie vrai quand la distance est bonne.
+func _keep_distance(distance: float, keep_min: float, keep_max: float) -> bool:
+	var speed := float(_type["move_speed"])
+	if distance < keep_min:
+		velocity = -_facing * speed * 0.85
+		_loop(_animation("retreat"))
+		return false
+	if distance > keep_max:
+		velocity = _facing * speed
+		_loop(_animation("walk"))
+		return false
+	velocity = Vector3.ZERO
+	_loop(_animation("idle"))
+	return true
+
+
 func _chase() -> void:
 	if _hero == null or _hero.is_dead():
 		velocity = Vector3.ZERO
@@ -224,6 +316,7 @@ func _strike() -> void:
 
 
 func _fall() -> void:
+	_on_fall()
 	state = State.DOWN
 	_state_time = 0.0
 	_down_time = 0.0
@@ -266,6 +359,49 @@ func _finish_rising() -> void:
 		return
 	health = int(ceil(float(_type["health"]) * float(_type["rise_health"])))
 	rose.emit(self)
+
+
+## Appelé quand le mort tombe, avant qu'il ne devienne un corps.
+func _on_fall() -> void:
+	pass
+
+
+## Accroche un objet (arme, cloche) à un os du squelette.
+func _attach(prop: Dictionary) -> Node3D:
+	if _skeleton == null:
+		return null
+	var attachment := BoneAttachment3D.new()
+	attachment.bone_name = prop.get("bone", "handslot.r")
+	_skeleton.add_child(attachment)
+	var node: Node3D
+	if prop.has("model"):
+		node = (load(prop["model"]) as PackedScene).instantiate() as Node3D
+	else:
+		node = _build_prop(prop.get("kind", ""))
+	if node == null:
+		return null
+	node.position = prop.get("offset", Vector3.ZERO)
+	node.rotation_degrees = prop.get("rotation", Vector3.ZERO)
+	attachment.add_child(node)
+	return node
+
+
+## Objets construits par code, faute de modèle dans les packs.
+func _build_prop(_kind: String) -> Node3D:
+	return null
+
+
+## Assombrit ou teinte le modèle (terre, cendre).
+func _tint(color: Color) -> void:
+	for mesh_node in _model.find_children("*", "MeshInstance3D", true, false):
+		var mesh_instance := mesh_node as MeshInstance3D
+		for i in mesh_instance.get_surface_override_material_count():
+			var base := mesh_instance.get_active_material(i) as StandardMaterial3D
+			if base == null:
+				continue
+			var tinted := base.duplicate() as StandardMaterial3D
+			tinted.albedo_color = tinted.albedo_color * color
+			mesh_instance.set_surface_override_material(i, tinted)
 
 
 # --- Marque au sol ------------------------------------------------------------

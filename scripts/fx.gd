@@ -1,0 +1,48 @@
+class_name Fx
+extends RefCounted
+## Effets visuels simples, partagés par les morts et les niveaux.
+
+
+## Une onde qui s'élargit au sol puis s'efface : coup de cloche, cri.
+static func ring(parent: Node, at: Vector3, color: Color, radius: float, duration := 0.9) -> void:
+	var torus := TorusMesh.new()
+	torus.inner_radius = 0.92
+	torus.outer_radius = 1.0
+	torus.rings = 32
+	torus.ring_segments = 4
+	var material := StandardMaterial3D.new()
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	material.albedo_color = color
+	var mesh := MeshInstance3D.new()
+	mesh.mesh = torus
+	mesh.material_override = material
+	mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	parent.add_child(mesh)
+	mesh.global_position = at + Vector3(0.0, 0.15, 0.0)
+	mesh.scale = Vector3(0.5, 1.0, 0.5)
+	var tween := mesh.create_tween()
+	tween.set_parallel(true)
+	tween.tween_property(mesh, "scale", Vector3(radius, 1.0, radius), duration) \
+		.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
+	tween.tween_property(material, "albedo_color:a", 0.0, duration).set_ease(Tween.EASE_IN)
+	tween.chain().tween_callback(mesh.queue_free)
+
+
+## Matériau simple, sans texture.
+static func flat(color: Color, metallic := 0.0, roughness := 0.8) -> StandardMaterial3D:
+	var material := StandardMaterial3D.new()
+	material.albedo_color = color
+	material.metallic = metallic
+	material.roughness = roughness
+	return material
+
+
+## Matériau lumineux et transparent (visées, lueurs).
+static func glow(color: Color) -> StandardMaterial3D:
+	var material := StandardMaterial3D.new()
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	material.albedo_color = color
+	material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	return material

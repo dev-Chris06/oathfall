@@ -7,6 +7,7 @@ extends Node
 ##                         puis traverse la Grille
 ##   --capture=DOSSIER     même chose, en enregistrant des images
 ##   --arena               lance la salle d'essai au lieu du chapitre
+##   --level=ID            commence par ce niveau (la_grille, les_allees…)
 ##   --checkpoint=N        commence au point de reprise N
 ##
 ##   godot --headless --path . --fixed-fps 60 -- --selftest
@@ -16,6 +17,7 @@ signal level_loaded(level: Level)
 const LEVELS := {
 	&"arena": preload("res://scripts/levels/arena.gd"),
 	&"la_grille": preload("res://scripts/levels/la_grille.gd"),
+	&"les_allees": preload("res://scripts/levels/les_allees.gd"),
 }
 
 var level: Level
@@ -36,6 +38,8 @@ func _ready() -> void:
 			capture_dir = arg.trim_prefix("--capture=")
 		elif arg == "--arena":
 			level_id = &"arena"
+		elif arg.begins_with("--level="):
+			level_id = StringName(arg.trim_prefix("--level="))
 		elif arg.begins_with("--checkpoint="):
 			forced_checkpoint = arg.trim_prefix("--checkpoint=").to_int()
 
@@ -55,8 +59,8 @@ func _ready() -> void:
 	Progress.load_save()
 	if level_id == &"arena":
 		load_level(level_id, 0)
-	elif forced_checkpoint >= 0:
-		load_level(&"la_grille", forced_checkpoint)
+	elif forced_checkpoint >= 0 or level_id != &"la_grille":
+		load_level(level_id, maxi(forced_checkpoint, 0))
 	elif LEVELS.has(Progress.level_id):
 		load_level(Progress.level_id, Progress.checkpoint)
 	else:

@@ -17,13 +17,12 @@ const HALF_WIDTH := 10.0
 const GATE_Z: Array[float] = [0.0, -20.0, -40.0]
 const EXIT := Vector3(0.0, 0.0, -57.0)
 
-## Les vantaux de chaque grille, et l'obstacle qui la ferme.
-var _gates: Array[Dictionary] = []
 var _first_rose := false
 
 
 func _init() -> void:
 	title = "La Grille"
+	next_level = &"les_allees"
 
 
 func _checkpoint_position(index: int) -> Vector3:
@@ -38,9 +37,7 @@ func _checkpoint_position(index: int) -> Vector3:
 # --- Scénario -----------------------------------------------------------------
 
 func _run(checkpoint: int) -> void:
-	for i in GATE_Z.size():
-		if checkpoint > 0 and i <= checkpoint:
-			open_gate(i, true)
+	open_gates_before(checkpoint)
 
 	if checkpoint <= 0:
 		await _outer_yard()
@@ -89,7 +86,7 @@ func _inner_yard() -> void:
 	spawn(&"depouille", Vector3(-8.0, 0.0, -28.0))
 	spawn(&"depouille", Vector3(8.0, 0.0, -32.0))
 	spawn(&"depouille", Vector3(0.0, 0.0, -33.0))
-	await wait_until(func() -> bool: return _standing() <= 1)
+	await wait_until(func() -> bool: return standing_count() <= 1)
 	spawn(&"depouille", Vector3(-8.0, 0.0, -36.0))
 	spawn(&"depouille", Vector3(7.5, 0.0, -26.5))
 	await until_peace()
@@ -105,7 +102,7 @@ func _vault_yard() -> void:
 	for pos: Vector3 in [Vector3(-5.0, 0.0, -49.0), Vector3(5.0, 0.0, -49.0),
 			Vector3(-2.0, 0.0, -53.0), Vector3(2.0, 0.0, -53.0)]:
 		spawn(&"depouille", pos).rise_delay = 14.0
-	await wait_until(func() -> bool: return _standing() <= 1)
+	await wait_until(func() -> bool: return standing_count() <= 1)
 	for pos: Vector3 in [Vector3(-8.0, 0.0, -44.0), Vector3(8.0, 0.0, -44.0),
 			Vector3(0.0, 0.0, -55.0)]:
 		spawn(&"depouille", pos).rise_delay = 14.0
@@ -117,45 +114,6 @@ func _leave() -> void:
 	hud.show_message("Le passage derrière le caveau\nmène aux Allées.", 4.0)
 	await reach(EXIT, 2.5)
 	finish()
-
-
-## Morts encore debout ou en train de sortir de terre.
-func _standing() -> int:
-	var count := 0
-	for enemy in enemies():
-		if not enemy.is_down():
-			count += 1
-	return count
-
-
-# --- Grilles ------------------------------------------------------------------
-
-func open_gate(index: int, instant := false) -> void:
-	var gate := _gates[index]
-	if gate["open"]:
-		return
-	gate["open"] = true
-	(gate["blocker"] as CollisionShape3D).set_deferred("disabled", true)
-	for side: int in [0, 1]:
-		var leaf := gate["leaves"][side] as Node3D
-		if leaf == null:
-			continue
-		var angle := deg_to_rad(105.0) * (1.0 if side == 0 else -1.0)
-		if instant:
-			leaf.rotation.y = angle
-		else:
-			var tween := create_tween()
-			tween.tween_property(leaf, "rotation:y", angle, 1.6) \
-				.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-
-
-func _add_gate(z: float, model: String) -> void:
-	var node := grave_piece(model, Vector3(0.0, 0.0, z))
-	_gates.append({
-		"open": false,
-		"leaves": [node.find_child("*_left", true, false), node.find_child("*_right", true, false)],
-		"blocker": solid(Vector3(0.0, 0.0, z), Vector3(4.2, 4.0, 0.8)),
-	})
 
 
 # --- Décor --------------------------------------------------------------------
@@ -191,9 +149,9 @@ func _build() -> void:
 		if gz != GATE_Z[0]:
 			for x: float in [-2.1, 2.1]:
 				grave_piece("fence_pillar", Vector3(x, 0.0, gz))
-	_add_gate(GATE_Z[0], "arch_gate")
-	_add_gate(GATE_Z[1], "fence_gate")
-	_add_gate(GATE_Z[2], "fence_gate")
+	add_gate(Vector3(0.0, 0.0, GATE_Z[0]), 1, "arch_gate")
+	add_gate(Vector3(0.0, 0.0, GATE_Z[1]), 1)
+	add_gate(Vector3(0.0, 0.0, GATE_Z[2]), 2)
 
 	# Le chemin qui mène à la grille, hors des murs.
 	for z: float in [10.0, 6.0, 2.0]:

@@ -113,6 +113,10 @@ Retour de l'auteur encore attendu : les sensations de combat sur téléphone
 | `scripts/main.gd` | Point d'entrée : charge les niveaux, points de reprise |
 | `scripts/level.gd` | Base des niveaux : héros, caméra, HUD, apparition des morts, outils de scénario (`say`, `reach`, `until_peace`, `wait`) |
 | `scripts/levels/la_grille.gd` | Niveau 1 : décor, grilles, scénario |
+| `scripts/levels/les_allees.gd` | Niveau 2 : allée de mausolées, archers, Porte-cloche |
+| `scripts/enemies/` | Comportements propres : archer (et son carreau), Porte-cloche, Fouisseur, Veuve |
+| `scripts/fx.gd` | Effets partagés : ondes au sol, matériaux simples |
+| `scripts/ui/` | Polices du jeu, parchemin du carnet |
 | `scripts/levels/arena.gd` | Salle d'essai, utilisée par le test automatique |
 | `scripts/progress.gd` | Chargé en permanence (`Progress`) : souvenirs, niveau, or, compétences, sauvegarde |
 | `scripts/skill_book.gd` | Le carnet : écran des compétences |
@@ -143,6 +147,15 @@ Règles à garder :
 - **Scénarios** : attendre avec `wait()` ou `wait_until()` du niveau, jamais
   avec un minuteur de l'arbre, pour que tout s'arrête si le niveau est
   rechargé.
+- **Un type de mort** se déclare dans `enemy_types.gd` avec son `behavior`
+  (`melee`, `archer`, `bell`, `burrower`, `widow`) ; `Enemy.create()`
+  choisit la classe. Un comportement écrit `_chase()` et, pour ses actions
+  propres, `_special()` dans l'état SPECIAL. Frapper un mort en SPECIAL
+  l'interrompt.
+- **Grilles** : `add_gate(position, point_de_reprise)` ; au retour à un point
+  de reprise, les grilles d'avant sont ouvertes.
+- **Textes à l'écran** : polices de `GameFonts` (CC0). La gothique n'a pas
+  d'accents : la réserver aux titres, avec la police de texte en secours.
 - **Sol** : `pave()` dessine tous les carreaux en un seul appel. Ne pas
   poser les carreaux un par un.
 - **Entrées** : le jeu ne lit que `TouchControls.move`, `rite_held` et les
@@ -166,11 +179,16 @@ godot --headless --path . --import
 godot --headless --path . --fixed-fps 60 -- --selftest
 
 # Voir le rendu : ouvre une fenêtre, enregistre des images, puis quitte
+# (ajouter --level=les_allees pour un autre niveau)
 godot --path . --resolution 1280x720 -- --capture=/chemin/vers/un/dossier
 # … en commençant à un point de reprise
 godot --path . --resolution 1280x720 -- --capture=/chemin --checkpoint=2
 ```
 
+- Le joueur automatique joue comme un joueur moyen : il choisit ses cibles
+  (archers, cloches, Veuves d'abord) et esquive les tirs annoncés. S'il tombe
+  souvent dans un niveau (il affiche « chute du héros »), le niveau est
+  probablement trop dur : alléger les vagues plutôt que l'aider davantage.
 - Le test doit se terminer par `SELFTEST OK`. Il est aussi exécuté par le
   build, qui échoue sinon. **Toute nouvelle mécanique doit y gagner une
   vérification.**
