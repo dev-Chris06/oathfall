@@ -17,6 +17,15 @@ Le texte de licence de chaque pack est conservé à côté de ses fichiers
 (`LICENSE.txt`). La licence CC0 n'impose pas de crédit ; Kay Lousberg
 (www.kaylousberg.com) est cité ici par reconnaissance.
 
+## Polices
+
+| Police | Auteur | Licence | Source | Fichiers utilisés |
+|---|---|---|---|---|
+| Standard Blackletter | David Grigg (Standard Ebooks) | CC0 1.0 | https://github.com/standardebooks/standard-blackletter | `assets/fonts/StandardBlackletter.otf` |
+| MFB Oldstyle | Daniel Benjamin Miller, d'après Morris Fuller Benton | CC0 1.0 | https://ctan.org/pkg/mfb-oldstyle | `assets/fonts/MFBOldstyle-*.otf` |
+
+Les textes de licence sont conservés dans `assets/fonts/`.
+
 ## Moteur
 
 Le jeu est réalisé avec Godot Engine (licence MIT), https://godotengine.org.

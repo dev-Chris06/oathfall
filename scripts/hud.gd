@@ -62,7 +62,7 @@ func _ready() -> void:
 	_debug = _make_label(13, Color(1.0, 1.0, 1.0, 0.5))
 	_debug.position = Vector2(24.0, 92.0)
 
-	_message = _make_label(30, Color(1.0, 0.93, 0.78))
+	_message = _make_label(34, Color(1.0, 0.93, 0.78))
 	# Toute la largeur de l'écran : le texte se centre quelle que soit sa longueur.
 	_message.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
 	_message.offset_top = 110.0
@@ -93,7 +93,7 @@ func set_counts(standing: int, down: int) -> void:
 ## Niveau du héros, part de la jauge des souvenirs remplie, or porté.
 func set_progress(level: int, progress: float, gold: int) -> void:
 	_memory_fill.size.x = BAR_SIZE.x * progress
-	_level_label.text = "Niv. %d    Or : %d" % [level, gold]
+	_level_label.text = "Niv. %d    Oboles : %d" % [level, gold]
 
 
 func set_debug(text: String) -> void:
@@ -108,6 +108,7 @@ func show_message(text: String, seconds: float) -> void:
 
 func _make_label(font_size: int, color: Color) -> Label:
 	var label := Label.new()
+	label.add_theme_font_override("font", GameFonts.text())
 	label.add_theme_font_size_override("font_size", font_size)
 	label.add_theme_color_override("font_color", color)
 	label.add_theme_color_override("font_outline_color", Color.BLACK)
