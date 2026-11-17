@@ -226,6 +226,8 @@ func _run() -> void:
 		return
 	if not await _blow_alignment_tests():
 		return
+	if not await _crier_tests():
+		return
 	if not await _trigger_tests():
 		return
 	if not await _reach_tests():
@@ -255,6 +257,8 @@ func _run() -> void:
 	if not await _traverse(&"la_fosse"):
 		return
 	if not await _traverse(&"la_porte_des_halles"):
+		return
+	if not await _traverse(&"les_etals"):
 		return
 	if not await _map_tests():
 		return
@@ -776,7 +780,7 @@ func _blow_alignment_tests() -> bool:
 	sonneur.take_hit(hero.global_position, 100000)
 
 	# Les morts du chapitre : on attend qu'ils arment leur coup au corps à corps.
-	for id: StringName in [&"depouille", &"porte_cloche", &"fouisseur", &"archer_creux"]:
+	for id: StringName in [&"depouille", &"porte_cloche", &"fouisseur", &"archer_creux", &"boucher"]:
 		var enemy := arena.spawn(id, hero.global_position + Vector3(1.3, 0.0, 0.0), false)
 		enemy._cooldown = 0.0
 		var armed := await _until(func() -> bool:
@@ -1086,7 +1090,7 @@ func _reach_tests() -> bool:
 	main._drop_level()
 	await _frames(4)
 	for id: StringName in [&"la_grille", &"les_allees", &"la_chapelle", &"l_ossuaire",
-			&"la_fosse", &"la_porte_des_halles", &"refuge"]:
+			&"la_fosse", &"la_porte_des_halles", &"les_etals", &"refuge"]:
 		var level := main.LEVELS[id].new() as Level
 		main.add_child(level)
 		await _frames(4)
@@ -1099,7 +1103,7 @@ func _reach_tests() -> bool:
 		if zone["area"] > 2200.0 or zone["min_x"] < -22.0 or zone["max_x"] > 22.0 or zone["min_z"] < -110.0:
 			return _fail("le héros sort du niveau %s : %.0f m² atteignables (x %.1f à %.1f, z %.1f à %.1f)" % [
 				id, zone["area"], zone["min_x"], zone["max_x"], zone["min_z"], zone["max_z"]])
-	print("test réussi : aucun des 7 niveaux ne laisse sortir le héros")
+	print("test réussi : aucun niveau ne laisse sortir le héros")
 	return true
 
 
@@ -1111,7 +1115,7 @@ func _visible_walls_tests() -> bool:
 	main._drop_level()
 	await _frames(3)
 	for id: StringName in [&"la_grille", &"les_allees", &"la_chapelle", &"l_ossuaire",
-			&"la_fosse", &"la_porte_des_halles", &"refuge"]:
+			&"la_fosse", &"la_porte_des_halles", &"les_etals", &"refuge"]:
 		var level := main.LEVELS[id].new() as Level
 		main.add_child(level)
 		await _frames(3)
@@ -1145,7 +1149,7 @@ func _visible_walls_tests() -> bool:
 					id, at.x, at.z, size.x, size.z, int(100.0 * uncovered / samples)])
 		level.queue_free()
 		await _frames(2)
-	print("test réussi : tout obstacle des 7 niveaux a un objet visible")
+	print("test réussi : tout obstacle de chaque niveau a un objet visible")
 	return true
 
 
@@ -1283,6 +1287,43 @@ func _reachable_zone(level: Level) -> Dictionary:
 			if space.intersect_shape(query, 1).is_empty():
 				queue.append(next)
 	return zone
+
+
+## Le Crieur : son cri presse les morts debout, l'interrompre le retarde.
+func _crier_tests() -> bool:
+	var arena := _level() as Arena
+	var hero := arena.hero
+	hero.heal(1000)
+	hero.global_position = Vector3(0.0, 0.0, 30.0)
+	_passive = true
+	var crier := arena.spawn(&"crieur", Vector3(0.0, 0.0, -8.0), false) as CrierEnemy
+	var ally := arena.spawn(&"depouille", Vector3(2.0, 0.0, -10.0), false)
+	var shouted := [false]
+	crier.shouted.connect(func(_n: int) -> void: shouted[0] = true)
+	crier._shout_timer = 0.0
+	if not await _until(func() -> bool: return shouted[0], 12.0):
+		return _fail("le Crieur ne crie pas alors qu'un mort est debout près de lui")
+	if ally.haste_time <= 0.0:
+		return _fail("le cri du Crieur ne presse pas les morts debout")
+	# Interrompu, il ne crie pas.
+	shouted[0] = false
+	await _frames(5)
+	crier._shout_timer = 0.0
+	await _frames(2)
+	if crier.state != Enemy.State.SPECIAL:
+		return _fail("le Crieur ne prend pas son souffle")
+	crier.take_hit(hero.global_position, 1)
+	await _frames(70)
+	if shouted[0]:
+		return _fail("frapper le Crieur n'interrompt pas son cri")
+	crier.take_hit(hero.global_position, 100000)
+	ally.take_hit(hero.global_position, 100000)
+	print("test réussi : le Crieur presse les morts debout, et le frapper interrompt son cri")
+	_passive = false
+	hero.global_position = Vector3(0.0, 0.0, 3.0)
+	if not await _until(func() -> bool: return arena.enemies_left() == 0, 240.0):
+		return _fail("les morts de l'essai du Crieur n'ont pas été mis au repos")
+	return true
 
 
 ## Traverse un niveau de bout en bout. Le joueur automatique peut tomber :

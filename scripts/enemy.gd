@@ -23,11 +23,15 @@ const BEHAVIORS := {
 	"widow": "res://scripts/enemies/widow.gd",
 	"sonneur": "res://scripts/enemies/sonneur.gd",
 	"fossoyeuse": "res://scripts/enemies/fossoyeuse.gd",
+	"crier": "res://scripts/enemies/crier.gd",
 }
 ## Portée et force des cloches : chaque Porte-cloche debout dans ce rayon
 ## ajoute `BELL_BOOST` à la vitesse de relèvement d'un corps.
 const BELL_RADIUS := 15.0
 const BELL_BOOST := 1.5
+
+## Un mort pressé par un Crieur va et frappe plus vite pendant quelques secondes.
+const HASTE := 1.45
 
 const TURN_SPEED := 9.0
 const STAGGER_TIME := 0.35
@@ -58,6 +62,8 @@ var _down_time := 0.0
 var _rise_duration := 0.0
 ## Vrai pendant la première sortie de terre : le mort garde alors toute sa vie.
 var _emerging := false
+## Secondes de hâte restantes (voir `hasten`).
+var haste_time := 0.0
 
 
 ## Crée un mort du bon comportement pour ce type.
@@ -113,6 +119,9 @@ func _physics_process(delta: float) -> void:
 		return
 	_state_time += delta
 	_cooldown = maxf(0.0, _cooldown - delta)
+	if haste_time > 0.0:
+		haste_time = maxf(0.0, haste_time - delta)
+		_cooldown = maxf(0.0, _cooldown - delta * (HASTE - 1.0))
 
 	match state:
 		State.CHASE:
@@ -147,6 +156,8 @@ func _physics_process(delta: float) -> void:
 	if state == State.CHASE or state == State.WINDUP or state == State.STAGGER or state == State.SPECIAL:
 		var target_yaw := atan2(_facing.x, _facing.z)
 		_model.rotation.y = lerp_angle(_model.rotation.y, target_yaw, minf(1.0, TURN_SPEED * delta))
+		if haste_time > 0.0 and state == State.CHASE:
+			velocity *= HASTE
 		move_and_slide()
 
 
@@ -225,6 +236,12 @@ func take_hit(from: Vector3, damage: int) -> void:
 	state = State.STAGGER
 	_state_time = 0.0
 	_once(_animation("hit"), 1.5)
+
+
+## Le presse pour `seconds` secondes : il va et frappe plus vite.
+func hasten(seconds: float) -> void:
+	if is_standing():
+		haste_time = maxf(haste_time, seconds)
 
 
 ## Donne le Repos : le mort ne se relèvera plus.
