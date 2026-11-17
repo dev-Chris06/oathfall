@@ -193,9 +193,15 @@ func _build_path() -> void:
 			k += 1
 		solid(Vector3(side * 4.8, 0.0, -7.5), Vector3(0.6, 4.0, 29.0))
 	solid(Vector3(0.0, 0.0, 7.5), Vector3(10.0, 4.0, 1.0))
-	for x: float in [-4.1, 4.1]:
+	# La grille tient entre deux piliers, et des panneaux de clôture la
+	# prolongent jusqu'aux murs du chemin : plus de vide sur les côtés.
+	for x: float in [-2.1, 2.1]:
 		grave_piece("fence_pillar", Vector3(x, 0.0, GATE_Z))
-	add_gate(Vector3(0.0, 0.0, GATE_Z), 1, "fence_gate", 0.0, 8.4)
+	for x: float in [-4.1, 4.1]:
+		grave_piece("fence", Vector3(x, 0.0, GATE_Z))
+	for x: float in [-3.45, 3.45]:
+		solid(Vector3(x, 0.0, GATE_Z), Vector3(2.7, 4.0, 0.6))
+	add_gate(Vector3(0.0, 0.0, GATE_Z), 1)
 	grave_piece("post_lantern", Vector3(-3.2, 0.0, 2.0))
 	grave_piece("post_lantern", Vector3(3.2, 0.0, 2.0))
 	flame(Vector3(-3.2, 2.6, 2.4), 2.2, 9.0)
