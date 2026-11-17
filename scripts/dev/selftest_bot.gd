@@ -226,6 +226,8 @@ func _run() -> void:
 		return
 	if not await _blow_alignment_tests():
 		return
+	if not await _trigger_tests():
+		return
 	for type_id: StringName in EnemyTypes.TYPES:
 		if not Progress.has_met(type_id):
 			return _fail("%s a été vu mais n'est pas au bestiaire" % type_id)
@@ -1014,6 +1016,37 @@ func _grille_tests() -> bool:
 		return _fail("la fin de la Grille n'a pas été enregistrée")
 	print("test 11 réussi : la Grille est terminée, vie %d, niveau %d, %d d'or, %d chute(s)" % [
 		_level().hero.health, Progress.hero_level, Progress.gold, falls[0]])
+	return true
+
+
+## Les lignes de déclenchement : franchir la ligne suffit, même loin du point,
+## et un héros resté en arrière ne déclenche rien.
+func _trigger_tests() -> bool:
+	var level := Level.new()
+	main.add_child(level)
+	await _frames(3)
+	var target := Vector3(0.0, 0.0, -10.0)
+	var state := {"done": false}
+	var waiter := func() -> void:
+		await level.reach(target, 2.0)
+		state["done"] = true
+	waiter.call()
+	level.hero.global_position = Vector3(6.0, 0.0, -2.0)
+	await _frames(10)
+	if state["done"]:
+		level.queue_free()
+		return _fail("la zone s'est déclenchée alors que le héros était encore en arrière")
+	if level.objective == null:
+		level.queue_free()
+		return _fail("l'objectif n'est pas posé pendant l'attente")
+	# Le héros court sur le côté et dépasse la ligne sans passer près du point.
+	level.hero.global_position = Vector3(7.0, 0.0, -12.0)
+	await _frames(10)
+	var triggered: bool = state["done"] and level.objective == null
+	level.queue_free()
+	if not triggered:
+		return _fail("franchir la ligne loin du point n'a pas déclenché la suite")
+	print("test réussi : une zone se déclenche dès que sa ligne est franchie")
 	return true
 
 

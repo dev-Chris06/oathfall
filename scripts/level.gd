@@ -44,12 +44,13 @@ var controls: TouchControls
 var hud: Hud
 
 ## Point que le héros doit rejoindre, s'il y en a un. Sert au joueur
-## automatique et, plus tard, à un repère à l'écran.
+## automatique et au repère affiché dans le décor et à l'écran.
 var objective = null
 ## Le carnet des compétences, tant qu'il est ouvert.
 var book: SkillBook
 
 var _camera: GameCamera
+var _guide: Node3D
 var _enemies: Array[Enemy] = []
 var _lights: Array[OmniLight3D] = []
 var _light_base: Array[float] = []
@@ -88,6 +89,7 @@ func _ready() -> void:
 	hud = Hud.new()
 	add_child(hud)
 	hud.set_health(hero.health, hero.max_health)
+	_build_guide()
 
 	hero.hit_landed.connect(_on_hit_landed)
 	hero.health_changed.connect(hud.set_health)
@@ -113,6 +115,8 @@ func _process(delta: float) -> void:
 		var flicker := sin(_time * 9.0 + i * 1.7) * 0.25 + sin(_time * 23.0 + i * 4.1) * 0.12
 		_lights[i].light_energy = _light_base[i] + flicker
 
+	_update_guide()
+
 	_hud_timer -= delta
 	if _hud_timer <= 0.0:
 		_hud_timer = 0.25
@@ -120,6 +124,72 @@ func _process(delta: float) -> void:
 		hud.set_debug("Oathfall %s — %s — %d images/s" % [
 			ProjectSettings.get_setting("application/config/version", "?"),
 			title, Engine.get_frames_per_second()])
+
+
+# --- Repère de l'objectif -----------------------------------------------------
+
+## Repère posé sur l'objectif : une pointe d'or au-dessus d'une colonne de
+## lueur. Quand l'objectif sort de l'écran, une flèche le montre sur le bord.
+func _build_guide() -> void:
+	_guide = Node3D.new()
+	_guide.visible = false
+	var tip := MeshInstance3D.new()
+	var cone := CylinderMesh.new()
+	cone.top_radius = 0.5
+	cone.bottom_radius = 0.0
+	cone.height = 0.9
+	cone.radial_segments = 4
+	cone.rings = 1
+	tip.mesh = cone
+	tip.material_override = Fx.glow(Color(0.95, 0.72, 0.32, 0.85))
+	tip.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_guide.add_child(tip)
+	var beam := MeshInstance3D.new()
+	var column := CylinderMesh.new()
+	column.top_radius = 0.1
+	column.bottom_radius = 0.1
+	column.height = 7.0
+	column.radial_segments = 6
+	column.rings = 1
+	beam.mesh = column
+	beam.material_override = Fx.glow(Color(0.95, 0.72, 0.32, 0.18))
+	beam.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	beam.position.y = -3.8
+	_guide.add_child(beam)
+	add_child(_guide)
+
+
+func _update_guide() -> void:
+	if _guide == null or _camera == null:
+		return
+	if objective == null:
+		_guide.visible = false
+		hud.set_guide(false, Vector2.ZERO, 0.0)
+		return
+	var target: Vector3 = objective
+	_guide.visible = true
+	_guide.position = target + Vector3(0.0, 4.6 + sin(_time * 3.0) * 0.25, 0.0)
+	_guide.rotation.y = _time * 1.5
+	var view := get_viewport().get_visible_rect().size
+	var behind := _camera.is_position_behind(target)
+	var screen := _camera.unproject_position(target)
+	var margin := 70.0
+	var inside := not behind and Rect2(Vector2(margin, margin), view - Vector2(margin, margin) * 2.0).has_point(screen)
+	if inside:
+		hud.set_guide(false, Vector2.ZERO, 0.0)
+		return
+	var centre := view * 0.5
+	var direction := screen - centre
+	if behind:
+		direction = -direction
+	if direction.length() < 1.0:
+		direction = Vector2.UP
+	direction = direction.normalized()
+	# Sur le bord de l'écran, dans la direction de l'objectif.
+	var reach_x := (view.x * 0.5 - margin) / maxf(absf(direction.x), 0.001)
+	var reach_y := (view.y * 0.5 - margin) / maxf(absf(direction.y), 0.001)
+	var at := centre + direction * minf(reach_x, reach_y)
+	hud.set_guide(true, at, direction.angle() + PI * 0.5)
 
 
 # --- À écrire par chaque niveau -----------------------------------------------
@@ -163,14 +233,20 @@ func say(text: String, seconds := 3.0) -> void:
 	await wait(seconds)
 
 
-## Attend que le héros arrive à moins de `radius` du point `where`.
+## Attend que le héros atteigne la zone de `where` : il en est à moins de
+## `radius`, ou il a franchi sa ligne (les niveaux avancent vers -Z). Courir
+## sans passer au point exact suffit donc à déclencher la suite.
 func reach(where: Vector3, radius := 2.5) -> void:
 	objective = where
-	await wait_until(func() -> bool:
-		var offset := hero.global_position - where
-		offset.y = 0.0
-		return offset.length() <= radius)
+	await wait_until(func() -> bool: return crossed(where, radius))
 	objective = null
+
+
+## Vrai si le héros est près de `where` ou a dépassé sa ligne vers -Z.
+func crossed(where: Vector3, radius: float) -> bool:
+	var offset := hero.global_position - where
+	offset.y = 0.0
+	return offset.length() <= radius or hero.global_position.z <= where.z
 
 
 ## Attend que tous les morts du niveau reposent.

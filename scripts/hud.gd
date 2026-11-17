@@ -15,6 +15,7 @@ var _flash: ColorRect
 var _boss_box: Control
 var _boss_fill: ColorRect
 var _boss_label: Label
+var _guide: Polygon2D
 
 
 func _ready() -> void:
@@ -72,6 +73,24 @@ func _ready() -> void:
 	_message.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_message.modulate.a = 0.0
 	_build_boss_bar()
+	_build_guide()
+
+
+## La flèche d'or qui montre l'objectif quand il est hors de l'écran.
+func _build_guide() -> void:
+	_guide = Polygon2D.new()
+	_guide.polygon = PackedVector2Array([Vector2(0.0, -26.0), Vector2(22.0, 16.0), Vector2(0.0, 6.0), Vector2(-22.0, 16.0)])
+	_guide.color = Color(0.95, 0.72, 0.32, 0.9)
+	_guide.visible = false
+	add_child(_guide)
+
+
+## Montre la flèche à `at` (coordonnées d'écran), tournée de `angle`.
+func set_guide(shown: bool, at: Vector2, angle: float) -> void:
+	_guide.visible = shown
+	if shown:
+		_guide.position = at
+		_guide.rotation = angle
 
 
 ## La barre du boss, en haut au centre : nom, puis vie.
