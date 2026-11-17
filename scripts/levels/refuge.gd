@@ -154,7 +154,7 @@ func _build() -> void:
 	music_track = &"refuge"
 	var cells: Array[Vector2] = []
 	for col in range(-4, 5):
-		for row in range(-7, 3):
+		for row in range(-7, 4):
 			cells.append(Vector2(col * 4.0, row * 4.0))
 	pave(GRAVEYARD + "floor_dirt.gltf", cells)
 	var stones: Array[Vector2] = []
@@ -200,10 +200,15 @@ func _build_fence() -> void:
 	for z in range(-24, 11, 4):
 		grave_piece("fence_broken" if z % 12 == 0 else "fence", Vector3(-16.0, 0.0, z), 90.0)
 		grave_piece("fence", Vector3(16.0, 0.0, z), 90.0)
+	# Le portail de la route : fermé, pour ne laisser voir que le moulin ; on
+	# en part par le bouton PARTIR, devant lui.
 	for side: float in [-1.0, 1.0]:
-		grave_piece("fence_pillar", Vector3(side * 4.2, 0.0, 11.0))
-		grave_piece("post_lantern", Vector3(side * 3.2, 0.0, 10.0))
-		flame(Vector3(side * 3.2, 2.6, 10.4), 2.2, 9.0)
+		grave_piece("fence_pillar", Vector3(side * 2.1, 0.0, 11.0))
+		grave_piece("fence", Vector3(side * 4.1, 0.0, 11.0))
+		solid(Vector3(side * 3.2, 0.0, 11.0), Vector3(2.4, 4.0, 1.0))
+		grave_piece("post_lantern", Vector3(side * 3.6, 0.0, 9.6))
+		flame(Vector3(side * 3.6, 2.6, 10.0), 2.2, 9.0)
+	add_gate(Vector3(0.0, 0.0, 11.0), 0)
 	solid(Vector3(-16.4, 0.0, -7.0), Vector3(0.8, 4.0, 40.0))
 	solid(Vector3(16.4, 0.0, -7.0), Vector3(0.8, 4.0, 40.0))
 	solid(Vector3(0.0, 0.0, -26.4), Vector3(34.0, 4.0, 0.8))

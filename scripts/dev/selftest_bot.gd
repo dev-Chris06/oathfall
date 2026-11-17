@@ -1175,6 +1175,25 @@ func _map_tests() -> bool:
 		return _fail("un toucher sur le moulin ne le choisit pas")
 	print("test 12 réussi : la Grille et le moulin ne se disputent plus les touchers")
 
+	# La carte est aérée : niveaux d'un chapitre bien espacés, moulin loin de
+	# tout niveau, un chapitre par voie, et l'eau est bien animée.
+	var positions: PackedVector2Array = map._scene.node_positions
+	# Les chapitres écrits seulement : les voies hautes, plus étroites, attendent leur tour.
+	for i in WorldData.CHAPTERS.size() * WorldData.LEVELS_PER_CHAPTER:
+		if positions[i].distance_to(WorldMap.MILL_POINT) < 150.0:
+			return _fail("le niveau %d est collé au moulin" % (i + 1))
+		if i % WorldData.LEVELS_PER_CHAPTER != 0 and positions[i].distance_to(positions[i - 1]) < 150.0:
+			return _fail("les niveaux %d et %d sont trop serrés sur la carte" % [i, i + 1])
+		if absf(positions[i].y - positions[i / WorldData.LEVELS_PER_CHAPTER * WorldData.LEVELS_PER_CHAPTER].y) > 1.0:
+			return _fail("le niveau %d n'est pas sur la voie de son chapitre" % (i + 1))
+	if map._scene.river == null or not is_instance_valid(map._scene.river):
+		return _fail("la rive animée manque sur la carte")
+	var before: float = map._scene.river.time
+	await _frames(20)
+	if map._scene.river.time <= before:
+		return _fail("l'eau de la carte ne s'anime pas")
+	print("test 12 réussi : carte aérée, chapitres sur leurs voies, moulin à l'écart, eau animée")
+
 	# Le moulin se choisit comme un niveau, mais ne consomme pas le repas.
 	Progress.add_gold(100)
 	Progress.pack_meal(&"fromage")
@@ -1325,6 +1344,17 @@ func _refuge_tests() -> bool:
 	var hero := level.hero
 	if hero.interaction_label != "":
 		return _fail("une interaction est proposée au départ (« %s »)" % hero.interaction_label)
+	# Le héros qui force vers le sud bute sur le portail, sur le sol du moulin :
+	# il ne marche jamais dans le noir au-delà.
+	level.objective = Vector3(0.0, 0.0, 20.0)
+	await _frames(150)
+	level.objective = null
+	await _frames(3)
+	if hero.global_position.z > 11.0 or hero.global_position.z < 8.0:
+		return _fail("le héros n'est pas arrêté par le portail du moulin (z = %.1f)" % hero.global_position.z)
+	if hero.interaction_label != "PARTIR":
+		return _fail("PARTIR n'est pas proposé devant le portail")
+	print("test 13 réussi : le portail du moulin arrête le héros, PARTIR est proposé devant")
 	hero.global_position = Vector3(7.0, 0.0, -7.0)
 	await _frames(3)
 	if hero.interaction_label != "PARLER" or level.controls.rite_label != "PARLER":

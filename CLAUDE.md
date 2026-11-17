@@ -208,7 +208,7 @@ Retour de l'auteur encore attendu : les sensations de combat sur téléphone
 | `scripts/audio.gd` | Chargé en permanence (`Audio`) : bruitages (`Audio.play(&"clang")`), musiques en fondu (`Audio.music(&"boss")`), volumes des options. Événements et fichiers déclarés dans ses tableaux `EVENTS` et `TRACKS` |
 | `tools/audio/generate.py` | Fabrique les bruitages lourds et les six musiques en boucle (`python3 -I tools/audio/generate.py assets/audio`), reproductible |
 | `scripts/fx.gd` | Effets partagés : ondes au sol, matériaux simples |
-| `scripts/map/` | La carte : `world_map.gd` (écran, défilement, choix), `map_scene.gd` (la ville dessinée par code) |
+| `scripts/map/` | La carte : `world_map.gd` (écran, défilement, choix), `map_scene.gd` (la ville dessinée par code ; un chapitre par voie de la route ; le moulin, le pont et le fleuve animé sur la rive sud, `MapRiver`) |
 | `scripts/data/world_data.gd` | Chapitres et niveaux dans l'ordre de la route |
 | `scripts/ui/` | Polices, thème « théâtre d'ombres » (`Theatre`), page découpée du carnet, ciel de nuit, boîte de dialogue, boutique, écran-titre, ouverture |
 | `scripts/levels/arena.gd` | Salle d'essai, utilisée par le test automatique |
@@ -238,6 +238,13 @@ Règles à garder :
   `completed`, `failed` et `checkpoint_reached` ; `Main` fait le reste. Le
   niveau avance vers -Z, dos à la caméra. Il fixe `objective` quand le héros
   doit rejoindre un point : le joueur automatique s'en sert.
+- **Zones et lignes** : `reach(point, rayon)` réussit près du point **ou dès que
+  sa ligne est franchie** (les niveaux avancent vers -Z) : courir sans passer
+  au point exact ne bloque jamais le scénario. Les grilles ferment chaque
+  partie tant que ses morts ne reposent pas. Pendant `reach`, `objective` est
+  posé : le niveau montre une pointe d'or sur une colonne de lueur, et une
+  flèche au bord de l'écran si le point est hors champ (`Level._update_guide`,
+  `Hud.set_guide`). Ne jamais attendre un point précis sans ligne.
 - **Scénarios** : attendre avec `wait()` ou `wait_until()` du niveau, jamais
   avec un minuteur de l'arbre, pour que tout s'arrête si le niveau est
   rechargé.
@@ -269,6 +276,9 @@ Règles à garder :
   signal `Enemy.health_changed`. Un boss qui ne chasse personne garde un
   minuteur qui court quel que soit son état (sinon un héros qui le harcèle
   l'empêche d'agir).
+- **Le Repos découvert** : à la Grille, `hero.rite_enabled` est faux au début
+  (pas de bouton REPOS) ; le premier mort est abattu, se relève, et c'est
+  alors qu'Anselme enseigne le rite et que le bouton apparaît.
 - **Grilles** : `add_gate(position, point_de_reprise)` ; au retour à un point
   de reprise, les grilles d'avant sont ouvertes.
 - **Corps et obstacles** : la chute projette le corps ; il peut finir derrière

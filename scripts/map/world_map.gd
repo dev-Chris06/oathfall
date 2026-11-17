@@ -15,10 +15,9 @@ const PICK_RADIUS := 52.0
 const PARALLAX := 0.35
 const FRICTION := 5.0
 ## Le moulin, sur la carte : le refuge, hors des murs.
-## Sa zone tactile est petite et un niveau proche passe toujours avant lui :
-## la Grille est à 60 pixels de là.
-const MILL_POINT := Vector2(190.0, 2345.0)
-const MILL_RADIUS := 46.0
+## Il se tient sur la rive sud, loin des niveaux : sa zone tactile est la tour.
+const MILL_POINT := Vector2(135.0, 2650.0)
+const MILL_RADIUS := 70.0
 
 ## Les niveaux construits, donnés par `Main`.
 var available: Array = []
@@ -84,6 +83,8 @@ func _process(delta: float) -> void:
 	_apply_scroll()
 	_glow.time = _time
 	_glow.queue_redraw()
+	_scene.river.time = _time
+	_scene.river.queue_redraw()
 
 
 # --- États --------------------------------------------------------------------
@@ -376,4 +377,4 @@ class MapGlow extends Control:
 		if selected_index >= 0:
 			draw_arc(scene.node_positions[selected_index], 25.0 + 2.0 * sin(time * 3.0), 0.0, TAU, 40, Theatre.CREAM, 3.0)
 		if refuge_selected:
-			draw_arc(WorldMap.MILL_POINT, 28.0 + 2.0 * sin(time * 3.0), 0.0, TAU, 40, Theatre.CREAM, 3.0)
+			draw_arc(WorldMap.MILL_POINT, 62.0 + 2.0 * sin(time * 3.0), 0.0, TAU, 48, Theatre.CREAM, 3.0)

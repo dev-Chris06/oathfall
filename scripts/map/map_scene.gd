@@ -7,14 +7,14 @@ extends Control
 ## ce qui bouge : voir `WorldMap`.
 
 const W := 1280.0
-const H := 2800.0
+const H := 2960.0
 const NODE_COUNT := 50
 
 ## Chaque étage : son rang, sa base et son sommet, ses bords, et les voies de
 ## la route qui le traversent.
 const TERRACES := [
-	{"act": 1, "y0": 2380.0, "y1": 1990.0, "x0": 70.0, "x1": 1210.0, "lanes": [2325.0, 2205.0, 2085.0]},
-	{"act": 2, "y0": 1960.0, "y1": 1500.0, "x0": 190.0, "x1": 1090.0, "lanes": [1905.0, 1785.0, 1665.0]},
+	{"act": 1, "y0": 2560.0, "y1": 2110.0, "x0": 70.0, "x1": 1210.0, "lanes": [2505.0, 2355.0, 2205.0]},
+	{"act": 2, "y0": 2020.0, "y1": 1500.0, "x0": 190.0, "x1": 1090.0, "lanes": [1965.0, 1815.0, 1665.0]},
 	{"act": 3, "y0": 1470.0, "y1": 1000.0, "x0": 320.0, "x1": 960.0, "lanes": [1415.0, 1315.0]},
 	{"act": 4, "y0": 970.0, "y1": 330.0, "x0": 430.0, "x1": 850.0, "lanes": [915.0, 815.0, 715.0]},
 ]
@@ -23,7 +23,18 @@ const BODY := {1: Color(0.02, 0.02, 0.04), 2: Color(0.05, 0.063, 0.125), 3: Colo
 const GROUND := {1: Color(0.04, 0.04, 0.07), 2: Color(0.08, 0.1, 0.18), 3: Color(0.12, 0.157, 0.26), 4: Color(0.18, 0.227, 0.353)}
 const LAMP := Color(1.0, 0.7, 0.28)
 const PALE_LAMP := Color(0.95, 0.82, 0.54)
-const LABEL_Y := [2050.0, 1540.0, 1062.0, 380.0]
+const LABEL_Y := [2062.0, 1540.0, 1062.0, 380.0]
+
+## Le fleuve passe au pied de la ville basse ; le moulin se tient sur sa rive
+## sud, et un pont mène à la ville.
+const RIVER_TOP := 2562.0
+const RIVER_BOTTOM := 2700.0
+const BRIDGE_X := 232.0
+const MILL_X := 135.0
+const MILL_HUB := Vector2(135.0, 2590.0)
+const MILL_DOOR := Vector2(135.0, 2706.0)
+## Les niveaux d'un chapitre se répartissent sur sa voie, hors des angles.
+const LANE_MARGIN := 0.1
 
 var node_positions := PackedVector2Array()
 var route := PackedVector2Array()
@@ -31,6 +42,10 @@ var route := PackedVector2Array()
 var states := PackedStringArray()
 ## Pour chaque niveau du chapitre 1 : le niveau est-il construit ?
 var ready_flags: Array = []
+## L'eau, le pont et les ailes du moulin : ce qui bouge sur la rive.
+var river: MapRiver
+## Pour chaque voie de la route : son départ et son arrivée.
+var lane_segments: Array = []
 
 var _shapes: Array = []
 var _rng := RandomNumberGenerator.new()
@@ -43,6 +58,8 @@ func _init() -> void:
 	_rng.seed = 5
 	_build_shapes()
 	_build_route()
+	river = MapRiver.new()
+	add_child(river)
 	states.resize(NODE_COUNT)
 	states.fill("ferme")
 
@@ -150,51 +167,37 @@ func _build_shapes() -> void:
 
 
 func _build_route() -> void:
-	var points: Array[Vector2] = [Vector2(200.0, 2405.0)]
+	var points: Array[Vector2] = [MILL_DOOR, Vector2(BRIDGE_X, MILL_DOOR.y)]
+	lane_segments = []
 	var k := 0
 	for terrace: Dictionary in TERRACES:
 		for ly: float in terrace["lanes"]:
 			var a := Vector2(float(terrace["x0"]) + 55.0, ly)
 			var b := Vector2(float(terrace["x1"]) - 55.0, ly)
-			if k % 2 == 0:
-				points.append(a)
-				points.append(b)
-			else:
-				points.append(b)
-				points.append(a)
+			var from := a if k % 2 == 0 else b
+			var to := b if k % 2 == 0 else a
+			if k == 0:
+				# La première voie commence au pont.
+				from = Vector2(BRIDGE_X, ly)
+			points.append(from)
+			points.append(to)
+			lane_segments.append([from, to])
 			k += 1
 	points.append(Vector2(640.0, 575.0))
 	route = PackedVector2Array(points)
 
-	var cumulative: Array[float] = [0.0]
-	for i in range(1, route.size()):
-		cumulative.append(cumulative[i - 1] + route[i].distance_to(route[i - 1]))
-	var total: float = cumulative[cumulative.size() - 1]
+	# Un chapitre par voie : cinq niveaux, régulièrement espacés.
 	node_positions = PackedVector2Array()
 	for n in NODE_COUNT:
-		var wanted := total * (0.025 + 0.95 * float(n) / float(NODE_COUNT - 1))
-		for j in range(1, cumulative.size()):
-			if cumulative[j] >= wanted:
-				var t := (wanted - cumulative[j - 1]) / (cumulative[j] - cumulative[j - 1] + 0.0001)
-				node_positions.append(route[j - 1].lerp(route[j], t))
-				break
+		var segment: Array = lane_segments[mini(n / WorldData.LEVELS_PER_CHAPTER, lane_segments.size() - 1)]
+		var t := LANE_MARGIN + (1.0 - 2.0 * LANE_MARGIN) * float(n % WorldData.LEVELS_PER_CHAPTER) / float(WorldData.LEVELS_PER_CHAPTER - 1)
+		node_positions.append((segment[0] as Vector2).lerp(segment[1], t))
 
 
 # --- Dessin -------------------------------------------------------------------
 
 func _draw() -> void:
-	# Fondations : une zone sombre sous le fleuve.
-	draw_rect(Rect2(60.0, 2480.0, 1160.0, 250.0), Color(0.016, 0.016, 0.04))
-	draw_string(GameFonts.text(), Vector2(0.0, 2640.0), "?", HORIZONTAL_ALIGNMENT_CENTER, W, 110, Color(Theatre.MUTED, 0.3))
-	for i in 10:
-		var c := Vector2(450.0 + 70.0 * (i % 5) + (0.0 if i < 5 else 35.0), 2680.0 + 0.0 * i + 55.0 * (i / 5) - 55.0)
-		draw_arc(c, 8.0, 0.0, TAU, 20, Color(0.29, 0.27, 0.38, 0.6), 2.0)
-	# Le fleuve
-	for i in 4:
-		var line := PackedVector2Array()
-		for k in 54:
-			line.append(Vector2(40.0 + k * 22.0, 2402.0 + 18.0 * i + 4.0 * sin(k * 0.8 + i)))
-		draw_polyline(line, Color(0.15, 0.2, 0.35), 3.0)
+	_draw_river_bed()
 
 	# Du plus loin au plus proche : chaque étage cache le pied du précédent.
 	for act in [4, 3, 2, 1]:
@@ -202,6 +205,7 @@ func _draw() -> void:
 		for shape: Dictionary in _shapes:
 			if shape["act"] == act:
 				_draw_shape(shape)
+	_draw_bridge()
 	_draw_mill()
 
 	# La route : un chemin de braises, qui luit.
@@ -243,20 +247,73 @@ func _draw_shape(shape: Dictionary) -> void:
 			draw_colored_polygon(points, BODY[shape["act"]])
 
 
+## L'eau (sans ses ondes, voir `MapRiver`) et la rive sud, avec ses roseaux.
+func _draw_river_bed() -> void:
+	var height := RIVER_BOTTOM - RIVER_TOP
+	draw_rect(Rect2(0.0, RIVER_TOP, W, height), Color(0.045, 0.07, 0.15))
+	draw_rect(Rect2(0.0, RIVER_TOP + height * 0.3, W, height * 0.4), Color(0.06, 0.09, 0.185))
+	# La rive sud : de la terre sombre, au bord irrégulier.
+	var bank := PackedVector2Array()
+	var x := 0.0
+	while x <= W + 20.0:
+		bank.append(Vector2(x, RIVER_BOTTOM + 3.0 * sin(x * 0.021) + 2.0 * sin(x * 0.067 + 1.0)))
+		x += 20.0
+	var edge := bank.duplicate()
+	bank.append(Vector2(W, H))
+	bank.append(Vector2(0.0, H))
+	draw_colored_polygon(bank, Color(0.03, 0.034, 0.056))
+	draw_polyline(edge, Color(0.2, 0.25, 0.4, 0.5), 1.5)
+	# Des roseaux au bord de l'eau.
+	var reeds := RandomNumberGenerator.new()
+	reeds.seed = 17
+	for i in 46:
+		var rx := reeds.randf_range(20.0, W - 20.0)
+		if absf(rx - BRIDGE_X) < 34.0 or absf(rx - MILL_X) < 50.0:
+			continue
+		var base_y := RIVER_BOTTOM + 3.0
+		for blade in 3:
+			var lean := reeds.randf_range(-6.0, 6.0)
+			draw_line(Vector2(rx + blade * 4.0, base_y), Vector2(rx + blade * 4.0 + lean, base_y - reeds.randf_range(14.0, 30.0)),
+				Color(0.012, 0.016, 0.03), 2.0)
+
+
+## Le pont de bois, du moulin à la ville, avec deux lanternes.
+func _draw_bridge() -> void:
+	var deck := Color(0.012, 0.012, 0.03)
+	var left := BRIDGE_X - 17.0
+	var right := BRIDGE_X + 17.0
+	draw_rect(Rect2(left, RIVER_TOP - 6.0, 34.0, RIVER_BOTTOM - RIVER_TOP + 12.0), deck)
+	draw_line(Vector2(left, RIVER_TOP - 6.0), Vector2(left, RIVER_BOTTOM + 6.0), Color(0.3, 0.34, 0.5, 0.55), 1.5)
+	draw_line(Vector2(right, RIVER_TOP - 6.0), Vector2(right, RIVER_BOTTOM + 6.0), Color(0.3, 0.34, 0.5, 0.55), 1.5)
+	var y := RIVER_TOP + 6.0
+	while y < RIVER_BOTTOM:
+		draw_rect(Rect2(left - 3.0, y, 40.0, 3.0), Color(0.025, 0.025, 0.05))
+		y += 14.0
+	for side: float in [left - 8.0, right + 8.0]:
+		draw_rect(Rect2(side - 2.0, RIVER_BOTTOM - 40.0, 4.0, 46.0), deck)
+		draw_rect(Rect2(side - 7.0, RIVER_BOTTOM - 52.0, 14.0, 14.0), Color(LAMP, 0.18))
+		draw_rect(Rect2(side - 4.0, RIVER_BOTTOM - 49.0, 8.0, 9.0), LAMP)
+
+
+## Le moulin, sur la rive sud : une tour de pierre, un toit, une fenêtre
+## allumée. Ses ailes tournent (voir `MapRiver`).
 func _draw_mill() -> void:
-	var dark: Color = BODY[1]
-	draw_colored_polygon(PackedVector2Array([Vector2(174, 2400), Vector2(226, 2400), Vector2(214, 2310), Vector2(186, 2310)]), dark)
-	# Une fenêtre allumée : le refuge est le seul endroit habité.
-	draw_rect(Rect2(189.0, 2340.0, 22.0, 30.0), Color(LAMP, 0.16))
-	draw_rect(Rect2(194.0, 2345.0, 12.0, 20.0), LAMP)
-	var hub := Vector2(200.0, 2310.0)
-	for a in 4:
-		var angle := deg_to_rad(25.0 + a * 90.0)
-		var tip := hub + Vector2(cos(angle), sin(angle)) * 78.0
-		var side := Vector2(-sin(angle), cos(angle)) * 15.0
-		var start := hub.lerp(tip, 0.3)
-		draw_colored_polygon(PackedVector2Array([start, tip, tip + side, start + side]), dark)
-		draw_line(hub, tip, dark, 4.0)
+	var dark := Color(0.008, 0.008, 0.02)
+	var rim := Color(0.28, 0.33, 0.52, 0.55)
+	var body := PackedVector2Array([
+		Vector2(MILL_X - 33.0, MILL_DOOR.y), Vector2(MILL_X + 33.0, MILL_DOOR.y),
+		Vector2(MILL_X + 24.0, MILL_HUB.y + 8.0), Vector2(MILL_X - 24.0, MILL_HUB.y + 8.0)])
+	var roof := PackedVector2Array([
+		Vector2(MILL_X - 30.0, MILL_HUB.y + 8.0), Vector2(MILL_X + 30.0, MILL_HUB.y + 8.0),
+		Vector2(MILL_X, MILL_HUB.y - 40.0)])
+	draw_colored_polygon(body, dark)
+	draw_colored_polygon(roof, dark)
+	draw_polyline(PackedVector2Array([body[0], body[3], roof[0], roof[2], roof[1], body[2], body[1]]), rim, 1.5)
+	# La porte, et la fenêtre allumée : le refuge est le seul endroit habité.
+	draw_rect(Rect2(MILL_X - 9.0, MILL_DOOR.y - 30.0, 18.0, 30.0), Color(0.03, 0.025, 0.04))
+	draw_rect(Rect2(MILL_X - 11.0, MILL_DOOR.y - 78.0, 22.0, 30.0), Color(LAMP, 0.16))
+	draw_rect(Rect2(MILL_X - 6.0, MILL_DOOR.y - 73.0, 12.0, 20.0), LAMP)
+	draw_rect(Rect2(MILL_X - 4.0, MILL_HUB.y + 14.0, 8.0, 12.0), Color(LAMP, 0.85))
 
 
 func _draw_nodes() -> void:
@@ -273,7 +330,7 @@ func _draw_nodes() -> void:
 				draw_circle(p, 9.0, Theatre.EMBER)
 			_:
 				draw_circle(p, 7.0, Color(0.29, 0.27, 0.38))
-		if i >= 5 and i % 5 == 0:
+		if i >= 10 and i % 5 == 0:
 			draw_string(GameFonts.text(), p + Vector2(-30.0, -24.0), str(i / 5 + 1), HORIZONTAL_ALIGNMENT_CENTER, 60.0, 20, Color(Theatre.MUTED, 0.85))
 
 
@@ -285,10 +342,15 @@ func _draw_labels() -> void:
 		var y: float = LABEL_Y[a]
 		draw_string(font, Vector2(W - 600.0, y), String(act["name"]).to_upper(), HORIZONTAL_ALIGNMENT_RIGHT, 400.0, 26, Theatre.MUTED)
 		draw_string(font, Vector2(W - 600.0, y + 28.0), act["title"], HORIZONTAL_ALIGNMENT_RIGHT, 400.0, 19, Color(Theatre.MUTED, 0.8))
-	draw_string(GameFonts.italic(), Vector2(60.0, 2440.0), "le moulin, refuge", HORIZONTAL_ALIGNMENT_LEFT, 300.0, 20, Color(Theatre.MUTED, 0.9))
+	draw_string(GameFonts.italic(), Vector2(MILL_X - 110.0, MILL_DOOR.y + 44.0), "le moulin, refuge", HORIZONTAL_ALIGNMENT_CENTER, 220.0, 20, Color(Theatre.MUTED, 0.95))
+	# Le titre du chapitre, au départ de sa voie, du côté que n'occupe pas le
+	# nom de son premier niveau.
 	for c in WorldData.CHAPTERS.size():
-		var p0 := node_positions[c * WorldData.LEVELS_PER_CHAPTER]
-		_outlined(Vector2(p0.x - 190.0, p0.y - 46.0), "Chapitre %s" % WorldData.roman(c + 1), 24, Theatre.EMBER, 300.0)
+		var segment: Array = lane_segments[c]
+		var start: Vector2 = segment[0]
+		var first_above := (c * WorldData.LEVELS_PER_CHAPTER) % 2 == 1
+		_outlined(Vector2(start.x - 150.0, start.y + (50.0 if first_above else -46.0)),
+			"Chapitre %s" % WorldData.roman(c + 1), 24, Theatre.EMBER, 300.0)
 	var levels := WorldData.chapter_levels()
 	for i in levels.size():
 		var p := node_positions[i]
@@ -302,3 +364,104 @@ func _outlined(at: Vector2, text: String, size: int, color: Color, width: float)
 	var font := GameFonts.text()
 	draw_string_outline(font, at, text, HORIZONTAL_ALIGNMENT_CENTER, width, size, 7, Color(0.0, 0.0, 0.02, 0.9))
 	draw_string(font, at, text, HORIZONTAL_ALIGNMENT_CENTER, width, size, color)
+
+
+## Ce qui bouge sur la rive : l'eau qui coule vers l'est, les lueurs de la
+## ville qui tremblent à sa surface, les ailes du moulin. Seule cette couche
+## se redessine à chaque image.
+class MapRiver extends Control:
+	var time := 0.0
+	var _streaks: Array[Dictionary] = []
+	var _glints: Array[Dictionary] = []
+
+	func _init() -> void:
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+		size = Vector2(MapScene.W, MapScene.H)
+		var rng := RandomNumberGenerator.new()
+		rng.seed = 11
+		for i in 46:
+			_streaks.append({
+				"y": rng.randf_range(MapScene.RIVER_TOP + 12.0, MapScene.RIVER_BOTTOM - 8.0),
+				"x": rng.randf_range(0.0, MapScene.W),
+				"speed": rng.randf_range(14.0, 52.0),
+				"length": rng.randf_range(14.0, 46.0),
+				"alpha": rng.randf_range(0.18, 0.5),
+			})
+		for i in 20:
+			var gx := rng.randf_range(60.0, MapScene.W - 60.0)
+			if absf(gx - MapScene.BRIDGE_X) < 40.0:
+				gx += 90.0
+			_glints.append({
+				"x": gx,
+				"y": rng.randf_range(MapScene.RIVER_TOP + 8.0, MapScene.RIVER_BOTTOM - 10.0),
+				"w": rng.randf_range(8.0, 26.0),
+				"phase": rng.randf_range(0.0, TAU),
+			})
+
+	func _draw() -> void:
+		_draw_waves()
+		_draw_streaks()
+		_draw_glints()
+		_draw_sails()
+
+	## Sous le pont, l'eau ne se voit pas.
+	func _under_bridge(x: float, margin := 0.0) -> bool:
+		return absf(x - MapScene.BRIDGE_X) < 24.0 + margin
+
+	func _draw_waves() -> void:
+		for i in 7:
+			var base := MapScene.RIVER_TOP + 18.0 + i * 16.0
+			var amplitude := 2.5 + 0.6 * i
+			var speed := 22.0 + 7.0 * i
+			var color := Color(0.2, 0.28, 0.46, 0.55 - 0.04 * i)
+			var points := PackedVector2Array()
+			var x := -16.0
+			while x <= MapScene.W + 16.0:
+				if _under_bridge(x):
+					_flush(points, color)
+					points = PackedVector2Array()
+				else:
+					var flow := x - time * speed
+					points.append(Vector2(x, base + amplitude * sin(flow * 0.028 + i * 1.9) + 1.2 * sin(flow * 0.07 + i)))
+				x += 16.0
+			_flush(points, color)
+
+	func _flush(points: PackedVector2Array, color: Color) -> void:
+		if points.size() > 1:
+			draw_polyline(points, color, 2.5)
+
+	func _draw_streaks() -> void:
+		var span := MapScene.W + 100.0
+		for i in _streaks.size():
+			var streak := _streaks[i]
+			var x := fposmod(float(streak["x"]) + time * float(streak["speed"]), span) - 50.0
+			var length: float = streak["length"]
+			if _under_bridge(x + length * 0.5, length * 0.5):
+				continue
+			var alpha := float(streak["alpha"]) * (0.65 + 0.35 * sin(time * 2.0 + i))
+			draw_line(Vector2(x, streak["y"]), Vector2(x + length, streak["y"]), Color(0.55, 0.68, 0.95, alpha), 2.0)
+
+	## Les lanternes de la ville se reflètent en traits qui tremblent.
+	func _draw_glints() -> void:
+		for glint in _glints:
+			var phase: float = glint["phase"]
+			var width: float = glint["w"]
+			var alpha := 0.2 + 0.16 * sin(time * 2.1 + phase)
+			var x := float(glint["x"]) + 3.0 * sin(time * 1.3 + phase)
+			draw_rect(Rect2(x - width * 0.5, glint["y"], width, 2.5), Color(MapScene.LAMP, alpha))
+
+	func _draw_sails() -> void:
+		var hub := MapScene.MILL_HUB
+		var dark := Color(0.008, 0.008, 0.02)
+		var rim := Color(0.28, 0.33, 0.52, 0.55)
+		for blade in 4:
+			var angle := time * 0.45 + blade * PI * 0.5
+			var direction := Vector2(cos(angle), sin(angle))
+			var tip := hub + direction * 74.0
+			var side := Vector2(-direction.y, direction.x) * 15.0
+			var start := hub + direction * 20.0
+			var quad := PackedVector2Array([start, tip, tip + side, start + side])
+			draw_colored_polygon(quad, dark)
+			draw_polyline(PackedVector2Array([start, tip, tip + side, start + side, start]), rim, 1.2)
+			draw_line(hub, tip, dark, 4.0)
+		draw_circle(hub, 6.0, dark)
