@@ -972,6 +972,25 @@ func _grille_tests() -> bool:
 	main.load_level(&"la_grille")
 	_watch(_level())
 
+	# Le Repos reste caché jusqu'à ce que le premier mort se soit relevé.
+	var intro := _level() as LaGrille
+	var leaked := [false]
+	var hidden := await _until(func() -> bool:
+		return not intro.hero.rite_enabled, 120.0)
+	if not hidden:
+		return _fail("le bouton REPOS n'est pas caché au début de la Grille")
+	var learned := await _until(func() -> bool:
+		if intro.hero.rite_enabled:
+			return true
+		if intro.controls.rite_available:
+			leaked[0] = true
+		return false, 120.0)
+	if leaked[0]:
+		return _fail("le bouton REPOS est apparu avant que le mort se relève")
+	if not learned or not intro._first_rose:
+		return _fail("le Repos n'a pas été enseigné après le relèvement du premier mort")
+	print("test réussi : le Repos n'apparaît qu'après avoir vu un mort se relever")
+
 	# 9. Le premier point de reprise, sauvegardé.
 	if not await _until(func() -> bool: return _checkpoint >= 1, 300.0):
 		return _fail("le premier point de reprise n'a pas été atteint")

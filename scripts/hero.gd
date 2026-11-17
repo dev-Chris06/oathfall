@@ -77,6 +77,9 @@ var dodge_time := DODGE_TIME
 ## Ce qu'on peut faire ici sans que ce soit le Repos (parler, partir) : le
 ## niveau y met le libellé du bouton, vide quand il n'y a rien à faire.
 var interaction_label := ""
+## Faux tant que le héros ne connaît pas encore le Repos (début de la Grille) :
+## le bouton REPOS n'apparaît pas.
+var rite_enabled := true
 ## Fioles portées, tenues à jour par `Level`.
 var flasks := 0
 var _interact_was_held := false
@@ -349,6 +352,8 @@ func _strike() -> void:
 
 ## Le corps à terre le plus proche, s'il est à portée du rite.
 func _nearest_body() -> Enemy:
+	if not rite_enabled:
+		return null
 	var best: Enemy = null
 	var best_distance := RITE_RANGE
 	for node in get_tree().get_nodes_in_group(&"bodies"):

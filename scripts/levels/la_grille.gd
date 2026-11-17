@@ -56,17 +56,20 @@ func _outer_yard() -> void:
 	open_gate(0)
 	await reach(Vector3(0.0, 0.0, -6.0), 3.0)
 
+	# Le Repos reste inconnu : pas de bouton tant que le joueur n'a pas vu un
+	# mort se relever.
+	hero.rite_enabled = false
 	var first := spawn(&"depouille", Vector3(-2.0, 0.0, -12.0))
 	first.rise_delay = 4.0
 	first.rose.connect(func(_e: Enemy) -> void: _first_rose = true, CONNECT_ONE_SHOT)
 	hud.show_message("Un mort sort de terre.\nFrappe-le : bouton FRAPPER.", 4.0)
-	await wait_until(func() -> bool: return _first_rose or enemies_left() == 0)
-	if _first_rose:
-		# Il laisse cette fois le temps d'apprendre le rite.
-		first.rise_delay = 40.0
-		await wait(1.6)
-		hud.show_message("FRÈRE ANSELME, derrière le mur :\n« Soldat ! Ici, les morts se relèvent.\n"
-			+ "Abats-le, tiens-toi près du corps\net maintiens REPOS ! »", 7.0)
+	await wait_until(func() -> bool: return _first_rose)
+	# Il s'est relevé : voilà le problème, puis la réponse. Cette fois il
+	# laisse le temps d'apprendre le rite.
+	first.rise_delay = 40.0
+	hero.rite_enabled = true
+	hud.show_message("FRÈRE ANSELME, derrière le mur :\n« Soldat ! Ici, les morts se relèvent.\n"
+		+ "Abats-le encore, tiens-toi près du corps\net maintiens REPOS ! »", 7.0)
 	await until_peace()
 	await say("Il repose. Ce qu'il portait te revient :\nun souvenir.", 3.0)
 
