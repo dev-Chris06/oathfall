@@ -151,7 +151,10 @@ func _render(type_id: StringName) -> void:
 	viewport.add_child(camera)
 	var reach := maxf(box.size.y, box.size.x * 1.15) * 0.5
 	var distance := reach / tan(deg_to_rad(camera.fov / 2.0)) * 1.12
-	camera.position = center + Vector3(0.45, 0.25, 1.0).normalized() * distance
+	# Par défaut on le voit de son côté gauche ; `portrait_side` -1 montre son
+	# côté droit, celui de la main qui porte la cloche.
+	var side := float(EnemyTypes.get_type(type_id).get("portrait_side", 1.0))
+	camera.position = center + Vector3(0.45 * side, 0.25, 1.0).normalized() * distance
 	camera.look_at(center, Vector3.UP)
 	camera.current = true
 

@@ -397,6 +397,7 @@ func _attach(prop: Dictionary) -> Node3D:
 		return null
 	node.position = prop.get("offset", Vector3.ZERO)
 	node.rotation_degrees = prop.get("rotation", Vector3.ZERO)
+	node.scale = Vector3.ONE * float(prop.get("scale", 1.0))
 	attachment.add_child(node)
 	return node
 

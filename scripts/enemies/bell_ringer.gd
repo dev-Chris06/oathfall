@@ -8,6 +8,9 @@ const BRONZE := Color(0.55, 0.38, 0.16)
 
 var _ring_timer := 1.0
 var _bell: Node3D
+## Ce qui oscille : la cloche pend de la main, couchée de 90° par rapport à
+## l'os de la main, dont l'axe pointe vers l'avant.
+var _swing: Node3D
 
 
 func setup(type_id: StringName, hero: Hero) -> void:
@@ -26,11 +29,11 @@ func _chase() -> void:
 func _ring() -> void:
 	Audio.play(&"bell_small")
 	Fx.ring(get_parent(), global_position, Color(0.85, 0.62, 0.3, 0.55), BELL_RADIUS, 1.3)
-	if _bell != null:
-		var tween := _bell.create_tween()
-		tween.tween_property(_bell, "rotation_degrees:z", 35.0, 0.12)
-		tween.tween_property(_bell, "rotation_degrees:z", -25.0, 0.2)
-		tween.tween_property(_bell, "rotation_degrees:z", 0.0, 0.25)
+	if _swing != null:
+		var tween := _swing.create_tween()
+		tween.tween_property(_swing, "rotation_degrees:x", 35.0, 0.12)
+		tween.tween_property(_swing, "rotation_degrees:x", -25.0, 0.2)
+		tween.tween_property(_swing, "rotation_degrees:x", 0.0, 0.25)
 
 
 func _on_fall() -> void:
@@ -46,6 +49,9 @@ func _build_prop(kind: String) -> Node3D:
 	if kind != "bell":
 		return null
 	_bell = Node3D.new()
+	_swing = Node3D.new()
+	_swing.rotation_degrees = Vector3(0.0, 0.0, 90.0)
+	_bell.add_child(_swing)
 	var body := MeshInstance3D.new()
 	var cone := CylinderMesh.new()
 	cone.top_radius = 0.1
@@ -55,7 +61,7 @@ func _build_prop(kind: String) -> Node3D:
 	body.mesh = cone
 	body.material_override = Fx.flat(BRONZE, 0.7, 0.45)
 	body.position.y = -0.3
-	_bell.add_child(body)
+	_swing.add_child(body)
 	var crown := MeshInstance3D.new()
 	var knob := SphereMesh.new()
 	knob.radius = 0.09
@@ -63,7 +69,7 @@ func _build_prop(kind: String) -> Node3D:
 	crown.mesh = knob
 	crown.material_override = body.material_override
 	crown.position.y = -0.06
-	_bell.add_child(crown)
+	_swing.add_child(crown)
 	var clapper := MeshInstance3D.new()
 	var ball := SphereMesh.new()
 	ball.radius = 0.06
@@ -71,5 +77,5 @@ func _build_prop(kind: String) -> Node3D:
 	clapper.mesh = ball
 	clapper.material_override = Fx.flat(Color(0.15, 0.13, 0.12), 0.5, 0.6)
 	clapper.position.y = -0.55
-	_bell.add_child(clapper)
+	_swing.add_child(clapper)
 	return _bell

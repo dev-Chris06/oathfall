@@ -94,9 +94,11 @@ const TYPES := {
 			"tip": "Abats-le en premier, avant de t'occuper des corps.",
 		},
 		"behavior": "bell",
+		# Le portrait le montre du côté de la main qui porte la cloche.
+		"portrait_side": -1.0,
 		"model": "res://assets/kaykit/skeletons/Skeleton_Warrior.glb",
 		"hidden_parts": ["Skeleton_Warrior_Helmet"],
-		"props": [{"kind": "bell", "bone": "handslot.r", "offset": Vector3(0.0, -0.1, 0.0)}],
+		"props": [{"kind": "bell", "bone": "handslot.r", "offset": Vector3(0.0, -0.1, 0.0), "scale": 1.15}],
 		"tint": Color(0.85, 0.8, 0.72),
 		"scale": 1.15,
 		"health": 75,
