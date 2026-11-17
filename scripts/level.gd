@@ -40,6 +40,10 @@ var scripted := false
 var music_track: StringName = &""
 ## Terrain jouable (x, z, largeur, profondeur), pour habiller ses abords.
 var play_area := Rect2()
+## Décor des abords (voir `Scenery`) : cimetière par défaut.
+var scenery: StringName = &""
+## Étendue du sol dallé, notée par `pave()`.
+var floor_bounds := Rect2()
 
 var hero: Hero
 var controls: TouchControls
@@ -71,7 +75,8 @@ func _ready() -> void:
 	_build_environment()
 	_build()
 	if play_area.has_area():
-		dress_surroundings(play_area)
+		Scenery.dress(self, Scenery.UNDERGROUND if underground else (scenery if scenery != &"" else Scenery.CEMETERY),
+			floor_bounds if floor_bounds.has_area() else play_area, play_area)
 	if music_track == &"":
 		music_track = &"underground" if underground else &"cemetery"
 	Audio.level_track = music_track
@@ -529,43 +534,6 @@ func _add_obstacle(node: Node3D, share: float) -> void:
 	solid(node.position + offset, size, node.rotation_degrees.y)
 
 
-## Habille ce qui entoure le terrain jouable (`play_area` : x, z, largeur,
-## profondeur) pour que la caméra, plus haute que les murs, ne montre jamais
-## de vide : de la terre sombre à perte de vue en plein air, un massif de
-## roche derrière les murs sous terre.
-func dress_surroundings(area: Rect2) -> void:
-	var ground := Fx.flat(Color(0.075, 0.07, 0.085), 0.0, 1.0)
-	if not underground:
-		var plane := MeshInstance3D.new()
-		var mesh := PlaneMesh.new()
-		mesh.size = Vector2(600.0, 600.0)
-		plane.mesh = mesh
-		plane.material_override = ground
-		plane.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		plane.position = Vector3(area.get_center().x, -0.06, area.get_center().y)
-		add_child(plane)
-		return
-	var rock := Fx.flat(Color(0.06, 0.058, 0.075), 0.0, 1.0)
-	var reach := 60.0
-	var x0 := area.position.x
-	var x1 := area.end.x
-	var z0 := area.position.y
-	var z1 := area.end.y
-	for part: Rect2 in [
-			Rect2(x0 - reach, z0 - reach, reach, area.size.y + 2.0 * reach),
-			Rect2(x1, z0 - reach, reach, area.size.y + 2.0 * reach),
-			Rect2(x0, z0 - reach, area.size.x, reach),
-			Rect2(x0, z1, area.size.x, reach)]:
-		var block := MeshInstance3D.new()
-		var box := BoxMesh.new()
-		box.size = Vector3(part.size.x, 10.0, part.size.y)
-		block.mesh = box
-		block.material_override = rock
-		block.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		block.position = Vector3(part.get_center().x, 5.0, part.get_center().y)
-		add_child(block)
-
-
 ## Pave le sol d'un même carreau en un seul appel de dessin. `cells` donne
 ## le centre de chaque carreau sur le plan (x, z).
 func pave(file: String, cells: Array[Vector2]) -> void:
@@ -578,8 +546,11 @@ func pave(file: String, cells: Array[Vector2]) -> void:
 	multimesh.transform_format = MultiMesh.TRANSFORM_3D
 	multimesh.mesh = source.mesh
 	multimesh.instance_count = cells.size()
+	var tile := source.mesh.get_aabb().size
 	for i in cells.size():
 		multimesh.set_instance_transform(i, Transform3D(Basis(), Vector3(cells[i].x, 0.0, cells[i].y)))
+		var square := Rect2(cells[i].x - tile.x / 2.0, cells[i].y - tile.z / 2.0, tile.x, tile.z)
+		floor_bounds = square if not floor_bounds.has_area() else floor_bounds.merge(square)
 	var instance := MultiMeshInstance3D.new()
 	instance.multimesh = multimesh
 	# Le sol ne projette pas d'ombre : il ne ferait que la recevoir.

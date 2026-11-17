@@ -205,9 +205,9 @@ func _build() -> void:
 			cells.append(Vector2(col * 4.0, row * 4.0))
 	pave(DUNGEON + "floor_tile_large.glb", cells)
 
-	_side_walls(NARTHEX, 4.0, -14.0)
+	_side_walls(NARTHEX, 6.0, -14.0)
 	_side_walls(NAVE, -14.0, -46.0)
-	_side_walls(CHOIR, -46.0, -80.0)
+	_side_walls(CHOIR, -46.0, -81.0)
 	_cross_wall(-14.0, 2.1, NAVE)
 	_cross_wall(-46.0, 2.1, CHOIR)
 	for gz in GATES_Z:

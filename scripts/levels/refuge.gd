@@ -19,6 +19,7 @@ var _rotor: Node3D
 
 func _init() -> void:
 	title = "Le moulin"
+	scenery = Scenery.RIVER
 	play_area = Rect2(-16.8, -27.0, 33.6, 40.5)
 
 

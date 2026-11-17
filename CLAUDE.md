@@ -278,17 +278,25 @@ Règles à garder :
   l'empêche d'agir).
 - **Niveaux fermés** : le héros ne doit jamais pouvoir sortir du décor, et le
   mur qui l'arrête doit se **voir** (clôture, mur, pilier), jamais un obstacle
-  seul. `_reach_tests` (test) mesure, avec la capsule du héros et toutes les
-  grilles ouvertes, la zone qu'il atteint depuis le départ : elle doit rester
-  bornée. Tout nouveau niveau y est ajouté. Le test ne voit pas le vide qui
-  reste visible par-dessus les murs (la caméra est plus haute qu'eux) : c'est
-  un défaut connu, à traiter en habillant le tour des niveaux.
-- **Obstacles et abords** : `Level.grave_piece()` donne un obstacle aux décors
-  verticaux de `Level.OBSTACLES` (stèles, arbres, lanternes…), à l'emprise de
-  leur modèle ; `collide` faux pour ce qui bouge (les pierres de la
-  Fossoyeuse). Chaque niveau déclare `play_area` : `dress_surroundings`
-  étend de la terre sombre à perte de vue en plein air, et un massif de roche
-  derrière les murs sous terre, pour que la caméra ne montre jamais de vide.
+  seul. `_reach_tests` (test) mesure, avec une capsule un peu plus mince que
+  le héros (0,42) et toutes les grilles ouvertes, la zone qu'il atteint depuis
+  le départ : elle doit rester bornée. Tout nouveau niveau y est ajouté. Un
+  mur latéral qui s'arrête avant le mur du fond laisse un passage dans le
+  coin : toujours les faire se rejoindre.
+- **Obstacles** : `Level.grave_piece()` donne un obstacle aux décors verticaux
+  de `Level.OBSTACLES` (stèles, arbres, lanternes…), à l'emprise de leur
+  modèle ; `collide` faux pour ce qui bouge (les pierres de la Fossoyeuse).
+- **Abords** (`scripts/scenery.gd`) : le terrain jouable est un plateau, et ce
+  que la caméra voit autour est un décor défini selon le lieu, jamais du noir
+  ni un horizon indéfini. Chaque niveau déclare `play_area` (la zone fermée par
+  ses murs) et, hors cimetière, `scenery` : `PIT` (la Fosse : terre et
+  collines), `RIVER` (le moulin : fleuve animé et rive d'en face) ; sous terre
+  (`underground`) un massif de roche derrière les murs ; le cimetière est le
+  défaut (toits d'un faubourg en contrebas). **La caméra regarde à 36° sous
+  l'horizontale : elle ne voit jamais le ciel, seulement le sol jusqu'à 45 m**,
+  donc les abords sont du sol plus bas vu d'en haut, et tout objet lointain
+  doit être bas. Les matériaux **luisent** (`_glow`) : sans lueur, ils retombent
+  au noir sous la brume sur le téléphone.
 - **Sous la ville (carte)** : la plaque sombre, le « ? » et dix cercles ne
   sont pas jouables. Un cercle s'allume quand les cinq niveaux de son chapitre
   sont faits ; le « ? » s'allume quand les dix le sont. Aucun nom n'y est écrit.

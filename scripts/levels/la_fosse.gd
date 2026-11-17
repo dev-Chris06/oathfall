@@ -25,6 +25,7 @@ var _tends_corpses := false
 
 func _init() -> void:
 	title = "La Fosse"
+	scenery = Scenery.PIT
 	play_area = Rect2(-18.0, -54.0, 36.0, 62.0)
 	# Les monticules d'où elle jaillit, en couronne autour du centre.
 	for i in 6:
@@ -194,6 +195,12 @@ func _build_path() -> void:
 			k += 1
 		solid(Vector3(side * 4.8, 0.0, -7.5), Vector3(0.6, 4.0, 29.0))
 	solid(Vector3(0.0, 0.0, 7.5), Vector3(10.0, 4.0, 1.0))
+	# Les murs du chemin rejoignent le cercle de monticules à l'entrée de la
+	# fosse : plus de passage entre les deux.
+	for side: float in [-1.0, 1.0]:
+		grave_piece("fence", Vector3(side * 5.9, 0.0, -20.3), 90.0)
+		grave_piece("fence_pillar", Vector3(side * 5.9, 0.0, -22.3))
+		solid(Vector3(side * 5.8, 0.0, -20.8), Vector3(1.4, 4.0, 3.6))
 	# La grille tient entre deux piliers, et des panneaux de clôture la
 	# prolongent jusqu'aux murs du chemin : plus de vide sur les côtés.
 	for x: float in [-2.1, 2.1]:
@@ -253,13 +260,14 @@ func _build_pit() -> void:
 	# on ne peut plus contourner la fosse par le nord.
 	for x: float in [-8.1, -4.1, 4.1, 8.1]:
 		grave_piece("fence", Vector3(x, 0.0, -50.5))
-	solid(Vector3(0.0, 0.0, -52.5), Vector3(14.0, 4.0, 1.0))
+	solid(Vector3(0.0, 0.0, -52.5), Vector3(20.0, 4.0, 1.0))
 	for x: float in [-6.5, 6.5]:
 		solid(Vector3(x, 0.0, -50.5), Vector3(6.0, 4.0, 0.6))
 	for side: float in [-1.0, 1.0]:
 		grave_piece("fence", Vector3(side * 9.9, 0.0, -49.6), 90.0)
 		grave_piece("fence_pillar", Vector3(side * 9.9, 0.0, -47.6))
-		solid(Vector3(side * 9.7, 0.0, -49.6), Vector3(0.8, 4.0, 2.6))
+		grave_piece("fence", Vector3(side * 9.9, 0.0, -53.1), 90.0)
+		solid(Vector3(side * 9.7, 0.0, -50.8), Vector3(0.8, 4.0, 5.2))
 	for at: Vector3 in [Vector3(-3.0, 0.0, -8.0), Vector3(2.0, 0.0, -15.0), CENTER + Vector3(4.0, 0.0, 3.0)]:
 		grave_piece("skull", at, at.z * 13.0).scale = Vector3.ONE * 0.45
 		grave_piece("bone_A", at + Vector3(0.6, 0.05, 0.4), at.z * 31.0)

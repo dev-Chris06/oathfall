@@ -141,8 +141,15 @@ func _build() -> void:
 	grave_piece("post_lantern", Vector3(-3.0, 0.0, -78.5))
 
 	# Les bords de la place.
-	solid(Vector3(-HALF_WIDTH - 0.3, 0.0, -38.0), Vector3(0.6, 4.0, 92.0))
-	solid(Vector3(HALF_WIDTH + 0.3, 0.0, -38.0), Vector3(0.6, 4.0, 92.0))
+	# Le chemin d'arrivée est clos de clôtures (les murs latéraux laissaient
+	# un passage de 1,2 dans les coins du fond).
+	for side: float in [-1.0, 1.0]:
+		grave_piece("fence", Vector3(side * HALF_WIDTH, 0.0, 7.0), 90.0)
+		grave_piece("fence_pillar", Vector3(side * HALF_WIDTH, 0.0, 9.5))
+	for x: float in [-8.0, -4.0, 0.0, 4.0, 8.0]:
+		grave_piece("fence", Vector3(x, 0.0, 9.5))
+	solid(Vector3(-HALF_WIDTH - 0.3, 0.0, -37.1), Vector3(0.6, 4.0, 93.8))
+	solid(Vector3(HALF_WIDTH + 0.3, 0.0, -37.1), Vector3(0.6, 4.0, 93.8))
 	solid(Vector3(0.0, 0.0, 9.5), Vector3(2.0 * HALF_WIDTH, 4.0, 0.6))
 	solid(Vector3(0.0, 0.0, -80.5), Vector3(2.0 * HALF_WIDTH, 4.0, 0.6))
 	for x: float in [-5.55, 5.55]:

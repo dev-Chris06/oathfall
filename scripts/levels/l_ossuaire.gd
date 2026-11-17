@@ -133,7 +133,9 @@ func _build() -> void:
 	# Le fond : un mur derrière le héros au départ, la sortie au nord.
 	solid(Vector3(0.0, 0.0, 5.5), Vector3(2.0 * CORRIDOR, 4.0, 1.0))
 	place("wall_doorway.glb", Vector3(0.0, 0.0, -88.5))
-	solid(Vector3(0.0, 0.0, -89.5), Vector3(4.0, 4.0, 1.0))
+	solid(Vector3(0.0, 0.0, -89.5), Vector3(6.6, 4.0, 1.0))
+	for x: float in [-2.0, 2.0]:
+		place("wall.glb", Vector3(x, 0.0, -89.5))
 	flame(Vector3(0.0, 2.6, -87.4), 2.6, 9.0)
 
 	# Les ossements.

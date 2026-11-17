@@ -1100,12 +1100,14 @@ func _reach_tests() -> bool:
 ## La zone que le héros atteint à pied depuis son départ, sans qu'aucune
 ## image de jeu ne passe : on sonde les obstacles avec sa capsule.
 func _reachable_zone(level: Level) -> Dictionary:
-	const STEP := 0.25
+	const STEP := 0.1
 	const LIMIT := Vector2(-115.0, 30.0)
 	const WIDTH := 45.0
 	var space := level.get_world_3d().direct_space_state
 	var shape := CapsuleShape3D.new()
-	shape.radius = 0.5
+	# Un peu plus mince que le héros (0,5) : un passage tout juste praticable
+	# doit être vu, c'est ainsi qu'un coin des Allées avait échappé au test.
+	shape.radius = 0.42
 	shape.height = 1.7
 	var query := PhysicsShapeQueryParameters3D.new()
 	query.shape = shape
