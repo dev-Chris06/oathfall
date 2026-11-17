@@ -16,6 +16,8 @@ var _burst_hit := false
 func setup(type_id: StringName, hero: Hero) -> void:
 	super.setup(type_id, hero)
 	var dome := SphereMesh.new()
+	dome.radial_segments = 16
+	dome.rings = 8
 	dome.radius = 0.75
 	dome.height = 0.7
 	dome.is_hemisphere = true

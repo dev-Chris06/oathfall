@@ -70,6 +70,8 @@ func setup(type_id: StringName, hero: Hero) -> void:
 	add_child(_glow)
 	# Le monticule qui avance quand elle file sous terre.
 	var dome := SphereMesh.new()
+	dome.radial_segments = 16
+	dome.rings = 8
 	dome.radius = 1.3
 	dome.height = 1.2
 	dome.is_hemisphere = true
@@ -501,6 +503,9 @@ func _arrache_stone() -> void:
 	if best != null:
 		props.erase(best)
 		Fx.ring(get_parent(), best.global_position, Color(0.5, 0.36, 0.24, 0.8), 3.0, 0.5)
+		var blocker = best.get_meta("blocker", null)
+		if is_instance_valid(blocker):
+			(blocker as Node).queue_free()
 		best.queue_free()
 
 
@@ -644,6 +649,7 @@ func _build_prop(kind: String) -> Node3D:
 	var spade := Node3D.new()
 	var shaft := MeshInstance3D.new()
 	var rod := CylinderMesh.new()
+	rod.radial_segments = 12
 	rod.top_radius = 0.05
 	rod.bottom_radius = 0.06
 	rod.height = 1.6

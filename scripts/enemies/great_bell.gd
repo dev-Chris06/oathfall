@@ -34,6 +34,7 @@ func _ready() -> void:
 	for dx in [-0.5, 0.5]:
 		var chain := MeshInstance3D.new()
 		var link := CylinderMesh.new()
+		link.radial_segments = 12
 		link.top_radius = 0.05
 		link.bottom_radius = 0.05
 		link.height = 1.3
@@ -48,6 +49,7 @@ func _ready() -> void:
 	add_child(_bell)
 	var body := MeshInstance3D.new()
 	var cone := CylinderMesh.new()
+	cone.radial_segments = 12
 	cone.top_radius = 0.45
 	cone.bottom_radius = 1.45
 	cone.height = 2.2
@@ -66,6 +68,8 @@ func _ready() -> void:
 	_bell.add_child(rim)
 	var clapper := MeshInstance3D.new()
 	var ball := SphereMesh.new()
+	ball.radial_segments = 16
+	ball.rings = 8
 	ball.radius = 0.22
 	ball.height = 0.44
 	clapper.mesh = ball

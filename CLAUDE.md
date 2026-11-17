@@ -286,17 +286,35 @@ Règles à garder :
 - **Obstacles** : `Level.grave_piece()` donne un obstacle aux décors verticaux
   de `Level.OBSTACLES` (stèles, arbres, lanternes…), à l'emprise de leur
   modèle ; `collide` faux pour ce qui bouge (les pierres de la Fossoyeuse).
+- **Murs visibles** : tout obstacle (`solid`) doit avoir un objet visible au
+  même endroit, jamais un mur invisible, et ne jamais être décalé derrière le
+  mur qu'on voit (le corps traverserait le mur visible). `_visible_walls_tests`
+  le vérifie sur chaque niveau. Un mur de fond placé derrière la caméra de
+  départ la cache : le faire **bas** (`place(..., height_scale)`), comme les
+  murets de la Chapelle et de l'Ossuaire.
+- **Regroupement** : `Level.place()` regroupe les clôtures et les murs
+  (`BATCHED`) en MultiMesh, une commande de dessin par partie de modèle ; elle
+  renvoie alors un nœud vide. Sous terre, chaque mur reçoit un bloc de pierre
+  de 8 de haut (`_caps`) : la caméra voit par-dessus les murs de 4. Les
+  sphères et cylindres générés se font à basse résolution (16×8, 12 segments) :
+  les valeurs par défaut (64×32) coûtaient 120 000 triangles à la Fosse.
 - **Abords** (`scripts/scenery.gd`) : le terrain jouable est un plateau, et ce
   que la caméra voit autour est un décor défini selon le lieu, jamais du noir
-  ni un horizon indéfini. Chaque niveau déclare `play_area` (la zone fermée par
-  ses murs) et, hors cimetière, `scenery` : `PIT` (la Fosse : terre et
-  collines), `RIVER` (le moulin : fleuve animé et rive d'en face) ; sous terre
-  (`underground`) un massif de roche derrière les murs ; le cimetière est le
-  défaut (toits d'un faubourg en contrebas). **La caméra regarde à 36° sous
-  l'horizontale : elle ne voit jamais le ciel, seulement le sol jusqu'à 45 m**,
-  donc les abords sont du sol plus bas vu d'en haut, et tout objet lointain
-  doit être bas. Les matériaux **luisent** (`_glow`) : sans lueur, ils retombent
-  au noir sous la brume sur le téléphone.
+  ni un horizon indéfini. Chaque niveau déclare `play_area` et, hors cimetière,
+  `scenery` : `PIT` (la Fosse : terre et collines), `RIVER` (le moulin : fleuve
+  animé et rive d'en face) ; le cimetière est le défaut (toits d'un faubourg en
+  contrebas) ; sous terre ce sont les blocs sur les murs. **La caméra regarde à
+  36° sous l'horizontale : elle ne voit jamais le ciel, seulement le sol jusqu'à
+  45 m**, donc les abords sont du sol plus bas vu d'en haut, et tout objet
+  lointain doit être bas. Les matériaux **luisent** (`_glow`) : sans lueur, ils
+  retombent au noir sous la brume sur le téléphone.
+- **Interface de jeu** : les boutons (`touch_controls.gd`) sont des disques
+  sombres au double liseré, avec une icône dessinée en code (épée, roulade,
+  fiole, pierre tombale pour le Repos, bulle, porte, ciseaux, livre, pause), un
+  anneau de recharge pour l'esquive, un chiffre sur la fiole, un signal sur le
+  carnet. La légende du bouton d'action est un `Label` (le texte dessiné dans la
+  zone des boutons sortait en blocs). Le bouton pause (à côté du carnet, ou
+  Échap/P) ouvre `PauseMenu` : Reprendre, volumes, Quitter après confirmation.
 - **Sous la ville (carte)** : la plaque sombre, le « ? » et dix cercles ne
   sont pas jouables. Un cercle s'allume quand les cinq niveaux de son chapitre
   sont faits ; le « ? » s'allume quand les dix le sont. Aucun nom n'y est écrit.

@@ -216,7 +216,6 @@ func _build_fence() -> void:
 	solid(Vector3(0.0, 0.0, -26.4), Vector3(34.0, 4.0, 0.8))
 	for side: float in [-1.0, 1.0]:
 		solid(Vector3(side * 10.0, 0.0, 11.4), Vector3(12.0, 4.0, 0.8))
-	solid(Vector3(0.0, 0.0, 13.0), Vector3(10.0, 4.0, 0.8))
 
 
 ## Le moulin, au fond : une tour, un toit, des ailes qui tournent.
@@ -226,6 +225,7 @@ func _build_mill() -> void:
 	add_child(mill)
 	var tower := MeshInstance3D.new()
 	var body := CylinderMesh.new()
+	body.radial_segments = 12
 	body.top_radius = 2.3
 	body.bottom_radius = 3.4
 	body.height = 9.0
@@ -236,6 +236,7 @@ func _build_mill() -> void:
 	mill.add_child(tower)
 	var roof := MeshInstance3D.new()
 	var cone := CylinderMesh.new()
+	cone.radial_segments = 12
 	cone.top_radius = 0.0
 	cone.bottom_radius = 3.1
 	cone.height = 3.4
@@ -301,6 +302,7 @@ func _build_fire() -> void:
 	for yaw: float in [20.0, 100.0]:
 		var log := MeshInstance3D.new()
 		var trunk := CylinderMesh.new()
+		trunk.radial_segments = 12
 		trunk.top_radius = 0.09
 		trunk.bottom_radius = 0.11
 		trunk.height = 1.3
@@ -311,6 +313,7 @@ func _build_fire() -> void:
 		add_child(log)
 	var fire := MeshInstance3D.new()
 	var flame_cone := CylinderMesh.new()
+	flame_cone.radial_segments = 12
 	flame_cone.top_radius = 0.0
 	flame_cone.bottom_radius = 0.42
 	flame_cone.height = 1.1
@@ -343,6 +346,7 @@ func _build_stall() -> void:
 	for dx: float in [-1.9, 1.9]:
 		var pole := MeshInstance3D.new()
 		var mast := CylinderMesh.new()
+		mast.radial_segments = 12
 		mast.top_radius = 0.07
 		mast.bottom_radius = 0.09
 		mast.height = 2.7
@@ -362,6 +366,8 @@ func _build_stall() -> void:
 	for at: Vector3 in [Vector3(5.6, 1.1, -8.4), Vector3(6.4, 1.1, -8.3), Vector3(8.4, 1.1, -8.5)]:
 		var sack := MeshInstance3D.new()
 		var bag := SphereMesh.new()
+		bag.radial_segments = 16
+		bag.rings = 8
 		bag.radius = 0.28
 		bag.height = 0.5
 		sack.mesh = bag

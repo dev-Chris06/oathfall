@@ -23,6 +23,7 @@ func setup(top: Vector3) -> void:
 
 	var length := _top.length()
 	var cylinder := CylinderMesh.new()
+	cylinder.radial_segments = 12
 	cylinder.top_radius = 0.07
 	cylinder.bottom_radius = 0.07
 	cylinder.height = length
@@ -36,6 +37,8 @@ func setup(top: Vector3) -> void:
 
 	# Une lueur sur la corde, pour qu'on la repère dans la pénombre.
 	var sphere := SphereMesh.new()
+	sphere.radial_segments = 16
+	sphere.rings = 8
 	sphere.radius = 0.2
 	sphere.height = 0.4
 	_marker_material = Fx.glow(Color(1.0, 0.7, 0.3, 0.8))

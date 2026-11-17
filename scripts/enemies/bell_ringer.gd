@@ -54,6 +54,7 @@ func _build_prop(kind: String) -> Node3D:
 	_bell.add_child(_swing)
 	var body := MeshInstance3D.new()
 	var cone := CylinderMesh.new()
+	cone.radial_segments = 12
 	cone.top_radius = 0.1
 	cone.bottom_radius = 0.3
 	cone.height = 0.42
@@ -64,6 +65,8 @@ func _build_prop(kind: String) -> Node3D:
 	_swing.add_child(body)
 	var crown := MeshInstance3D.new()
 	var knob := SphereMesh.new()
+	knob.radial_segments = 16
+	knob.rings = 8
 	knob.radius = 0.09
 	knob.height = 0.18
 	crown.mesh = knob
@@ -72,6 +75,8 @@ func _build_prop(kind: String) -> Node3D:
 	_swing.add_child(crown)
 	var clapper := MeshInstance3D.new()
 	var ball := SphereMesh.new()
+	ball.radial_segments = 16
+	ball.rings = 8
 	ball.radius = 0.06
 	ball.height = 0.12
 	clapper.mesh = ball

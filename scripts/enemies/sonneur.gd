@@ -116,6 +116,7 @@ func _begin_quake() -> void:
 	# Un disque rouge au sol marque jusqu'où l'onde ira.
 	var radius := float(_type["quake_radius"])
 	var disc := CylinderMesh.new()
+	disc.radial_segments = 12
 	disc.top_radius = radius
 	disc.bottom_radius = radius
 	disc.height = 0.02
@@ -306,6 +307,7 @@ func _build_prop(kind: String) -> Node3D:
 	var maul := Node3D.new()
 	var shaft := MeshInstance3D.new()
 	var rod := CylinderMesh.new()
+	rod.radial_segments = 12
 	rod.top_radius = 0.05
 	rod.bottom_radius = 0.06
 	rod.height = 1.5

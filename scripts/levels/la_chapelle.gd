@@ -218,10 +218,15 @@ func _build() -> void:
 
 	# Le fond : un mur derrière le héros au départ, le mur du chevet au nord.
 	solid(Vector3(0.0, 0.0, 5.5), Vector3(2.0 * NARTHEX, 4.0, 1.0))
+	# Un muret : la caméra est derrière lui au départ et doit voir le héros.
+	for x: float in [-4.0, 0.0, 4.0]:
+		place("wall.glb", Vector3(x, 0.0, 5.5), 0.0, 0.35)
 	place("wall_doorway.glb", Vector3(0.0, 0.0, -80.5))
 	for x: float in [-4.0, 4.0, -8.0, 8.0]:
 		place("wall.glb", Vector3(x, 0.0, -80.5))
-	solid(Vector3(0.0, 0.0, -81.5), Vector3(2.0 * CHOIR + 2.0, 4.0, 1.0))
+	# L'obstacle est dans le mur visible (z = -80,5), pas derrière lui.
+	solid(Vector3(0.0, 0.0, -80.5), Vector3(2.0 * CHOIR + 2.0, 4.0, 1.0))
+	place("wall.glb", Vector3(0.0, 0.0, -82.0))
 
 	# La nef : des piliers le long des murs, deux rangées de bancs.
 	for z: float in [-20.0, -28.0, -36.0, -44.0]:

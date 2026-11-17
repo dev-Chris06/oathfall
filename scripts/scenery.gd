@@ -26,7 +26,9 @@ static func dress(level: Level, kind: StringName, floor_rect: Rect2, walls: Rect
 	rng.seed = hash(level.title)
 	match kind:
 		UNDERGROUND:
-			_rock(level, walls, rng)
+			# Sous terre, ce sont les blocs posés sur les murs (`Level._caps`)
+			# qui cachent l'arrière : rien d'autre à ajouter.
+			pass
 		PIT:
 			_ground(level, floor_rect, 6.0, Color(0.24, 0.16, 0.14), Color(0.13, 0.09, 0.08))
 			_hills(level, floor_rect, 6.0, rng)
@@ -247,35 +249,3 @@ static func _river(level: Level, floor_rect: Rect2, rng: RandomNumberGenerator) 
 	_multi(level, prism, _glow(Color(0.2, 0.12, 0.15), 1.3), roofs)
 	_multi(level, _box(Vector3.ONE), _glow(Color(1.0, 0.7, 0.3), 3.0), lamps)
 	_trees(level, floor_rect.grow(18.0), 2.6, rng, 22, Color(0.04, 0.05, 0.09))
-
-
-# --- Sous terre ---------------------------------------------------------------
-
-## Un massif de roche derrière les murs, plus haut que la caméra, rythmé de
-## piliers et de lueurs de torches : on ne voit que de la pierre.
-static func _rock(level: Level, walls: Rect2, rng: RandomNumberGenerator) -> void:
-	var rock := _glow(Color(0.11, 0.1, 0.13), 0.8)
-	var reach := 60.0
-	var bottom := -3.0
-	var top := 11.0
-	var parts: Array[Rect2] = [
-		Rect2(walls.position.x - reach, walls.position.y - reach, reach, walls.size.y + 2.0 * reach),
-		Rect2(walls.end.x, walls.position.y - reach, reach, walls.size.y + 2.0 * reach),
-		Rect2(walls.position.x, walls.position.y - reach, walls.size.x, reach),
-		Rect2(walls.position.x, walls.end.y, walls.size.x, reach)]
-	for part in parts:
-		_add(level, _box(Vector3(part.size.x, top - bottom, part.size.y)), rock,
-			Vector3(part.get_center().x, (top + bottom) / 2.0, part.get_center().y))
-	# Des piliers saillants et des niches éclairées le long des deux grands côtés.
-	var pillars: Array[Transform3D] = []
-	var niches: Array[Transform3D] = []
-	var z := walls.position.y + 4.0
-	while z < walls.end.y - 2.0:
-		for side: float in [-1.0, 1.0]:
-			var x := walls.position.x if side < 0.0 else walls.end.x
-			pillars.append(Transform3D(Basis.from_scale(Vector3(1.6, 14.0, 1.4)), Vector3(x - side * 0.6, 4.0, z)))
-			if rng.randf() < 0.55:
-				niches.append(Transform3D(Basis.from_scale(Vector3(0.2, 1.1, 0.7)), Vector3(x - side * 0.15, 6.2, z + 4.0)))
-		z += 9.0
-	_multi(level, _box(Vector3.ONE), _glow(Color(0.2, 0.18, 0.22), 1.0), pillars)
-	_multi(level, _box(Vector3.ONE), _glow(Color(1.0, 0.62, 0.25), 3.5), niches)

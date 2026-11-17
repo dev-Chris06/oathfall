@@ -148,6 +148,12 @@ func _build() -> void:
 		grave_piece("fence_pillar", Vector3(side * HALF_WIDTH, 0.0, 9.5))
 	for x: float in [-8.0, -4.0, 0.0, 4.0, 8.0]:
 		grave_piece("fence", Vector3(x, 0.0, 9.5))
+	# Des clôtures bordent la place de part et d'autre, d'un bout à l'autre.
+	for side: float in [-1.0, 1.0]:
+		var z := 8.0
+		while z > -80.5:
+			grave_piece("fence", Vector3(side * (HALF_WIDTH + 0.2), 0.0, z), 90.0)
+			z -= 4.0
 	solid(Vector3(-HALF_WIDTH - 0.3, 0.0, -37.1), Vector3(0.6, 4.0, 93.8))
 	solid(Vector3(HALF_WIDTH + 0.3, 0.0, -37.1), Vector3(0.6, 4.0, 93.8))
 	solid(Vector3(0.0, 0.0, 9.5), Vector3(2.0 * HALF_WIDTH, 4.0, 0.6))

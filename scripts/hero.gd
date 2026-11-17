@@ -183,6 +183,7 @@ func _physics_process(delta: float) -> void:
 	# Le bouton du Repos n'apparaît que près d'un corps, ou d'une corde.
 	var can_interact := interaction_label != "" and body == null and rope == null
 	controls.flask_count = flasks
+	controls.dodge_ready = 1.0 - _dodge_cooldown / maxf(dodge_cooldown, 0.01)
 	controls.rite_available = state != State.DEAD and (body != null or rope != null or can_interact or state == State.RITE)
 	controls.rite_label = "COUPER" if (_cut_target != null or (body == null and rope != null)) \
 		else (interaction_label if can_interact else "REPOS")

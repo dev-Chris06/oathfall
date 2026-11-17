@@ -54,6 +54,8 @@ var hud: Hud
 var objective = null
 ## Le carnet des compétences, tant qu'il est ouvert.
 var book: SkillBook
+## Le menu de pause, tant qu'il est ouvert.
+var pause_menu: PauseMenu
 
 var _camera: GameCamera
 var _guide: Node3D
@@ -74,6 +76,7 @@ func _ready() -> void:
 	add_child(_solids)
 	_build_environment()
 	_build()
+	_flush_batches()
 	if play_area.has_area():
 		Scenery.dress(self, Scenery.UNDERGROUND if underground else (scenery if scenery != &"" else Scenery.CEMETERY),
 			floor_bounds if floor_bounds.has_area() else play_area, play_area)
@@ -105,6 +108,7 @@ func _ready() -> void:
 	hero.hurt.connect(_on_hero_hurt)
 	hero.died.connect(_on_hero_died)
 	controls.book_pressed.connect(open_book)
+	controls.pause_pressed.connect(open_pause)
 	hero.flask_drunk.connect(_on_flask_drunk)
 	Progress.leveled_up.connect(_on_leveled_up)
 	Progress.skill_learned.connect(_on_skill_learned)
@@ -389,6 +393,15 @@ func open_book() -> void:
 	add_child(book)
 
 
+## Ouvre le menu de pause ; le jeu s'arrête tant qu'il est ouvert.
+func open_pause() -> void:
+	if hero.is_dead() or _finished or get_tree().paused:
+		return
+	pause_menu = PauseMenu.new()
+	pause_menu.leave_requested.connect(func() -> void: quit_requested.emit())
+	add_child(pause_menu)
+
+
 func _on_leave() -> void:
 	book.close_book()
 	quit_requested.emit()
@@ -483,8 +496,24 @@ func _build_environment() -> void:
 
 ## Pose un modèle. `file` est un chemin complet ou un nom de fichier du pack
 ## Dungeon.
-func place(file: String, pos: Vector3, yaw_deg := 0.0) -> Node3D:
+func place(file: String, pos: Vector3, yaw_deg := 0.0, height_scale := 1.0) -> Node3D:
 	var path := file if file.begins_with("res://") else DUNGEON + file
+	if underground and height_scale >= 0.99 and (path.ends_with("/wall.glb") or path.ends_with("/wall_doorway.glb")):
+		# Un bloc de pierre au-dessus du mur, plus haut que la caméra : on ne
+		# voit jamais ce qu'il y a derrière.
+		_caps.append(Transform3D(Basis(Vector3.UP, deg_to_rad(yaw_deg)) * Basis.from_scale(Vector3(4.02, 8.0, 1.02)),
+			pos + Vector3(0.0, 8.0, 0.0)))
+	if BATCHED.any(func(name: String) -> bool: return path.ends_with("/" + name)):
+		# Les pièces répétées (clôtures, murs) sont regroupées : une commande de
+		# dessin par partie de modèle, au lieu d'une par pièce.
+		if not _batches.has(path):
+			_batches[path] = []
+		_batches[path].append(Transform3D(Basis(Vector3.UP, deg_to_rad(yaw_deg)) * Basis.from_scale(Vector3(1.0, height_scale, 1.0)), pos))
+		var stub := Node3D.new()
+		stub.position = pos
+		stub.rotation_degrees.y = yaw_deg
+		add_child(stub)
+		return stub
 	var scene := load(path) as PackedScene
 	if scene == null:
 		push_warning("Modèle introuvable : " + path)
@@ -494,6 +523,17 @@ func place(file: String, pos: Vector3, yaw_deg := 0.0) -> Node3D:
 	node.rotation_degrees.y = yaw_deg
 	add_child(node)
 	return node
+
+
+## Modèles posés en grand nombre, regroupés par `place()`.
+const BATCHED := ["fence.gltf", "fence_broken.gltf", "fence_pillar.gltf", "wall.glb"]
+
+## Les pièces regroupées : chemin du modèle -> transformations.
+var _batches := {}
+## Les blocs posés au-dessus des murs sous terre.
+var _caps: Array[Transform3D] = []
+## Étendue de chaque modèle regroupé, pour le contrôle des murs visibles.
+var _batch_bounds := {}
 
 
 ## Décors du cimetière qui arrêtent le héros et les morts, avec la part de
@@ -516,8 +556,87 @@ func grave_piece(file: String, pos: Vector3, yaw_deg := 0.0, collide := true) ->
 	return node
 
 
+## Transformation d'un nœud par rapport à la racine de son modèle (hors arbre).
+func _relative(node: Node3D, root: Node3D) -> Transform3D:
+	var t := node.transform
+	var parent := node.get_parent()
+	while parent != null and parent != root:
+		t = (parent as Node3D).transform * t
+		parent = parent.get_parent()
+	return t
+
+
+## Crée les MultiMesh des pièces regroupées, et les blocs au-dessus des murs.
+func _flush_batches() -> void:
+	for path: String in _batches:
+		var model := (load(path) as PackedScene).instantiate() as Node3D
+		var transforms: Array = _batches[path]
+		var bounds := AABB()
+		var first := true
+		for node in model.find_children("*", "MeshInstance3D", true, false):
+			var part := node as MeshInstance3D
+			if part.mesh == null:
+				continue
+			var local := _relative(part, model)
+			var multimesh := MultiMesh.new()
+			multimesh.transform_format = MultiMesh.TRANSFORM_3D
+			multimesh.mesh = part.mesh
+			multimesh.instance_count = transforms.size()
+			for i in transforms.size():
+				multimesh.set_instance_transform(i, (transforms[i] as Transform3D) * local)
+			var instance := MultiMeshInstance3D.new()
+			instance.multimesh = multimesh
+			add_child(instance)
+			var b := local * part.mesh.get_aabb()
+			bounds = b if first else bounds.merge(b)
+			first = false
+		_batch_bounds[path] = bounds
+		model.free()
+	if _caps.is_empty():
+		return
+	var cap_mesh := BoxMesh.new()
+	cap_mesh.size = Vector3.ONE
+	var cap := MultiMesh.new()
+	cap.transform_format = MultiMesh.TRANSFORM_3D
+	cap.mesh = cap_mesh
+	cap.instance_count = _caps.size()
+	for i in _caps.size():
+		cap.set_instance_transform(i, _caps[i])
+	var cap_instance := MultiMeshInstance3D.new()
+	cap_instance.multimesh = cap
+	var material := Fx.flat(Color(0.13, 0.12, 0.15), 0.0, 1.0)
+	material.emission_enabled = true
+	material.emission = Color(0.13, 0.12, 0.15)
+	material.emission_energy_multiplier = 0.8
+	cap_instance.material_override = material
+	cap_instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(cap_instance)
+
+
+## Les boîtes de tout ce qui se voit et se dresse (pas le sol), pièces
+## regroupées comprises : sert au contrôle « tout obstacle est visible ».
+func visible_boxes() -> Array[AABB]:
+	var boxes: Array[AABB] = []
+	for node in find_children("*", "MeshInstance3D", true, false):
+		var part := node as MeshInstance3D
+		if part.mesh == null:
+			continue
+		if part.get_parent() == self and part.material_override is StandardMaterial3D \
+				and (part.material_override as StandardMaterial3D).emission_enabled:
+			continue
+		var b := part.global_transform * part.mesh.get_aabb()
+		if b.size.y >= 0.25 and b.size.x <= 100.0 and b.size.z <= 100.0:
+			boxes.append(b)
+	for path: String in _batches:
+		if not _batch_bounds.has(path):
+			continue
+		for t: Transform3D in _batches[path]:
+			boxes.append(t * (_batch_bounds[path] as AABB))
+	return boxes
+
+
 ## Un obstacle à l'emprise du modèle (réduite de `share`), faisant corps avec lui.
-func _add_obstacle(node: Node3D, share: float) -> void:
+func _add_obstacle(node: Node3D, share: float) -> CollisionShape3D:
 	var box := AABB()
 	var first := true
 	for mesh_node in node.find_children("*", "MeshInstance3D", true, false):
@@ -528,10 +647,11 @@ func _add_obstacle(node: Node3D, share: float) -> void:
 		box = b if first else box.merge(b)
 		first = false
 	if first:
-		return
-	var size := Vector3(maxf(box.size.x * share, 0.5), clampf(box.size.y, 1.0, 4.0), maxf(box.size.z * share, 0.5))
-	var offset := Vector3(box.get_center().x, 0.0, box.get_center().z).rotated(Vector3.UP, node.rotation.y)
-	solid(node.position + offset, size, node.rotation_degrees.y)
+		return null
+	var scale := node.scale
+	var size := Vector3(maxf(box.size.x * share * scale.x, 0.5), clampf(box.size.y * scale.y, 1.0, 4.0), maxf(box.size.z * share * scale.z, 0.5))
+	var offset := Vector3(box.get_center().x * scale.x, 0.0, box.get_center().z * scale.z).rotated(Vector3.UP, node.rotation.y)
+	return solid(node.position + offset, size, node.rotation_degrees.y)
 
 
 ## Pave le sol d'un même carreau en un seul appel de dessin. `cells` donne

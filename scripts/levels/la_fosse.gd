@@ -166,6 +166,8 @@ func _build() -> void:
 	for mound in _mounds:
 		var dome := MeshInstance3D.new()
 		var half := SphereMesh.new()
+		half.radial_segments = 16
+		half.rings = 8
 		half.radius = 1.6
 		half.height = 1.2
 		half.is_hemisphere = true
@@ -181,6 +183,9 @@ func _build() -> void:
 		var at := CENTER + Vector3(sin(angle), 0.0, cos(angle)) * 6.0
 		var stone := grave_piece("gravestone", at, rad_to_deg(angle) + 180.0, false)
 		stone.scale = Vector3.ONE * 1.5
+		# La pierre arrête le passage tant qu'elle est là ; la Fossoyeuse
+		# l'arrache avec son obstacle (méta `blocker`).
+		stone.set_meta("blocker", _add_obstacle(stone, 0.8))
 		_stones.append(stone)
 
 
@@ -195,6 +200,8 @@ func _build_path() -> void:
 			k += 1
 		solid(Vector3(side * 4.8, 0.0, -7.5), Vector3(0.6, 4.0, 29.0))
 	solid(Vector3(0.0, 0.0, 7.5), Vector3(10.0, 4.0, 1.0))
+	for x: float in [-4.0, 0.0, 4.0]:
+		grave_piece("fence", Vector3(x, 0.0, 7.5))
 	# Les murs du chemin rejoignent le cercle de monticules à l'entrée de la
 	# fosse : plus de passage entre les deux.
 	for side: float in [-1.0, 1.0]:
@@ -233,6 +240,8 @@ func _build_pit() -> void:
 			# Le bord : une levée de terre, des pierres, des clôtures.
 			var rim := MeshInstance3D.new()
 			var bank := SphereMesh.new()
+			bank.radial_segments = 16
+			bank.rings = 8
 			bank.radius = 2.0
 			bank.height = 2.0
 			bank.is_hemisphere = true
@@ -261,6 +270,8 @@ func _build_pit() -> void:
 	for x: float in [-8.1, -4.1, 4.1, 8.1]:
 		grave_piece("fence", Vector3(x, 0.0, -50.5))
 	solid(Vector3(0.0, 0.0, -52.5), Vector3(20.0, 4.0, 1.0))
+	for x: float in [-8.0, -4.0, 0.0, 4.0, 8.0]:
+		grave_piece("fence", Vector3(x, 0.0, -52.5))
 	for x: float in [-6.5, 6.5]:
 		solid(Vector3(x, 0.0, -50.5), Vector3(6.0, 4.0, 0.6))
 	for side: float in [-1.0, 1.0]:

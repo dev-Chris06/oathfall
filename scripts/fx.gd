@@ -81,6 +81,7 @@ static func sector(radius: float, angle_deg: float, color: Color) -> MeshInstanc
 ## Un disque plat posé au sol : une zone qui va être frappée.
 static func disc(radius: float, color: Color) -> MeshInstance3D:
 	var cylinder := CylinderMesh.new()
+	cylinder.radial_segments = 12
 	cylinder.top_radius = radius
 	cylinder.bottom_radius = radius
 	cylinder.height = 0.02

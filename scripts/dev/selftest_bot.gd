@@ -230,6 +230,12 @@ func _run() -> void:
 		return
 	if not await _reach_tests():
 		return
+	if not await _visible_walls_tests():
+		return
+	if not await _pause_tests():
+		return
+	if not await _stone_tests():
+		return
 	for type_id: StringName in EnemyTypes.TYPES:
 		if not Progress.has_met(type_id):
 			return _fail("%s a été vu mais n'est pas au bestiaire" % type_id)
@@ -1094,6 +1100,133 @@ func _reach_tests() -> bool:
 			return _fail("le héros sort du niveau %s : %.0f m² atteignables (x %.1f à %.1f, z %.1f à %.1f)" % [
 				id, zone["area"], zone["min_x"], zone["max_x"], zone["min_z"], zone["max_z"]])
 	print("test réussi : aucun des 7 niveaux ne laisse sortir le héros")
+	return true
+
+
+## Tout obstacle se voit : un mur que le héros touche sans le voir est un
+## défaut (jeu invisible). On échantillonne chaque obstacle le long de sa plus
+## grande dimension, à hauteur de héros, et il faut un objet visible à moins de
+## 0,35 pour plus de la moitié des points.
+func _visible_walls_tests() -> bool:
+	main._drop_level()
+	await _frames(3)
+	for id: StringName in [&"la_grille", &"les_allees", &"la_chapelle", &"l_ossuaire",
+			&"la_fosse", &"la_porte_des_halles", &"refuge"]:
+		var level := main.LEVELS[id].new() as Level
+		main.add_child(level)
+		await _frames(3)
+		var boxes := level.visible_boxes()
+		for node in level._solids.get_children():
+			var shape := node as CollisionShape3D
+			if shape == null or not shape.shape is BoxShape3D:
+				continue
+			var size: Vector3 = (shape.shape as BoxShape3D).size
+			var along := Vector3.RIGHT if size.x >= size.z else Vector3.BACK
+			var length := maxf(size.x, size.z)
+			var uncovered := 0
+			var samples := 0
+			var d := -length / 2.0 + 0.25
+			while d <= length / 2.0 - 0.2:
+				var p := shape.global_transform.origin + shape.global_transform.basis * (along * d)
+				p.y = 0.5
+				samples += 1
+				var seen := false
+				for box in boxes:
+					if box.grow(0.35).has_point(p):
+						seen = true
+						break
+				if not seen:
+					uncovered += 1
+				d += 0.5
+			if samples > 0 and float(uncovered) / samples > 0.5:
+				var at := shape.global_transform.origin
+				level.queue_free()
+				return _fail("mur invisible dans %s : obstacle en (%.1f, %.1f), %.1f x %.1f, %d %% sans objet visible" % [
+					id, at.x, at.z, size.x, size.z, int(100.0 * uncovered / samples)])
+		level.queue_free()
+		await _frames(2)
+	print("test réussi : tout obstacle des 7 niveaux a un objet visible")
+	return true
+
+
+## Le menu de pause : le bouton l'ouvre, le jeu s'arrête, Reprendre le ferme,
+## Quitter demande confirmation puis ramène à la carte.
+func _pause_tests() -> bool:
+	var level := main.LEVELS[&"la_grille"].new() as Level
+	main.add_child(level)
+	await _frames(4)
+	var left := [false]
+	level.quit_requested.connect(func() -> void: left[0] = true)
+	level.controls.pause_pressed.emit()
+	await _frames(2)
+	if level.pause_menu == null or not get_tree().paused:
+		level.queue_free()
+		return _fail("le bouton pause n'ouvre pas le menu ou n'arrête pas le jeu")
+	level.open_book()
+	if level.book != null and is_instance_valid(level.book):
+		level.queue_free()
+		return _fail("le carnet s'ouvre par-dessus le menu de pause")
+	level.pause_menu.close_menu()
+	await _frames(2)
+	if get_tree().paused:
+		level.queue_free()
+		return _fail("Reprendre ne relance pas le jeu")
+	level.open_pause()
+	await _frames(2)
+	level.pause_menu._ask()
+	if not level.pause_menu.is_asking() or left[0]:
+		level.queue_free()
+		return _fail("quitter ne demande pas de confirmation")
+	level.pause_menu._cancel()
+	if level.pause_menu.is_asking():
+		level.queue_free()
+		return _fail("Non ne referme pas la confirmation")
+	level.pause_menu._ask()
+	level.pause_menu.confirm_leave()
+	await _frames(2)
+	var ok: bool = left[0] and not get_tree().paused
+	level.queue_free()
+	await _frames(2)
+	if not ok:
+		return _fail("confirmer ne quitte pas le niveau")
+	print("test réussi : le menu de pause ouvre, reprend et quitte après confirmation")
+	return true
+
+
+## Les pierres du cercle de la Fosse arrêtent le passage, et la Fossoyeuse les
+## arrache avec leur obstacle.
+func _stone_tests() -> bool:
+	var level := main.LEVELS[&"la_fosse"].new() as Level
+	main.add_child(level)
+	await _frames(4)
+	var fosse := level as LaFosse
+	var space := level.get_world_3d().direct_space_state
+	var shape := CapsuleShape3D.new()
+	shape.radius = 0.4
+	shape.height = 1.7
+	var query := PhysicsShapeQueryParameters3D.new()
+	query.shape = shape
+	query.exclude = [level.hero.get_rid()]
+	var blocked := func(at: Vector3) -> bool:
+		query.transform = Transform3D(Basis(), Vector3(at.x, 0.9, at.z))
+		return not space.intersect_shape(query, 1).is_empty()
+	for stone: Node3D in fosse._stones:
+		if not blocked.call(stone.global_position):
+			level.queue_free()
+			return _fail("une pierre du cercle de la Fosse se traverse (%s)" % stone.global_position)
+	var first: Node3D = fosse._stones[0]
+	var blocker := first.get_meta("blocker", null) as Node
+	if blocker == null:
+		level.queue_free()
+		return _fail("la pierre n'a pas d'obstacle lié")
+	blocker.queue_free()
+	await _frames(2)
+	var freed: bool = not blocked.call(first.global_position)
+	level.queue_free()
+	await _frames(2)
+	if not freed:
+		return _fail("l'obstacle d'une pierre arrachée reste en place")
+	print("test réussi : les pierres du cercle arrêtent le passage et partent avec leur obstacle")
 	return true
 
 
