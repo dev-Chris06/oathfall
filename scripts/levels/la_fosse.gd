@@ -248,11 +248,17 @@ func _build_pit() -> void:
 		flame(at + Vector3(0.0, 1.0, 0.0), 2.4, 12.0)
 	# La sortie, au nord.
 	grave_piece("arch", Vector3(0.0, 0.0, -50.5))
-	for x: float in [-4.1, 4.1]:
+	# Les murs de la sortie rejoignent le cercle de monticules des deux côtés :
+	# on ne peut plus contourner la fosse par le nord.
+	for x: float in [-8.1, -4.1, 4.1, 8.1]:
 		grave_piece("fence", Vector3(x, 0.0, -50.5))
 	solid(Vector3(0.0, 0.0, -52.5), Vector3(14.0, 4.0, 1.0))
-	for x: float in [-6.0, 6.0]:
-		solid(Vector3(x, 0.0, -50.5), Vector3(5.0, 4.0, 0.6))
+	for x: float in [-6.5, 6.5]:
+		solid(Vector3(x, 0.0, -50.5), Vector3(6.0, 4.0, 0.6))
+	for side: float in [-1.0, 1.0]:
+		grave_piece("fence", Vector3(side * 9.9, 0.0, -49.6), 90.0)
+		grave_piece("fence_pillar", Vector3(side * 9.9, 0.0, -47.6))
+		solid(Vector3(side * 9.7, 0.0, -49.6), Vector3(0.8, 4.0, 2.6))
 	for at: Vector3 in [Vector3(-3.0, 0.0, -8.0), Vector3(2.0, 0.0, -15.0), CENTER + Vector3(4.0, 0.0, 3.0)]:
 		grave_piece("skull", at, at.z * 13.0).scale = Vector3.ONE * 0.45
 		grave_piece("bone_A", at + Vector3(0.6, 0.05, 0.4), at.z * 31.0)

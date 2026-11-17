@@ -276,6 +276,13 @@ Règles à garder :
   signal `Enemy.health_changed`. Un boss qui ne chasse personne garde un
   minuteur qui court quel que soit son état (sinon un héros qui le harcèle
   l'empêche d'agir).
+- **Niveaux fermés** : le héros ne doit jamais pouvoir sortir du décor, et le
+  mur qui l'arrête doit se **voir** (clôture, mur, pilier), jamais un obstacle
+  seul. `_reach_tests` (test) mesure, avec la capsule du héros et toutes les
+  grilles ouvertes, la zone qu'il atteint depuis le départ : elle doit rester
+  bornée. Tout nouveau niveau y est ajouté. Le test ne voit pas le vide qui
+  reste visible par-dessus les murs (la caméra est plus haute qu'eux) : c'est
+  un défaut connu, à traiter en habillant le tour des niveaux.
 - **Le Repos découvert** : à la Grille, `hero.rite_enabled` est faux au début
   (pas de bouton REPOS) ; le premier mort est abattu, se relève, et c'est
   alors qu'Anselme enseigne le rite et que le bouton apparaît.

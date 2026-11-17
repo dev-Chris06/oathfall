@@ -228,6 +228,8 @@ func _run() -> void:
 		return
 	if not await _trigger_tests():
 		return
+	if not await _reach_tests():
+		return
 	for type_id: StringName in EnemyTypes.TYPES:
 		if not Progress.has_met(type_id):
 			return _fail("%s a été vu mais n'est pas au bestiaire" % type_id)
@@ -1067,6 +1069,85 @@ func _trigger_tests() -> bool:
 		return _fail("franchir la ligne loin du point n'a pas déclenché la suite")
 	print("test réussi : une zone se déclenche dès que sa ligne est franchie")
 	return true
+
+
+## Aucun niveau ne laisse sortir le héros : depuis le départ, toutes les grilles
+## ouvertes (sauf le portail du moulin), la zone qu'il peut atteindre reste
+## celle du niveau. Une fuite (un coin non fermé, un passage entre deux murs)
+## la ferait déborder sur le noir qui entoure le décor.
+func _reach_tests() -> bool:
+	# Le niveau des essais précédents est retiré : ses murs fausseraient la mesure.
+	main._drop_level()
+	await _frames(4)
+	for id: StringName in [&"la_grille", &"les_allees", &"la_chapelle", &"l_ossuaire",
+			&"la_fosse", &"la_porte_des_halles", &"refuge"]:
+		var level := main.LEVELS[id].new() as Level
+		main.add_child(level)
+		await _frames(4)
+		if id != &"refuge":
+			level.open_gates_before(99)
+		await _frames(3)
+		var zone := _reachable_zone(level)
+		level.queue_free()
+		await _frames(2)
+		if zone["area"] > 2200.0 or zone["min_x"] < -22.0 or zone["max_x"] > 22.0 or zone["min_z"] < -110.0:
+			return _fail("le héros sort du niveau %s : %.0f m² atteignables (x %.1f à %.1f, z %.1f à %.1f)" % [
+				id, zone["area"], zone["min_x"], zone["max_x"], zone["min_z"], zone["max_z"]])
+	print("test réussi : aucun des 7 niveaux ne laisse sortir le héros")
+	return true
+
+
+## La zone que le héros atteint à pied depuis son départ, sans qu'aucune
+## image de jeu ne passe : on sonde les obstacles avec sa capsule.
+func _reachable_zone(level: Level) -> Dictionary:
+	const STEP := 0.25
+	const LIMIT := Vector2(-115.0, 30.0)
+	const WIDTH := 45.0
+	var space := level.get_world_3d().direct_space_state
+	var shape := CapsuleShape3D.new()
+	shape.radius = 0.5
+	shape.height = 1.7
+	var query := PhysicsShapeQueryParameters3D.new()
+	query.shape = shape
+	var exclude: Array[RID] = [level.hero.get_rid()]
+	for enemy in level.enemies():
+		exclude.append(enemy.get_rid())
+	query.exclude = exclude
+	var nx := int(2.0 * WIDTH / STEP) + 1
+	var nz := int((LIMIT.y - LIMIT.x) / STEP) + 1
+	var seen := PackedByteArray()
+	seen.resize(nx * nz)
+	var start := level.hero.global_position
+	var first := int(round((start.x + WIDTH) / STEP)) * nz + int(round((start.z - LIMIT.x) / STEP))
+	var queue := PackedInt32Array([first])
+	seen[first] = 1
+	var head := 0
+	var zone := {"area": 0.0, "min_x": 1e9, "max_x": -1e9, "min_z": 1e9, "max_z": -1e9}
+	while head < queue.size():
+		var cell := queue[head]
+		head += 1
+		var x := -WIDTH + (cell / nz) * STEP
+		var z := LIMIT.x + (cell % nz) * STEP
+		zone["area"] += STEP * STEP
+		zone["min_x"] = minf(zone["min_x"], x)
+		zone["max_x"] = maxf(zone["max_x"], x)
+		zone["min_z"] = minf(zone["min_z"], z)
+		zone["max_z"] = maxf(zone["max_z"], z)
+		if zone["area"] > 3500.0:
+			return zone
+		for step: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+			var ix: int = cell / nz + step.x
+			var iz: int = cell % nz + step.y
+			if ix < 0 or iz < 0 or ix >= nx or iz >= nz:
+				continue
+			var next := ix * nz + iz
+			if seen[next] == 1:
+				continue
+			seen[next] = 1
+			query.transform = Transform3D(Basis(), Vector3(-WIDTH + ix * STEP, 0.9, LIMIT.x + iz * STEP))
+			if space.intersect_shape(query, 1).is_empty():
+				queue.append(next)
+	return zone
 
 
 ## Traverse un niveau de bout en bout. Le joueur automatique peut tomber :

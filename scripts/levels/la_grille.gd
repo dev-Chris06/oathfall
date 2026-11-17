@@ -200,6 +200,11 @@ func _build() -> void:
 	grave_piece("pillar", Vector3(4.5, 0.0, -59.5))
 	solid(Vector3(-4.5, 0.0, -59.5), Vector3(1.0, 4.0, 1.0))
 	solid(Vector3(4.5, 0.0, -59.5), Vector3(1.0, 4.0, 1.0))
+	# Une clôture ferme les côtés du caveau : on ne le contourne pas.
+	for side: float in [-1.0, 1.0]:
+		for x: float in [5.0, 8.5]:
+			grave_piece("fence", Vector3(side * x, 0.0, -61.0))
+		solid(Vector3(side * 6.6, 0.0, -61.0), Vector3(7.2, 4.0, 0.8))
 	grave_piece("gravestone", Vector3(-6.5, 0.0, -54.0), -10.0)
 	grave_piece("gravestone", Vector3(6.5, 0.0, -55.0), 12.0)
 	grave_piece("post_skull", Vector3(-8.6, 0.0, -51.5), 90.0)
@@ -209,10 +214,19 @@ func _build() -> void:
 	grave_piece("lantern_standing", Vector3(2.2, 0.0, -59.0))
 	flame(Vector3(0.0, 1.4, -58.0), 2.6, 11.0)
 
-	# Les bords : le héros ne quitte pas le cimetière.
-	solid(Vector3(-HALF_WIDTH - 0.3, 0.0, -30.0), Vector3(0.6, 4.0, 80.0))
-	solid(Vector3(HALF_WIDTH + 0.3, 0.0, -30.0), Vector3(0.6, 4.0, 80.0))
-	solid(Vector3(0.0, 0.0, 13.0), Vector3(2.0 * HALF_WIDTH, 4.0, 0.6))
+	# Les bords : le héros ne quitte pas le cimetière. Le chemin d'arrivée est
+	# clos de clôtures sur les côtés et au sud, jusque dans les coins (les murs
+	# latéraux s'arrêtaient avant le mur du fond et laissaient sortir).
+	for z: float in [2.0, 6.0, 10.0]:
+		for side: float in [-1.0, 1.0]:
+			grave_piece("fence_broken" if z == 6.0 and side < 0.0 else "fence", Vector3(side * HALF_WIDTH, 0.0, z), 90.0)
+	for x: float in [-8.0, -4.0, 0.0, 4.0, 8.0]:
+		grave_piece("fence", Vector3(x, 0.0, 12.6))
+	for side: float in [-1.0, 1.0]:
+		grave_piece("fence_pillar", Vector3(side * HALF_WIDTH, 0.0, 12.6))
+	solid(Vector3(-HALF_WIDTH - 0.3, 0.0, -28.35), Vector3(0.6, 4.0, 83.3))
+	solid(Vector3(HALF_WIDTH + 0.3, 0.0, -28.35), Vector3(0.6, 4.0, 83.3))
+	solid(Vector3(0.0, 0.0, 13.0), Vector3(2.0 * HALF_WIDTH + 1.2, 4.0, 0.6))
 	for gz in GATE_Z:
 		for x: float in [-6.1, 6.1]:
 			solid(Vector3(x, 0.0, gz), Vector3(8.0, 4.0, 0.6))
