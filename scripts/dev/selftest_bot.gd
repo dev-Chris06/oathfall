@@ -131,6 +131,20 @@ func _dodge_if_needed(level: Level, hero: Hero, controls: TouchControls) -> void
 			# L'onde du Sonneur : on esquive quand son front arrive.
 			var gap := absf(enemy.wave_radius() - enemy.global_position.distance_to(hero.global_position))
 			threat = gap < 2.4
+		elif enemy is PeseurEnemy:
+			# Ses poids sont annoncés au sol : on s'écarte juste avant qu'ils ne
+			# tombent ; son coup, comme celui des autres.
+			for weight: Dictionary in enemy._weights:
+				var at: Vector3 = weight["at"]
+				var gap := Vector2(at.x - hero.global_position.x, at.z - hero.global_position.z).length()
+				if float(weight["time"]) > float(enemy._type["weight_windup"]) - 0.35 and gap < float(enemy._type["weight_radius"]) + 0.8:
+					var out := Vector2(hero.global_position.x - at.x, hero.global_position.z - at.z).normalized()
+					controls.simulated_move = out
+					controls.press_dodge()
+					return
+			threat = enemy.state == Enemy.State.WINDUP and not enemy._struck \
+				and enemy.global_position.distance_to(hero.global_position) < float(enemy._type["attack_range"]) + 0.5 \
+				and enemy._state_time > float(enemy._type["attack_windup"]) - 0.25
 		elif enemy is FossoyeuseEnemy:
 			# Ses gestes sont annoncés : on esquive juste avant qu'ils ne portent.
 			threat = enemy.danger_time(hero.global_position) < 0.3
@@ -228,6 +242,8 @@ func _run() -> void:
 		return
 	if not await _crier_tests():
 		return
+	if not await _peseur_tests():
+		return
 	if not await _trigger_tests():
 		return
 	if not await _reach_tests():
@@ -259,6 +275,8 @@ func _run() -> void:
 	if not await _traverse(&"la_porte_des_halles"):
 		return
 	if not await _traverse(&"les_etals"):
+		return
+	if not await _traverse(&"la_balance"):
 		return
 	if not await _map_tests():
 		return
@@ -1090,7 +1108,7 @@ func _reach_tests() -> bool:
 	main._drop_level()
 	await _frames(4)
 	for id: StringName in [&"la_grille", &"les_allees", &"la_chapelle", &"l_ossuaire",
-			&"la_fosse", &"la_porte_des_halles", &"les_etals", &"refuge"]:
+			&"la_fosse", &"la_porte_des_halles", &"les_etals", &"la_balance", &"refuge"]:
 		var level := main.LEVELS[id].new() as Level
 		main.add_child(level)
 		await _frames(4)
@@ -1115,7 +1133,7 @@ func _visible_walls_tests() -> bool:
 	main._drop_level()
 	await _frames(3)
 	for id: StringName in [&"la_grille", &"les_allees", &"la_chapelle", &"l_ossuaire",
-			&"la_fosse", &"la_porte_des_halles", &"les_etals", &"refuge"]:
+			&"la_fosse", &"la_porte_des_halles", &"les_etals", &"la_balance", &"refuge"]:
 		var level := main.LEVELS[id].new() as Level
 		main.add_child(level)
 		await _frames(3)
@@ -1323,6 +1341,85 @@ func _crier_tests() -> bool:
 	hero.global_position = Vector3(0.0, 0.0, 3.0)
 	if not await _until(func() -> bool: return arena.enemies_left() == 0, 240.0):
 		return _fail("les morts de l'essai du Crieur n'ont pas été mis au repos")
+	return true
+
+
+## Le Peseur : la balance règle les dégâts qu'il subit, ses poids sont annoncés.
+func _peseur_tests() -> bool:
+	var arena := _level() as Arena
+	var hero := arena.hero
+	hero.heal(1000)
+	hero.global_position = Vector3(0.0, 0.0, 30.0)
+	_passive = true
+	_allow_rest = false
+	var boss := arena.spawn(&"peseur", Vector3(0.0, 0.0, -8.0), false) as PeseurEnemy
+	var data := EnemyTypes.get_type(&"peseur")
+	var adds: Array[Enemy] = []
+	for i in 3:
+		adds.append(arena.spawn(&"depouille", Vector3(-6.0 + 3.0 * i, 0.0, -14.0), false))
+	await _frames(3)
+	boss._weight_timer = 1000.0
+
+	var hit := func(amount: int) -> int:
+		boss._poise = 0.0
+		var before := boss.health
+		boss.take_hit(hero.global_position, amount)
+		return before - boss.health
+
+	if boss.evaluate_balance() != PeseurEnemy.Balance.STANDING:
+		return _fail("trois morts debout et aucun corps : la balance ne penche pas de leur côté")
+	var shielded: int = hit.call(100)
+	if absi(shielded - int(round(100.0 * float(data["shield_factor"])))) > 1:
+		return _fail("protégé par la balance, le Peseur a subi %d au lieu de 35" % shielded)
+	# Abattus, ils deviennent des corps : la balance penche de l'autre côté.
+	for add in adds:
+		add.take_hit(hero.global_position, 100000)
+	await _frames(3)
+	if boss.evaluate_balance() != PeseurEnemy.Balance.LYING:
+		return _fail("trois corps et aucun mort debout : la balance ne penche pas du côté des corps")
+	var normal: int = hit.call(100)
+	if absi(normal - 100) > 1:
+		return _fail("côté corps, le Peseur a subi %d au lieu de 100" % normal)
+	if boss.weight_interval() >= float(data["weight_interval"]):
+		return _fail("côté corps, ses poids ne tombent pas plus vite")
+	# Deux Repos : un seul corps reste, c'est l'équilibre.
+	adds[0].give_rest()
+	adds[1].give_rest()
+	await _frames(3)
+	if boss.evaluate_balance() != PeseurEnemy.Balance.EVEN:
+		return _fail("un corps et aucun mort debout : la balance n'est pas à l'équilibre")
+	var vulnerable: int = hit.call(100)
+	if absi(vulnerable - int(round(100.0 * float(data["even_factor"])))) > 1:
+		return _fail("à l'équilibre, le Peseur a subi %d au lieu de 140" % vulnerable)
+
+	# Un poids est annoncé, puis tombe sur le héros immobile.
+	var life := hero.health
+	boss.drop_weight_at(hero.global_position)
+	if boss._weights.size() != 1:
+		return _fail("un poids annoncé n'est pas marqué au sol")
+	await _frames(40)
+	if hero.health != life:
+		return _fail("le poids a blessé le héros avant la fin de l'annonce")
+	await _frames(70)
+	if hero.health >= life:
+		return _fail("le poids n'a pas blessé le héros resté dans la zone")
+	life = hero.health
+	boss.drop_weight_at(hero.global_position + Vector3(12.0, 0.0, 0.0))
+	await _frames(110)
+	if hero.health != life:
+		return _fail("un poids tombé loin du héros l'a blessé")
+
+	print("test réussi : la balance du Peseur règle ses dégâts, ses poids sont annoncés et blessent")
+	boss.take_hit(hero.global_position, 100000)
+	adds[2].take_hit(hero.global_position, 100000)
+	await _frames(3)
+	boss.give_rest()
+	adds[2].give_rest()
+	_passive = false
+	_allow_rest = true
+	hero.global_position = Vector3(0.0, 0.0, 3.0)
+	if not await _until(func() -> bool: return arena.enemies_left() == 0, 60.0):
+		return _fail("les morts de l'essai du Peseur n'ont pas été mis au repos")
 	return true
 
 

@@ -279,6 +279,54 @@ const TYPES := {
 			"rise": "Death_C_Skeletons_Resurrect",
 		},
 	},
+	# Le Peseur, boss de la Balance. Sa balance juge combien de morts sont
+	# debout et combien gisent : trop de morts debout, il est protégé ; trop de
+	# corps, ses poids tombent plus vite ; à l'équilibre, il est vulnérable.
+	# Ses poids tombent sur une zone que le sol annonce.
+	&"peseur": {
+		"name": "Le Peseur",
+		# La fiche du bestiaire de Tibert.
+		"bestiary": {
+			"text": "Il juge tout sur sa balance, les corps comme les vivants. Trop de morts debout, il est protégé ; trop de corps, ses poids tombent plus vite.",
+			"tip": "Garde l'équilibre : abats les morts debout, donne le Repos aux corps. À l'équilibre, il est vulnérable. Une zone rouge annonce chaque poids.",
+		},
+		"behavior": "peseur",
+		"boss": true,
+		"model": "res://assets/kaykit/skeletons/Skeleton_Warrior.glb",
+		"hidden_parts": ["Skeleton_Warrior_Helmet"],
+		"props": [{"kind": "scales", "bone": "handslot.r", "offset": Vector3(0.0, 0.2, 0.0)}],
+		"tint": Color(0.82, 0.68, 0.45),
+		"scale": 1.75,
+		"health": 560,
+		"move_speed": 1.6,
+		"attack_range": 2.7,
+		"attack_damage": 20,
+		"attack_windup": 1.0,
+		"attack_cooldown": 2.8,
+		"attack_speed": 1.0,
+		"attack_impact": 0.52,
+		# Les poids : intervalle, délai d'annonce, rayon, dégâts.
+		"weight_interval": 7.5,
+		"weight_windup": 1.5,
+		"weight_radius": 2.4,
+		"weight_damage": 22,
+		# Part des dégâts reçus selon la balance : protégé (trop de morts
+		# debout) et à l'équilibre.
+		"shield_factor": 0.35,
+		"even_factor": 1.4,
+		"rise_delay": 40.0,
+		"rise_health": 0.3,
+		"memories": 70,
+		"gold": 45,
+		"animations": {
+			"idle": "Idle_Combat",
+			"walk": "Walking_D_Skeletons",
+			"attack": "2H_Melee_Attack_Chop",
+			"hit": "Hit_A",
+			"fall": "Death_C_Skeletons",
+			"rise": "Death_C_Skeletons_Resurrect",
+		},
+	},
 	# Le Sonneur, boss de la Chapelle des cendres. Chaque coup de sa cloche
 	# relève d'un coup tous les corps sans repos. Trois cordes retiennent la
 	# cloche : les couper la fait tomber sur lui.

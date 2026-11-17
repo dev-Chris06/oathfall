@@ -28,6 +28,7 @@ const LEVELS := {
 	&"la_fosse": preload("res://scripts/levels/la_fosse.gd"),
 	&"la_porte_des_halles": preload("res://scripts/levels/la_porte_des_halles.gd"),
 	&"les_etals": preload("res://scripts/levels/les_etals.gd"),
+	&"la_balance": preload("res://scripts/levels/la_balance.gd"),
 	&"refuge": preload("res://scripts/levels/refuge.gd"),
 }
 
