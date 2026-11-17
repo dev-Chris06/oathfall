@@ -327,6 +327,56 @@ const TYPES := {
 			"rise": "Death_C_Skeletons_Resurrect",
 		},
 	},
+	# Le Prévôt des halles, boss de la Halle. Il continue de lever l'impôt :
+	# un cercle d'or est annoncé sur le sol, et quelques secondes plus tard la
+	# levée frappe toute la salle, sauf qui se tient dans le cercle. À chaque
+	# tiers de sa vie, il convoque ses percepteurs et la levée se rapproche.
+	&"prevot": {
+		"name": "Le Prévôt",
+		# La fiche du bestiaire de Tibert.
+		"bestiary": {
+			"text": "Il lève encore l'impôt. Un cercle d'or paraît au sol : quelques secondes plus tard, la levée frappe toute la salle.",
+			"tip": "Rejoins le cercle d'or avant que la levée ne tombe. À chaque tiers de sa vie, il convoque ses percepteurs.",
+		},
+		"behavior": "prevot",
+		"boss": true,
+		"model": "res://assets/kaykit/skeletons/Skeleton_Warrior.glb",
+		"hidden_parts": ["Skeleton_Warrior_Helmet"],
+		"props": [{"kind": "mace", "bone": "handslot.r", "offset": Vector3(0.0, 0.1, 0.0)}],
+		"tint": Color(0.92, 0.75, 0.42),
+		"scale": 1.8,
+		"health": 720,
+		"move_speed": 2.0,
+		"attack_range": 3.0,
+		"attack_damage": 22,
+		"attack_windup": 1.0,
+		"attack_cooldown": 2.4,
+		"attack_speed": 1.0,
+		"attack_impact": 0.52,
+		# La levée : annonce, intervalle, rayon du cercle sûr, dégâts. Les
+		# percepteurs arrivent à `edict_time` secondes d'immobilité du Prévôt.
+		"levy_windup": 3.0,
+		"levy_interval": 14.0,
+		"safe_radius": 3.2,
+		"levy_damage": 30,
+		"edict_time": 1.6,
+		"stage2_at": 0.66,
+		"stage3_at": 0.33,
+		"rise_delay": 45.0,
+		"rise_health": 0.3,
+		"memories": 90,
+		"gold": 60,
+		"animations": {
+			"idle": "Idle_Combat",
+			"walk": "Walking_D_Skeletons",
+			"attack": "2H_Melee_Attack_Chop",
+			"levy": "Spellcast_Raise",
+			"edict": "Spellcast_Raise",
+			"hit": "Hit_A",
+			"fall": "Death_C_Skeletons",
+			"rise": "Death_C_Skeletons_Resurrect",
+		},
+	},
 	# Le Sonneur, boss de la Chapelle des cendres. Chaque coup de sa cloche
 	# relève d'un coup tous les corps sans repos. Trois cordes retiennent la
 	# cloche : les couper la fait tomber sur lui.

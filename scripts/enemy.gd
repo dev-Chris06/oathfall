@@ -25,6 +25,7 @@ const BEHAVIORS := {
 	"fossoyeuse": "res://scripts/enemies/fossoyeuse.gd",
 	"crier": "res://scripts/enemies/crier.gd",
 	"peseur": "res://scripts/enemies/peseur.gd",
+	"prevot": "res://scripts/enemies/prevot.gd",
 }
 ## Portée et force des cloches : chaque Porte-cloche debout dans ce rayon
 ## ajoute `BELL_BOOST` à la vitesse de relèvement d'un corps.

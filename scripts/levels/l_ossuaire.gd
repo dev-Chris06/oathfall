@@ -135,10 +135,10 @@ func _build() -> void:
 	# Un muret : la caméra est derrière lui au départ et doit voir le héros.
 	for x: float in [-2.0, 2.0]:
 		place("wall.glb", Vector3(x, 0.0, 5.5), 0.0, 0.35)
-	place("wall_doorway.glb", Vector3(0.0, 0.0, -88.5))
+	place("wall_doorway.glb", Vector3(0.0, 0.0, -88.5), 0.0, 1.0, true)
 	solid(Vector3(0.0, 0.0, -89.5), Vector3(6.6, 4.0, 1.0))
 	for x: float in [-2.0, 2.0]:
-		place("wall.glb", Vector3(x, 0.0, -89.5))
+		place("wall.glb", Vector3(x, 0.0, -89.5), 0.0, 1.0, true)
 	flame(Vector3(0.0, 2.6, -87.4), 2.6, 9.0)
 
 	# Les ossements.
@@ -188,7 +188,7 @@ func _room(south: float, north: float) -> void:
 			place("wall.glb", Vector3(side * (ROOM + 0.5), 0.0, z), -90.0 * side)
 		z -= 4.0
 	for x: float in [-5.0, -8.0, 5.0, 8.0]:
-		place("wall.glb", Vector3(x, 0.0, north - 0.5))
+		place("wall.glb", Vector3(x, 0.0, north - 0.5), 0.0, 1.0, true)
 	var length := south - north
 	for side: float in [-1.0, 1.0]:
 		solid(Vector3(side * (ROOM + 0.5), 0.0, (south + north) / 2.0), Vector3(1.0, 4.0, length))

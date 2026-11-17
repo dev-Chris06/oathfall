@@ -496,9 +496,14 @@ func _build_environment() -> void:
 
 ## Pose un modèle. `file` est un chemin complet ou un nom de fichier du pack
 ## Dungeon.
-func place(file: String, pos: Vector3, yaw_deg := 0.0, height_scale := 1.0) -> Node3D:
+## `cap` pose un bloc de pierre au-dessus d'un mur : c'est automatique pour les
+## murs latéraux (lacet ±90°), à demander pour un mur du fond. Jamais pour un
+## mur en travers qui peut se trouver entre la caméra et le héros : le bloc
+## cacherait le héros.
+func place(file: String, pos: Vector3, yaw_deg := 0.0, height_scale := 1.0, cap := false) -> Node3D:
 	var path := file if file.begins_with("res://") else DUNGEON + file
-	if underground and height_scale >= 0.99 and (path.ends_with("/wall.glb") or path.ends_with("/wall_doorway.glb")):
+	if underground and height_scale >= 0.99 and (cap or absf(sin(deg_to_rad(yaw_deg))) > 0.7) \
+			and (path.ends_with("/wall.glb") or path.ends_with("/wall_doorway.glb")):
 		# Un bloc de pierre au-dessus du mur, plus haut que la caméra : on ne
 		# voit jamais ce qu'il y a derrière.
 		_caps.append(Transform3D(Basis(Vector3.UP, deg_to_rad(yaw_deg)) * Basis.from_scale(Vector3(4.02, 8.0, 1.02)),

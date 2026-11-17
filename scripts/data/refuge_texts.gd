@@ -46,6 +46,14 @@ const NPCS := {
 					"Mange quelque chose avant de repartir. On ne monte pas en ville le ventre vide.",
 				],
 			},
+			{
+				"id": &"maud_5",
+				"needs": [&"les_etals"],
+				"lines": [
+					"La rue des bouchers ? Ils vendaient encore leur viande à des clients qui n'avaient plus de bouche.",
+					"Prends ces rations pour la route : celle-là, au moins, personne ne la pèsera.",
+				],
+			},
 		],
 		"idle": [
 			"Dis-moi ce qu'il te faut.",
@@ -105,6 +113,14 @@ const NPCS := {
 					"Tu as bien fait de lui donner le Repos. C'est la seule façon de rendre à la terre ce qu'elle a rendu.",
 				],
 			},
+			{
+				"id": &"anselme_5",
+				"needs": [&"la_balance"],
+				"lines": [
+					"Le Peseur ? Il pesait chaque âme pour savoir ce qu'elle devait. Tu n'as pas à lui donner raison.",
+					"Garde ton équilibre, soldat : on ne vient pas à bout des morts en frappant sans mesure, ni en priant sans fin.",
+				],
+			},
 		],
 		"idle": [
 			"Un rite mal choisi peut se désapprendre. Dis-le-moi.",
@@ -154,6 +170,14 @@ const NPCS := {
 				"lines": [
 					"Alors c'est fini, pour la ville basse ? Tu vas monter plus haut ?",
 					"Moi, je n'ai jamais vu la ville de près. Tu me raconteras ?",
+				],
+			},
+			{
+				"id": &"tibert_5",
+				"needs": [&"la_halle_du_prevot"],
+				"lines": [
+					"Un Prévôt qui lève l'impôt, alors qu'il n'y a plus personne pour le recevoir… Je me demande qui tient ses comptes.",
+					"Rapporte-moi ce que tu as vu dans la halle. Je le noterai avec le reste.",
 				],
 			},
 		],

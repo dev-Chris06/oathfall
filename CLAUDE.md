@@ -104,6 +104,20 @@ niveau ». Tout niveau construit reste jouable à tout moment (essais) ;
 « ici » désigne le premier non terminé. Le héros qui tombe se relève au
 dernier point de reprise. L'arène d'essai reste disponible (`-- --arena`).
 
+**Le chapitre II** (niveaux 6 à 10) est construit : la Porte des halles, les Étals,
+la Balance, les Caves du marché, la Halle du Prévôt. Nouveaux morts : le
+**Boucher** (hachoir lent et lourd, comportement `melee`) et le **Crieur** (il ne
+frappe pas : son cri presse les morts debout 5 s, `Enemy.hasten` ; le frapper
+pendant qu'il prend son souffle l'interrompt). Le **Peseur** compare, avec sa
+balance, les morts debout et les corps au sol : trop de morts debout, il ne
+subit que 35 % des coups ; trop de corps, ses poids (annoncés par un disque
+rouge) tombent plus vite ; à l'équilibre, il subit 140 %. On règle la balance
+en abattant les uns et en donnant le Repos aux autres. Le **Prévôt** lève
+l'impôt : un cercle d'or est annoncé, trois secondes plus tard la levée frappe
+toute la salle sauf le cercle ; à chaque tiers de sa vie il décrète (intouchable
+1,6 s) et convoque ses percepteurs. Le joueur automatique rejoint le cercle
+(`_levy_step`) et esquive les poids.
+
 **Le refuge** (`refuge.gd`) est le moulin, hors des murs : un niveau calme, sans
 mort. Maud (boutique d'**équipement** payé en or, `Gear` et `ShopScreen`), frère
 Anselme (les rites s'apprennent dans le carnet, partout ; Anselme fait
@@ -200,11 +214,16 @@ Retour de l'auteur encore attendu : les sensations de combat sur téléphone
 | `scripts/levels/la_chapelle.gd` | Niveau 3 : porche, nef, chœur, combat du Sonneur |
 | `scripts/levels/l_ossuaire.gd` | Niveau 4 : couloirs et salles, Fouisseur, Veuve |
 | `scripts/levels/la_fosse.gd` | Niveau 5 : le chemin, la fosse ronde, la Fossoyeuse |
-| `scripts/levels/la_porte_des_halles.gd` | Niveau 6 (chapitre II, « Le Marché aux absents ») : place de marché, étals (`Level.stall()`), trois parties. Les niveaux 7 à 10 du chapitre sont déclarés dans `WorldData.CHAPTER_2` mais pas encore construits : Étals (Boucher, Crieur), Balance (boss : le Peseur), Caves, Halle du Prévôt (boss) |
+| `scripts/levels/la_porte_des_halles.gd` | Niveau 6 (chapitre II, « Le Marché aux absents ») : place de marché, étals (`Level.stall()`), trois parties |
+| `scripts/levels/les_etals.gd` | Niveau 7 : la rue des bouchers, étals aux carcasses, Boucher et Crieur, deux barrières |
+| `scripts/levels/la_balance.gd` | Niveau 8, boss intermédiaire : la place des poids et mesures, le Peseur, la balance publique qui penche en direct |
+| `scripts/levels/les_caves.gd` | Niveau 9 : les caves du marché, souterraines (couloirs et trois salles de tonneaux), tous les morts du chapitre |
+| `scripts/levels/la_halle_du_prevot.gd` | Niveau 10, boss : la halle voûtée, antichambre puis le Prévôt ; fin du chapitre II |
 | `scripts/levels/refuge.gd`, `npc.gd` | Le moulin et ses personnages |
 | `scripts/data/refuge_texts.gd`, `gear.gd` | Conversations du refuge ; équipement (objets, effets, `Gear.apply`) |
 | `scripts/dev/portrait_tool.gd` | Fabrique les portraits du bestiaire (`-- --portraits`), rendus des vrais modèles |
 | `scripts/enemies/` | Comportements propres : archer (et son carreau), Porte-cloche, Fouisseur, Veuve, Sonneur, la grosse cloche avec ses cordes (`great_bell.gd`, `bell_rope.gd`), Fossoyeuse et ses pierres (`fossoyeuse.gd`, `grave_stone.gd`) |
+| `scripts/enemies/crier.gd`, `peseur.gd`, `prevot.gd` | Chapitre II : le Crieur (son cri donne la hâte, `Enemy.hasten`), le Peseur (boss : la balance), le Prévôt (boss : la levée et le cercle d'or) |
 | `scripts/audio.gd` | Chargé en permanence (`Audio`) : bruitages (`Audio.play(&"clang")`), musiques en fondu (`Audio.music(&"boss")`), volumes des options. Événements et fichiers déclarés dans ses tableaux `EVENTS` et `TRACKS` |
 | `tools/audio/generate.py` | Fabrique les bruitages lourds et les six musiques en boucle (`python3 -I tools/audio/generate.py assets/audio`), reproductible |
 | `scripts/fx.gd` | Effets partagés : ondes au sol, matériaux simples |

@@ -66,6 +66,8 @@ func _physics_process(delta: float) -> void:
 	if hero.is_dead() or _passive:
 		return
 	_dodge_if_needed(level, hero, controls)
+	if _levy_step(level, hero, controls):
+		return
 
 	var target := _choose_target(hero)
 	if target != null:
@@ -131,6 +133,12 @@ func _dodge_if_needed(level: Level, hero: Hero, controls: TouchControls) -> void
 			# L'onde du Sonneur : on esquive quand son front arrive.
 			var gap := absf(enemy.wave_radius() - enemy.global_position.distance_to(hero.global_position))
 			threat = gap < 2.4
+		elif enemy is PrevotEnemy:
+			# Son coup est annoncé : on esquive. La levée, elle, s'évite en
+			# rejoignant le cercle (voir `_levy_step`).
+			threat = enemy.state == Enemy.State.WINDUP and not enemy._struck \
+				and enemy.global_position.distance_to(hero.global_position) < float(enemy._type["attack_range"]) + 0.5 \
+				and enemy._state_time > float(enemy._type["attack_windup"]) - 0.25
 		elif enemy is PeseurEnemy:
 			# Ses poids sont annoncés au sol : on s'écarte juste avant qu'ils ne
 			# tombent ; son coup, comme celui des autres.
@@ -158,6 +166,20 @@ func _dodge_if_needed(level: Level, hero: Hero, controls: TouchControls) -> void
 			controls.simulated_move = side
 			controls.press_dodge()
 			return
+
+
+## La levée du Prévôt : le joueur rejoint le cercle d'or et s'y tient jusqu'au
+## coup. Renvoie vrai quand il s'en occupe.
+func _levy_step(level: Level, hero: Hero, controls: TouchControls) -> bool:
+	for enemy in level.enemies():
+		if enemy is PrevotEnemy and enemy.levy_pending:
+			var offset: Vector3 = enemy.levy_center - hero.global_position
+			offset.y = 0.0
+			if offset.length() > float(enemy._type["safe_radius"]) - 0.9:
+				controls.simulated_move = Vector2(offset.x, offset.z).normalized()
+				return true
+			return enemy.levy_time_left() < 2.2
+	return false
 
 
 ## Un joueur qui bute contre une tombe la contourne : s'il n'avance plus, il
@@ -244,6 +266,8 @@ func _run() -> void:
 		return
 	if not await _peseur_tests():
 		return
+	if not await _prevot_tests():
+		return
 	if not await _trigger_tests():
 		return
 	if not await _reach_tests():
@@ -277,6 +301,10 @@ func _run() -> void:
 	if not await _traverse(&"les_etals"):
 		return
 	if not await _traverse(&"la_balance"):
+		return
+	if not await _traverse(&"les_caves"):
+		return
+	if not await _traverse(&"la_halle_du_prevot"):
 		return
 	if not await _map_tests():
 		return
@@ -1108,7 +1136,7 @@ func _reach_tests() -> bool:
 	main._drop_level()
 	await _frames(4)
 	for id: StringName in [&"la_grille", &"les_allees", &"la_chapelle", &"l_ossuaire",
-			&"la_fosse", &"la_porte_des_halles", &"les_etals", &"la_balance", &"refuge"]:
+			&"la_fosse", &"la_porte_des_halles", &"les_etals", &"la_balance", &"les_caves", &"la_halle_du_prevot", &"refuge"]:
 		var level := main.LEVELS[id].new() as Level
 		main.add_child(level)
 		await _frames(4)
@@ -1133,7 +1161,7 @@ func _visible_walls_tests() -> bool:
 	main._drop_level()
 	await _frames(3)
 	for id: StringName in [&"la_grille", &"les_allees", &"la_chapelle", &"l_ossuaire",
-			&"la_fosse", &"la_porte_des_halles", &"les_etals", &"la_balance", &"refuge"]:
+			&"la_fosse", &"la_porte_des_halles", &"les_etals", &"la_balance", &"les_caves", &"la_halle_du_prevot", &"refuge"]:
 		var level := main.LEVELS[id].new() as Level
 		main.add_child(level)
 		await _frames(3)
@@ -1420,6 +1448,68 @@ func _peseur_tests() -> bool:
 	hero.global_position = Vector3(0.0, 0.0, 3.0)
 	if not await _until(func() -> bool: return arena.enemies_left() == 0, 60.0):
 		return _fail("les morts de l'essai du Peseur n'ont pas été mis au repos")
+	return true
+
+
+## Le Prévôt : la levée frappe hors du cercle d'or seulement, et à chaque
+## tiers de sa vie il décrète, intouchable un instant, avant de convoquer.
+func _prevot_tests() -> bool:
+	var arena := _level() as Arena
+	var hero := arena.hero
+	hero.heal(1000)
+	hero.global_position = Vector3(0.0, 0.0, 30.0)
+	_passive = true
+	_allow_rest = false
+	var boss := arena.spawn(&"prevot", Vector3(0.0, 0.0, -8.0), false) as PrevotEnemy
+	var data := EnemyTypes.get_type(&"prevot")
+	boss._levy_timer = 1000.0
+	await _frames(3)
+
+	# Dans le cercle d'or : la levée ne blesse pas.
+	boss._begin_levy()
+	if not boss.levy_pending or boss.levy_time_left() <= 0.0:
+		return _fail("la levée n'est pas annoncée")
+	hero.global_position = boss.levy_center
+	var life := hero.health
+	await _frames(200)
+	if boss.levy_pending or hero.health != life:
+		return _fail("la levée a blessé le héros qui se tenait dans le cercle d'or")
+	# Hors du cercle : elle frappe.
+	boss._levy_timer = 1000.0
+	boss._begin_levy()
+	hero.global_position = boss.levy_center + Vector3(float(data["safe_radius"]) + 4.0, 0.0, 0.0)
+	life = hero.health
+	await _frames(200)
+	if hero.health >= life:
+		return _fail("la levée n'a pas blessé le héros hors du cercle")
+
+	# Un nouveau tiers de sa vie : il décrète, intouchable, puis redevient vulnérable.
+	var stages := [0]
+	boss.stage_changed.connect(func(_s: int) -> void: stages[0] += 1)
+	boss.health = int(float(data["health"]) * 0.6)
+	await _frames(4)
+	if boss.stage() != 2 or stages[0] != 1:
+		return _fail("le Prévôt ne décrète pas au deuxième tiers de sa vie")
+	var before := boss.health
+	boss.take_hit(hero.global_position, 50)
+	if boss.health != before:
+		return _fail("le Prévôt est blessé pendant qu'il décrète")
+	await _frames(int(float(data["edict_time"]) * 60.0) + 15)
+	boss.take_hit(hero.global_position, 50)
+	if boss.health >= before:
+		return _fail("le Prévôt reste intouchable après avoir décrété")
+	if boss.levy_interval() >= float(data["levy_interval"]):
+		return _fail("la levée ne se rapproche pas au deuxième tiers")
+
+	print("test réussi : la levée du Prévôt épargne le cercle d'or et frappe ailleurs, et il décrète à chaque tiers")
+	boss.take_hit(hero.global_position, 100000)
+	await _frames(3)
+	boss.give_rest()
+	_passive = false
+	_allow_rest = true
+	hero.global_position = Vector3(0.0, 0.0, 3.0)
+	if not await _until(func() -> bool: return arena.enemies_left() == 0, 60.0):
+		return _fail("les morts de l'essai du Prévôt n'ont pas été mis au repos")
 	return true
 
 
