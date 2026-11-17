@@ -25,6 +25,7 @@ var _tends_corpses := false
 
 func _init() -> void:
 	title = "La Fosse"
+	play_area = Rect2(-18.0, -54.0, 36.0, 62.0)
 	# Les monticules d'où elle jaillit, en couronne autour du centre.
 	for i in 6:
 		var angle := deg_to_rad(30.0 + 60.0 * i)
@@ -177,7 +178,7 @@ func _build() -> void:
 	for i in 6:
 		var angle := deg_to_rad(60.0 * i)
 		var at := CENTER + Vector3(sin(angle), 0.0, cos(angle)) * 6.0
-		var stone := grave_piece("gravestone", at, rad_to_deg(angle) + 180.0)
+		var stone := grave_piece("gravestone", at, rad_to_deg(angle) + 180.0, false)
 		stone.scale = Vector3.ONE * 1.5
 		_stones.append(stone)
 

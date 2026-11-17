@@ -36,6 +36,7 @@ var _first_quake := true
 
 func _init() -> void:
 	title = "La Chapelle des cendres"
+	play_area = Rect2(-10.0, -82.0, 20.0, 88.0)
 	underground = true
 	next_level = &"l_ossuaire"
 

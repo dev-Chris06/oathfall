@@ -32,7 +32,11 @@ const RIVER_BOTTOM := 2700.0
 const BRIDGE_X := 232.0
 const MILL_X := 135.0
 const MILL_HUB := Vector2(135.0, 2590.0)
-const MILL_DOOR := Vector2(135.0, 2706.0)
+const MILL_DOOR := Vector2(152.0, 2706.0)
+## La roue à aubes, au flanc du moulin, plongée dans l'anse que l'eau creuse
+## dans la rive.
+const WHEEL := Vector2(90.0, 2690.0)
+const WHEEL_RADIUS := 27.0
 ## Les niveaux d'un chapitre se répartissent sur sa voie, hors des angles.
 const LANE_MARGIN := 0.1
 
@@ -46,6 +50,9 @@ var ready_flags: Array = []
 var river: MapRiver
 ## Pour chaque voie de la route : son départ et son arrivée.
 var lane_segments: Array = []
+## Un chapitre est accompli quand ses cinq niveaux sont faits : son cercle
+## s'allume sous la ville.
+var chapters_done: Array[bool] = []
 
 var _shapes: Array = []
 var _rng := RandomNumberGenerator.new()
@@ -67,6 +74,14 @@ func _init() -> void:
 func set_states(new_states: PackedStringArray, ready: Array) -> void:
 	states = new_states
 	ready_flags = ready
+	chapters_done = []
+	for c in WorldData.ROUTE_CHAPTERS:
+		var done := true
+		for i in WorldData.LEVELS_PER_CHAPTER:
+			var n := c * WorldData.LEVELS_PER_CHAPTER + i
+			if n >= states.size() or states[n] != "fait":
+				done = false
+		chapters_done.append(done)
 	queue_redraw()
 
 
@@ -198,6 +213,7 @@ func _build_route() -> void:
 
 func _draw() -> void:
 	_draw_river_bed()
+	_draw_foundations()
 
 	# Du plus loin au plus proche : chaque étage cache le pied du précédent.
 	for act in [4, 3, 2, 1]:
@@ -263,18 +279,43 @@ func _draw_river_bed() -> void:
 	bank.append(Vector2(0.0, H))
 	draw_colored_polygon(bank, Color(0.03, 0.034, 0.056))
 	draw_polyline(edge, Color(0.2, 0.25, 0.4, 0.5), 1.5)
+	# Une anse : l'eau entre dans la rive et baigne le pied du moulin.
+	var cove := PackedVector2Array([Vector2(40.0, RIVER_BOTTOM - 2.0), Vector2(132.0, RIVER_BOTTOM - 2.0), Vector2(136.0, 2718.0),
+		Vector2(122.0, 2742.0), Vector2(90.0, 2758.0), Vector2(58.0, 2750.0), Vector2(40.0, 2724.0)])
+	draw_colored_polygon(cove, Color(0.045, 0.07, 0.15))
+	draw_colored_polygon(cove, Color(0.07, 0.1, 0.2, 0.5))
+	draw_polyline(PackedVector2Array([cove[0], cove[6], cove[5], cove[4], cove[3], cove[2], cove[1]]), Color(0.2, 0.25, 0.4, 0.5), 1.5)
 	# Des roseaux au bord de l'eau.
 	var reeds := RandomNumberGenerator.new()
 	reeds.seed = 17
 	for i in 46:
 		var rx := reeds.randf_range(20.0, W - 20.0)
-		if absf(rx - BRIDGE_X) < 34.0 or absf(rx - MILL_X) < 50.0:
+		if absf(rx - BRIDGE_X) < 34.0 or rx < 190.0:
 			continue
 		var base_y := RIVER_BOTTOM + 3.0
 		for blade in 3:
 			var lean := reeds.randf_range(-6.0, 6.0)
 			draw_line(Vector2(rx + blade * 4.0, base_y), Vector2(rx + blade * 4.0 + lean, base_y - reeds.randf_range(14.0, 30.0)),
 				Color(0.012, 0.016, 0.03), 2.0)
+
+
+## Sous la ville : une plaque sombre, un « ? » et dix cercles, un par chapitre.
+## Un cercle s'allume quand son chapitre est accompli ; le « ? » s'allume quand
+## les dix le sont.
+func _draw_foundations() -> void:
+	var plaque := Rect2(430.0, 2800.0, 520.0, 130.0)
+	draw_rect(plaque, Color(0.012, 0.012, 0.03))
+	draw_rect(plaque, Color(0.2, 0.25, 0.4, 0.4), false, 1.5)
+	var all_done := chapters_done.size() == WorldData.ROUTE_CHAPTERS and not chapters_done.has(false)
+	draw_string(GameFonts.text(), Vector2(plaque.position.x, plaque.position.y + 98.0), "?", HORIZONTAL_ALIGNMENT_CENTER, 220.0, 100,
+		Color(Theatre.AMBER, 0.95) if all_done else Color(Theatre.MUTED, 0.35))
+	for i in WorldData.ROUTE_CHAPTERS:
+		var at := Vector2(680.0 + 54.0 * (i % 5) + (0.0 if i < 5 else 27.0), 2840.0 + 50.0 * (i / 5))
+		if i < chapters_done.size() and chapters_done[i]:
+			draw_circle(at, 17.0, Color(Theatre.AMBER, 0.2))
+			draw_circle(at, 9.0, Theatre.AMBER)
+		else:
+			draw_arc(at, 9.0, 0.0, TAU, 20, Color(0.29, 0.27, 0.38, 0.75), 2.0)
 
 
 ## Le pont de bois, du moulin à la ville, avec deux lanternes.
@@ -310,7 +351,7 @@ func _draw_mill() -> void:
 	draw_colored_polygon(roof, dark)
 	draw_polyline(PackedVector2Array([body[0], body[3], roof[0], roof[2], roof[1], body[2], body[1]]), rim, 1.5)
 	# La porte, et la fenêtre allumée : le refuge est le seul endroit habité.
-	draw_rect(Rect2(MILL_X - 9.0, MILL_DOOR.y - 30.0, 18.0, 30.0), Color(0.03, 0.025, 0.04))
+	draw_rect(Rect2(MILL_DOOR.x - 9.0, MILL_DOOR.y - 30.0, 18.0, 30.0), Color(0.03, 0.025, 0.04))
 	draw_rect(Rect2(MILL_X - 11.0, MILL_DOOR.y - 78.0, 22.0, 30.0), Color(LAMP, 0.16))
 	draw_rect(Rect2(MILL_X - 6.0, MILL_DOOR.y - 73.0, 12.0, 20.0), LAMP)
 	draw_rect(Rect2(MILL_X - 4.0, MILL_HUB.y + 14.0, 8.0, 12.0), Color(LAMP, 0.85))
@@ -342,7 +383,7 @@ func _draw_labels() -> void:
 		var y: float = LABEL_Y[a]
 		draw_string(font, Vector2(W - 600.0, y), String(act["name"]).to_upper(), HORIZONTAL_ALIGNMENT_RIGHT, 400.0, 26, Theatre.MUTED)
 		draw_string(font, Vector2(W - 600.0, y + 28.0), act["title"], HORIZONTAL_ALIGNMENT_RIGHT, 400.0, 19, Color(Theatre.MUTED, 0.8))
-	draw_string(GameFonts.italic(), Vector2(MILL_X - 110.0, MILL_DOOR.y + 44.0), "le moulin, refuge", HORIZONTAL_ALIGNMENT_CENTER, 220.0, 20, Color(Theatre.MUTED, 0.95))
+	draw_string(GameFonts.italic(), Vector2(MILL_X - 110.0, MILL_DOOR.y + 92.0), "le moulin, refuge", HORIZONTAL_ALIGNMENT_CENTER, 220.0, 20, Color(Theatre.MUTED, 0.95))
 	# Le titre du chapitre, au départ de sa voie, du côté que n'occupe pas le
 	# nom de son premier niveau.
 	for c in WorldData.CHAPTERS.size():
@@ -402,7 +443,42 @@ class MapRiver extends Control:
 		_draw_waves()
 		_draw_streaks()
 		_draw_glints()
+		_draw_cove()
+		_draw_wheel()
 		_draw_sails()
+
+	## Dans l'anse, de petites vagues viennent lécher la roue et le pied du moulin.
+	func _draw_cove() -> void:
+		for i in 3:
+			var base := 2712.0 + 13.0 * i
+			var points := PackedVector2Array()
+			for k in range(0, 9):
+				var x := 54.0 + 9.0 * k + 3.0 * i
+				points.append(Vector2(x, base + 2.0 * sin((x - time * 30.0) * 0.1 + i)))
+			draw_polyline(points, Color(0.3, 0.42, 0.65, 0.45 - 0.1 * i), 2.0)
+
+	## La roue à aubes : le courant la fait tourner, ses pales entrent dans l'eau.
+	func _draw_wheel() -> void:
+		var centre := MapScene.WHEEL
+		var radius := MapScene.WHEEL_RADIUS
+		var wood := Color(0.045, 0.03, 0.03)
+		var rim := Color(0.45, 0.3, 0.16, 0.7)
+		draw_arc(centre, radius, 0.0, TAU, 28, wood, 4.0)
+		draw_arc(centre, radius - 9.0, 0.0, TAU, 24, wood, 3.0)
+		for spoke in 8:
+			var angle := -time * 0.9 + spoke * TAU / 8.0
+			var direction := Vector2(cos(angle), sin(angle))
+			draw_line(centre, centre + direction * radius, wood, 3.0)
+			var tip := centre + direction * radius
+			var side := Vector2(-direction.y, direction.x) * 7.0
+			draw_colored_polygon(PackedVector2Array([tip - side, tip + side, tip + side + direction * 6.0, tip - side + direction * 6.0]), wood)
+		draw_arc(centre, radius, 0.0, TAU, 28, rim, 1.2)
+		draw_circle(centre, 4.0, wood)
+		# L'écume, là où la roue touche l'eau.
+		for k in 4:
+			var foam_x := centre.x - 14.0 + 9.0 * k + 3.0 * sin(time * 3.0 + k)
+			draw_line(Vector2(foam_x, MapScene.RIVER_BOTTOM + 14.0), Vector2(foam_x + 7.0, MapScene.RIVER_BOTTOM + 14.0),
+				Color(0.75, 0.85, 1.0, 0.35 + 0.2 * sin(time * 4.0 + k)), 2.0)
 
 	## Sous le pont, l'eau ne se voit pas.
 	func _under_bridge(x: float, margin := 0.0) -> bool:

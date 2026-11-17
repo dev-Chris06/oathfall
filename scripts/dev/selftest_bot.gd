@@ -1275,6 +1275,16 @@ func _map_tests() -> bool:
 		return _fail("l'eau de la carte ne s'anime pas")
 	print("test 12 réussi : carte aérée, chapitres sur leurs voies, moulin à l'écart, eau animée")
 
+	# Sous la ville, un cercle par chapitre : allumé quand ses cinq niveaux sont faits.
+	for level_data: Dictionary in WorldData.CHAPTER_1["levels"]:
+		Progress.mark_completed(level_data["id"])
+	map.refresh()
+	if map._scene.chapters_done.size() != WorldData.ROUTE_CHAPTERS or not map._scene.chapters_done[0]:
+		return _fail("le cercle du chapitre I ne s'allume pas quand ses cinq niveaux sont faits")
+	if map._scene.chapters_done.has(true) and map._scene.chapters_done.count(true) != 1 + (1 if Progress.is_completed(&"la_porte_des_halles") and Progress.is_completed(&"les_etals") and Progress.is_completed(&"la_balance") and Progress.is_completed(&"les_caves") and Progress.is_completed(&"la_halle_du_prevot") else 0):
+		return _fail("un cercle s'allume pour un chapitre inachevé")
+	print("test 12 réussi : les cercles des fondations suivent les chapitres accomplis")
+
 	# Le moulin se choisit comme un niveau, mais ne consomme pas le repas.
 	Progress.add_gold(100)
 	Progress.pack_meal(&"fromage")
@@ -1678,6 +1688,9 @@ func _capture_map() -> void:
 	map.select_level(&"la_chapelle")
 	await get_tree().create_timer(0.3).timeout
 	await _shoot("map_03_ferme")
+	map.scroll_to(2760.0, 0.62)
+	await get_tree().create_timer(0.4).timeout
+	await _shoot("map_08_moulin")
 	for step in [[1700.0, "map_04_citadelle"], [1100.0, "map_05_cathedrale"], [400.0, "map_06_palais"]]:
 		map.scroll_to(step[0], 0.5)
 		await get_tree().create_timer(0.3).timeout

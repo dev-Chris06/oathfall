@@ -21,6 +21,7 @@ const EXIT := Vector3(0.0, 0.0, -77.0)
 
 func _init() -> void:
 	title = "Les Allées"
+	play_area = Rect2(-6.4, -81.0, 12.8, 91.0)
 	next_level = &"la_chapelle"
 
 

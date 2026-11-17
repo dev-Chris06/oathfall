@@ -283,6 +283,15 @@ Règles à garder :
   bornée. Tout nouveau niveau y est ajouté. Le test ne voit pas le vide qui
   reste visible par-dessus les murs (la caméra est plus haute qu'eux) : c'est
   un défaut connu, à traiter en habillant le tour des niveaux.
+- **Obstacles et abords** : `Level.grave_piece()` donne un obstacle aux décors
+  verticaux de `Level.OBSTACLES` (stèles, arbres, lanternes…), à l'emprise de
+  leur modèle ; `collide` faux pour ce qui bouge (les pierres de la
+  Fossoyeuse). Chaque niveau déclare `play_area` : `dress_surroundings`
+  étend de la terre sombre à perte de vue en plein air, et un massif de roche
+  derrière les murs sous terre, pour que la caméra ne montre jamais de vide.
+- **Sous la ville (carte)** : la plaque sombre, le « ? » et dix cercles ne
+  sont pas jouables. Un cercle s'allume quand les cinq niveaux de son chapitre
+  sont faits ; le « ? » s'allume quand les dix le sont. Aucun nom n'y est écrit.
 - **Le Repos découvert** : à la Grille, `hero.rite_enabled` est faux au début
   (pas de bouton REPOS) ; le premier mort est abattu, se relève, et c'est
   alors qu'Anselme enseigne le rite et que le bouton apparaît.

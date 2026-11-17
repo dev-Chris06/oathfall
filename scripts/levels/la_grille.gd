@@ -22,6 +22,7 @@ var _first_rose := false
 
 func _init() -> void:
 	title = "La Grille"
+	play_area = Rect2(-10.6, -70.0, 21.2, 83.4)
 	next_level = &"les_allees"
 
 

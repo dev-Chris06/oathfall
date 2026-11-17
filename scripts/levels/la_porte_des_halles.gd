@@ -20,6 +20,7 @@ const CLOTHS: Array[Color] = [Color(0.32, 0.08, 0.07), Color(0.28, 0.2, 0.08), C
 
 func _init() -> void:
 	title = "La Porte des halles"
+	play_area = Rect2(-9.4, -80.0, 18.8, 89.0)
 	next_level = &"les_etals"
 
 

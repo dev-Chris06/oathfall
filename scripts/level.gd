@@ -38,6 +38,8 @@ var start_checkpoint := 0
 var scripted := false
 ## Musique du niveau (vide : selon le décor, souterrain ou cimetière).
 var music_track: StringName = &""
+## Terrain jouable (x, z, largeur, profondeur), pour habiller ses abords.
+var play_area := Rect2()
 
 var hero: Hero
 var controls: TouchControls
@@ -68,6 +70,8 @@ func _ready() -> void:
 	add_child(_solids)
 	_build_environment()
 	_build()
+	if play_area.has_area():
+		dress_surroundings(play_area)
 	if music_track == &"":
 		music_track = &"underground" if underground else &"cemetery"
 	Audio.level_track = music_track
@@ -487,9 +491,79 @@ func place(file: String, pos: Vector3, yaw_deg := 0.0) -> Node3D:
 	return node
 
 
-## Pose un modèle du pack de cimetière.
-func grave_piece(file: String, pos: Vector3, yaw_deg := 0.0) -> Node3D:
-	return place(GRAVEYARD + file + ".gltf", pos, yaw_deg)
+## Décors du cimetière qui arrêtent le héros et les morts, avec la part de
+## l'emprise du modèle qui sert d'obstacle (un tronc est plus étroit que sa
+## ramure). Les autres (os, bougies, carreaux) se traversent.
+const OBSTACLES := {
+	"gravestone": 0.8, "gravemarker_A": 0.8, "gravemarker_B": 0.8, "grave_A_destroyed": 0.8,
+	"tree_dead_large": 0.3, "tree_dead_medium": 0.3, "tree_dead_small": 0.3,
+	"post_lantern": 0.6, "lantern_standing": 0.6, "post_skull": 0.6,
+	"shrine_candles": 0.8, "bench": 0.8,
+}
+
+
+## Pose un modèle du pack de cimetière. S'il est solide (`OBSTACLES`), il
+## arrête le passage ; `collide` faux pour ce qui doit bouger (pierres lancées).
+func grave_piece(file: String, pos: Vector3, yaw_deg := 0.0, collide := true) -> Node3D:
+	var node := place(GRAVEYARD + file + ".gltf", pos, yaw_deg)
+	if collide and node != null and OBSTACLES.has(file):
+		_add_obstacle(node, float(OBSTACLES[file]))
+	return node
+
+
+## Un obstacle à l'emprise du modèle (réduite de `share`), faisant corps avec lui.
+func _add_obstacle(node: Node3D, share: float) -> void:
+	var box := AABB()
+	var first := true
+	for mesh_node in node.find_children("*", "MeshInstance3D", true, false):
+		var mesh_instance := mesh_node as MeshInstance3D
+		if mesh_instance.mesh == null:
+			continue
+		var b := (node.global_transform.affine_inverse() * mesh_instance.global_transform) * mesh_instance.mesh.get_aabb()
+		box = b if first else box.merge(b)
+		first = false
+	if first:
+		return
+	var size := Vector3(maxf(box.size.x * share, 0.5), clampf(box.size.y, 1.0, 4.0), maxf(box.size.z * share, 0.5))
+	var offset := Vector3(box.get_center().x, 0.0, box.get_center().z).rotated(Vector3.UP, node.rotation.y)
+	solid(node.position + offset, size, node.rotation_degrees.y)
+
+
+## Habille ce qui entoure le terrain jouable (`play_area` : x, z, largeur,
+## profondeur) pour que la caméra, plus haute que les murs, ne montre jamais
+## de vide : de la terre sombre à perte de vue en plein air, un massif de
+## roche derrière les murs sous terre.
+func dress_surroundings(area: Rect2) -> void:
+	var ground := Fx.flat(Color(0.075, 0.07, 0.085), 0.0, 1.0)
+	if not underground:
+		var plane := MeshInstance3D.new()
+		var mesh := PlaneMesh.new()
+		mesh.size = Vector2(600.0, 600.0)
+		plane.mesh = mesh
+		plane.material_override = ground
+		plane.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		plane.position = Vector3(area.get_center().x, -0.06, area.get_center().y)
+		add_child(plane)
+		return
+	var rock := Fx.flat(Color(0.06, 0.058, 0.075), 0.0, 1.0)
+	var reach := 60.0
+	var x0 := area.position.x
+	var x1 := area.end.x
+	var z0 := area.position.y
+	var z1 := area.end.y
+	for part: Rect2 in [
+			Rect2(x0 - reach, z0 - reach, reach, area.size.y + 2.0 * reach),
+			Rect2(x1, z0 - reach, reach, area.size.y + 2.0 * reach),
+			Rect2(x0, z0 - reach, area.size.x, reach),
+			Rect2(x0, z1, area.size.x, reach)]:
+		var block := MeshInstance3D.new()
+		var box := BoxMesh.new()
+		box.size = Vector3(part.size.x, 10.0, part.size.y)
+		block.mesh = box
+		block.material_override = rock
+		block.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		block.position = Vector3(part.get_center().x, 5.0, part.get_center().y)
+		add_child(block)
 
 
 ## Pave le sol d'un même carreau en un seul appel de dessin. `cells` donne
