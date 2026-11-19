@@ -45,6 +45,9 @@ const STAGGER_TIME := 0.35
 
 var state := State.CHASE
 var type_id_name: StringName
+## Rang d'apparition dans le niveau : stable d'une partie d'essai à l'autre,
+## contrairement à l'identifiant interne de l'objet.
+var spawn_index := 0
 var health := 0
 ## Délai avant de se relever. Modifiable par ce qui l'entoure (Porte-cloche,
 ## sceaux brisés, tests).
@@ -76,6 +79,9 @@ var health_scale := 1.0
 var damage_scale := 1.0
 
 var _open_time := 0.0
+## Garde fendue par le Requiem : le prochain coup abat (un boss : double).
+var _rent_time := 0.0
+var _rent_mark: MeshInstance3D
 var _stagger_guard := 0.0
 var _combo := 0
 var _haste_aura: MeshInstance3D
@@ -135,6 +141,10 @@ func _physics_process(delta: float) -> void:
 	_state_time += delta
 	_cooldown = maxf(0.0, _cooldown - delta)
 	_open_time = maxf(0.0, _open_time - delta)
+	if _rent_time > 0.0:
+		_rent_time = maxf(0.0, _rent_time - delta)
+		if _rent_time <= 0.0 and _rent_mark != null:
+			_rent_mark.visible = false
 	_stagger_guard = maxf(0.0, _stagger_guard - delta)
 	if haste_time > 0.0:
 		haste_time = maxf(0.0, haste_time - delta)
@@ -177,6 +187,7 @@ func _physics_process(delta: float) -> void:
 		_model.rotation.y = lerp_angle(_model.rotation.y, target_yaw, minf(1.0, TURN_SPEED * delta))
 		if haste_time > 0.0 and state == State.CHASE:
 			velocity *= HASTE
+		velocity *= candle_slow()
 		move_and_slide()
 
 
@@ -199,6 +210,9 @@ func is_down() -> bool:
 ## Vitesse à laquelle le corps approche de son relèvement : 1, plus chaque
 ## cloche qui sonne à portée.
 func rise_rate() -> float:
+	# Dans la lueur d'un cierge, aucun corps ne se relève.
+	if RiteCandle.lit(get_tree(), body_position()):
+		return 0.0
 	var rate := 1.0
 	for node in get_tree().get_nodes_in_group(&"bells"):
 		var bell := node as Node3D
@@ -246,6 +260,12 @@ func take_hit(from: Vector3, damage: int) -> void:
 		return
 	if _open_time > 0.0:
 		damage = int(round(float(damage) * OPEN_FACTOR))
+	if _rent_time > 0.0:
+		# La garde fendue : ce coup abat le mort ; un boss le prend double.
+		_rent_time = 0.0
+		if _rent_mark != null:
+			_rent_mark.visible = false
+		damage = health if not is_boss() else damage * 2
 	health -= damage
 	health_changed.emit(health, max_health())
 	if health <= 0:
@@ -263,6 +283,48 @@ func take_hit(from: Vector3, damage: int) -> void:
 	state = State.STAGGER
 	_state_time = 0.0
 	_once(_animation("hit"), 1.5)
+
+
+func is_boss() -> bool:
+	return bool(_type.get("boss", false))
+
+
+## Renversé par un rite (Glas, Tombée) : un mort ordinaire tombe comme
+## abattu ; un boss encaisse `boss_damage`.
+func knock_down(from: Vector3, boss_damage: int) -> void:
+	if not is_standing():
+		return
+	if is_boss():
+		take_hit(from, boss_damage)
+		return
+	health = 0
+	health_changed.emit(health, max_health())
+	_fall()
+
+
+## Garde fendue par le Requiem pendant `seconds` secondes : un anneau d'or
+## sous ses pieds.
+func rend(seconds: float) -> void:
+	if not is_standing():
+		return
+	_rent_time = seconds
+	if _rent_mark == null:
+		_rent_mark = Fx.disc(1.0, Color(0.91, 0.69, 0.38, 0.6))
+		add_child(_rent_mark)
+	_rent_mark.visible = true
+
+
+func is_rent() -> bool:
+	return _rent_time > 0.0
+
+
+## Ralentissement dû aux cierges : la moitié de la vitesse dans leur lueur.
+func candle_slow() -> float:
+	for node in get_tree().get_nodes_in_group(&"candles"):
+		var candle := node as RiteCandle
+		if candle != null and candle.covers(global_position):
+			return candle.slow
+	return 1.0
 
 
 ## Le presse pour `seconds` secondes : il va et frappe plus vite.

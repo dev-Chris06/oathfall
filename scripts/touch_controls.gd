@@ -10,6 +10,8 @@ signal dodge_pressed
 signal book_pressed
 signal pause_pressed
 signal flask_pressed
+## Un bouton de rite de combat (0, 1 ou 2).
+signal rite_slot_pressed(slot: int)
 
 const STICK_RADIUS := 95.0
 const ATTACK_RADIUS := 88.0
@@ -18,6 +20,7 @@ const RITE_RADIUS := 66.0
 const BOOK_RADIUS := 44.0
 const FLASK_RADIUS := 50.0
 const PAUSE_RADIUS := 38.0
+const SLOT_RADIUS := 52.0
 
 ## Direction voulue, de longueur 0 à 1. x vers la droite, y vers le bas de l'écran.
 var move := Vector2.ZERO
@@ -35,6 +38,9 @@ var rite_progress := 0.0
 var book_alert := false
 ## Part du temps de recharge de l'esquive déjà écoulée (1 : prête).
 var dodge_ready := 1.0
+## Les rites de combat portés et les braises : renseignés par le héros.
+var rite_slots: Array[StringName] = [&"", &"", &""]
+var embers := 0
 ## Entrées imposées par un script (tests, démonstrations).
 var simulated_move := Vector2.ZERO
 var simulated_rite := false
@@ -48,6 +54,10 @@ var _dodge_flash := 0.0
 var _pad: Control
 ## La légende du bouton d'action (« REPOS », « PARLER »…), sous lui.
 var _caption: Label
+## Le nom de chaque rite porté, sous son bouton.
+var _slot_labels: Array[Label] = []
+var _slot_flash: Array[float] = [0.0, 0.0, 0.0]
+var _slot_denied: Array[float] = [0.0, 0.0, 0.0]
 
 
 func _ready() -> void:
@@ -62,6 +72,13 @@ func _ready() -> void:
 	_caption.add_theme_constant_override("outline_size", 7)
 	_caption.visible = false
 	_pad.add_child(_caption)
+	for i in 3:
+		var label := Theatre.label("", 19, PALE)
+		label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.03, 0.95))
+		label.add_theme_constant_override("outline_size", 6)
+		label.visible = false
+		_pad.add_child(label)
+		_slot_labels.append(label)
 
 
 func _process(delta: float) -> void:
@@ -77,6 +94,17 @@ func _process(delta: float) -> void:
 		var size := _caption.get_minimum_size()
 		_caption.position = _rite_center() + Vector2(-size.x / 2.0, -RITE_RADIUS - 14.0 - size.y)
 
+	for i in 3:
+		var label := _slot_labels[i]
+		var id: StringName = rite_slots[i] if i < rite_slots.size() else &""
+		label.visible = id != &""
+		if label.visible:
+			label.text = String(RiteData.RITES[id]["name"])
+			label.modulate = Color.WHITE if embers >= RiteData.cost(id) else Color(1.0, 1.0, 1.0, 0.55)
+			var size := label.get_minimum_size()
+			label.position = slot_center(i) + Vector2(-size.x / 2.0, SLOT_RADIUS + 6.0)
+		_slot_flash[i] = maxf(0.0, _slot_flash[i] - delta * 4.0)
+		_slot_denied[i] = maxf(0.0, _slot_denied[i] - delta * 3.0)
 	_attack_flash = maxf(0.0, _attack_flash - delta * 5.0)
 	_dodge_flash = maxf(0.0, _dodge_flash - delta * 5.0)
 	_pad.queue_redraw()
@@ -99,6 +127,8 @@ func _input(event: InputEvent) -> void:
 				book_pressed.emit()
 			elif touch.position.distance_to(_attack_center()) <= ATTACK_RADIUS * 1.25:
 				press_attack()
+			elif _slot_at(touch.position) >= 0:
+				press_slot(_slot_at(touch.position))
 			elif flask_count > 0 and touch.position.distance_to(_flask_center()) <= FLASK_RADIUS * 1.3:
 				flask_pressed.emit()
 			elif touch.position.distance_to(_dodge_center()) <= DODGE_RADIUS * 1.3:
@@ -129,6 +159,12 @@ func _input(event: InputEvent) -> void:
 					press_dodge()
 				KEY_F:
 					flask_pressed.emit()
+				KEY_1, KEY_U:
+					press_slot(0)
+				KEY_2, KEY_I:
+					press_slot(1)
+				KEY_3, KEY_O:
+					press_slot(2)
 				KEY_C, KEY_TAB:
 					_release_all()
 					book_pressed.emit()
@@ -140,6 +176,37 @@ func _input(event: InputEvent) -> void:
 func press_attack() -> void:
 	_attack_flash = 1.0
 	attack_pressed.emit()
+
+
+func press_slot(slot: int) -> void:
+	if slot < 0 or slot >= rite_slots.size() or rite_slots[slot] == &"":
+		return
+	_slot_flash[slot] = 1.0
+	rite_slot_pressed.emit(slot)
+
+
+## Le bouton de rite refusé clignote en rouge.
+func deny_slot(slot: int) -> void:
+	if slot >= 0 and slot < 3:
+		_slot_denied[slot] = 1.0
+
+
+func _slot_at(point: Vector2) -> int:
+	for i in 3:
+		if i < rite_slots.size() and rite_slots[i] != &"" and point.distance_to(slot_center(i)) <= SLOT_RADIUS * 1.2:
+			return i
+	return -1
+
+
+## Les trois rites, en arc au-dessus et à gauche de FRAPPER.
+func slot_center(slot: int) -> Vector2:
+	match slot:
+		0:
+			return Vector2(_pad.size.x - 345.0, _pad.size.y - 280.0)
+		1:
+			return Vector2(_pad.size.x - 262.0, _pad.size.y - 420.0)
+		_:
+			return Vector2(_pad.size.x - 475.0, _pad.size.y - 325.0)
 
 
 func press_dodge() -> void:
@@ -159,7 +226,7 @@ func _pause_center() -> Vector2:
 
 
 func _flask_center() -> Vector2:
-	return Vector2(_pad.size.x - 318.0, _pad.size.y - 232.0)
+	return Vector2(_pad.size.x - 480.0, _pad.size.y - 100.0)
 
 
 func _book_center() -> Vector2:
@@ -211,6 +278,9 @@ func _draw_pad() -> void:
 
 	if flask_count > 0:
 		_draw_button(_flask_center(), FLASK_RADIUS, ACCENT_FLASK, 0.0, &"flask", -1.0, 0.0, str(flask_count))
+	for i in 3:
+		if i < rite_slots.size() and rite_slots[i] != &"":
+			_draw_slot(i)
 	var glow := 0.5 + 0.5 * sin(Time.get_ticks_msec() / 220.0) if book_alert else 0.0
 	_draw_button(_book_center(), BOOK_RADIUS, ACCENT_BOOK, glow * 0.5, &"book", -1.0, 0.0, "", "", glow if book_alert else -1.0)
 	_draw_button(_pause_center(), PAUSE_RADIUS, ACCENT_PAUSE, 0.0, &"pause")
@@ -220,6 +290,26 @@ func _draw_pad() -> void:
 		var kind: StringName = {"COUPER": &"cut", "PARLER": &"talk", "PARTIR": &"leave"}.get(rite_label, &"rest")
 		_draw_button(_rite_center(), RITE_RADIUS, ACCENT_REST, held, kind,
 			rite_progress if rite_progress > 0.0 else -1.0, 0.0, "", rite_label)
+
+
+## Un bouton de rite : son icône, grande, claire quand on peut le payer ; ses
+## losanges de coût en bas ; il clignote en rouge s'il est refusé.
+func _draw_slot(slot: int) -> void:
+	var id := rite_slots[slot]
+	var center := slot_center(slot)
+	var cost := RiteData.cost(id)
+	var ready := embers >= cost
+	var accent := ACCENT_BOOK.lerp(Color(0.9, 0.15, 0.1), _slot_denied[slot])
+	_pad.draw_circle(center + Vector2(0.0, 4.0), SLOT_RADIUS + 3.0, Color(0.0, 0.0, 0.0, 0.36))
+	var body := Color(0.045, 0.05, 0.1, 0.88).lerp(Color(0.45, 0.32, 0.16, 0.92), _slot_flash[slot] * 0.8)
+	_pad.draw_circle(center, SLOT_RADIUS, body)
+	if ready:
+		_pad.draw_circle(center, SLOT_RADIUS - 5.0, Color(accent, 0.12 + 0.06 * sin(Time.get_ticks_msec() / 260.0)))
+	_pad.draw_arc(center, SLOT_RADIUS, 0.0, TAU, 48, Color(accent, 0.95 if ready else 0.45), 3.5, true)
+	_pad.draw_arc(center, SLOT_RADIUS + 4.0, 0.0, TAU, 48, Color(PALE, 0.4 if ready else 0.15), 1.5, true)
+	RiteIcons.draw(_pad, id, center - Vector2(0.0, 6.0), SLOT_RADIUS * 0.6,
+		PALE if ready else Color(0.55, 0.53, 0.62), ACCENT_ATTACK if ready else Color(0.45, 0.4, 0.45))
+	RiteIcons.draw_cost(_pad, cost, center + Vector2(0.0, SLOT_RADIUS * 0.66), 4.5, ready)
 
 
 ## Un bouton : ombre, disque sombre, double liseré aux losanges, icône. `progress`

@@ -38,6 +38,19 @@ const CLASSES := {
 			{"animation": "1H_Melee_Attack_Slice_Horizontal", "damage": 12, "speed": 1.5},
 			{"animation": "1H_Melee_Attack_Chop", "damage": 20, "speed": 1.3},
 		],
+		# Le geste de chaque rite de combat (`RiteData`) : animation, vitesse,
+		# et part de l'animation où le coup porte.
+		"rite_animations": {
+			&"glas": {"animation": "2H_Melee_Attack_Chop", "speed": 1.4, "impact": 0.5},
+			&"linceul": {"animation": "2H_Melee_Attack_Spinning", "speed": 1.2},
+			&"cortege": {"animation": "1H_Melee_Attack_Stab", "speed": 2.4},
+			&"tombee": {"animation": "Jump_Full_Short", "speed": 1.0},
+			&"requiem": {"animation": "2H_Melee_Attack_Slice", "speed": 1.3, "impact": 0.42},
+			&"litanie": {"animation": "1H_Melee_Attack_Slice_Diagonal", "alternate": "1H_Melee_Attack_Slice_Horizontal", "speed": 3.0},
+			&"cierge": {"animation": "Interact", "speed": 1.6, "impact": 0.55},
+			&"absoute": {"animation": "1H_Melee_Attack_Slice_Horizontal", "speed": 1.7, "impact": 0.4},
+			&"rappel": {"animation": "Spellcast_Raise", "speed": 1.7, "impact": 0.55},
+		},
 	},
 	&"briseur": {
 		"name": "Briseur",

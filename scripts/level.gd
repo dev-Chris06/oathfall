@@ -62,6 +62,8 @@ var pause_menu: PauseMenu
 var _camera: GameCamera
 var _guide: Node3D
 var _enemies: Array[Enemy] = []
+## Morts apparus depuis le début du niveau (numéro d'apparition).
+var _spawned := 0
 var _lights: Array[OmniLight3D] = []
 var _light_base: Array[float] = []
 var _time := 0.0
@@ -113,6 +115,8 @@ func _ready() -> void:
 	controls.book_pressed.connect(open_book)
 	controls.pause_pressed.connect(open_pause)
 	hero.flask_drunk.connect(_on_flask_drunk)
+	hero.rite_cast.connect(_on_rite_cast)
+	hero.rite_denied.connect(_on_rite_denied)
 	Progress.leveled_up.connect(_on_leveled_up)
 	Progress.skill_learned.connect(_on_skill_learned)
 	Progress.changed.connect(_refresh_progress)
@@ -353,6 +357,8 @@ func open_gates_before(checkpoint: int) -> void:
 ## d'attaquer.
 func spawn(type_id: StringName, where: Vector3, from_grave := true) -> Enemy:
 	var enemy := Enemy.create(type_id)
+	enemy.spawn_index = _spawned
+	_spawned += 1
 	enemy.position = Vector3(where.x, 0.0, where.z)
 	add_child(enemy)
 	enemy.setup(type_id, hero)
@@ -409,6 +415,8 @@ func _on_enemy_rested(enemy: Enemy) -> void:
 	Progress.note_rest(enemy.type_id_name)
 	Progress.add_memories(enemy.memories_given())
 	Progress.add_gold(enemy.gold_given())
+	# Chaque Repos donné allume une braise pour les rites de combat.
+	Progress.add_ember()
 
 
 # --- Progression --------------------------------------------------------------
@@ -441,9 +449,21 @@ func _refresh_progress() -> void:
 	# Un achat ou un rite appris change les caractéristiques tout de suite.
 	hero.apply_stats(Progress.hero_stats())
 	hero.flasks = Progress.flasks
+	hero.embers = Progress.embers
+	hero.rite_slots = Progress.rite_slots.duplicate()
+	hud.set_embers(Progress.embers)
 	hero.apply_gear(Progress.equipped_map())
 	hud.set_progress(Progress.hero_level, Progress.level_progress(), Progress.gold)
 	controls.book_alert = Progress.skill_points > 0
+
+
+func _on_rite_cast(_rite_id: StringName, cost: int) -> void:
+	Progress.spend_embers(cost)
+
+
+func _on_rite_denied(slot: int, reason: String) -> void:
+	controls.deny_slot(slot)
+	hud.show_message(reason, 1.6)
 
 
 func _on_flask_drunk() -> void:

@@ -70,6 +70,8 @@ var _glide := {}
 var _dive := {}
 var _fade: ColorRect
 var _portraits: HBoxContainer
+## La fiche d'un rite qui vient de s'ouvrir, s'il y en a une.
+var _rite_card: Control
 
 var _chapter_label: Label
 var _chapter_title: Label
@@ -118,6 +120,9 @@ func _ready() -> void:
 	# Un quartier sort de la brume : une cloche sonne au loin.
 	if cinematics and _world.life.is_revealing():
 		Audio.play(&"bell_toll")
+	# Un rite de combat vient de s'ouvrir : il se présente.
+	if cinematics:
+		show_next_rite()
 
 
 ## Le modèle de la carte n'est pas dans l'arbre : il faut le libérer à la main.
@@ -595,6 +600,82 @@ func _show_portraits(dead: Array) -> void:
 		picture.tooltip_text = String(EnemyTypes.TYPES[type_id].get("name", type_id)) if Progress.has_met(type_id) else "?"
 		frame.add_child(picture)
 		_portraits.add_child(frame)
+
+
+# --- Les rites qui s'ouvrent --------------------------------------------------
+
+## Les rites ouverts que le joueur n'a pas encore vus présentés.
+func pending_rites() -> Array[StringName]:
+	var ids: Array[StringName] = []
+	for id in Progress.unlocked_rites():
+		if not Progress.has_seen(StringName("rite_%s" % id)):
+			ids.append(id)
+	return ids
+
+
+## Présente le premier rite pas encore vu : son icône, son animation, ce
+## qu'il fait, et où on le porte. Renvoie faux s'il n'y en a pas.
+func show_next_rite() -> bool:
+	if _rite_card != null and is_instance_valid(_rite_card):
+		_rite_card.queue_free()
+		_rite_card = null
+	var pending := pending_rites()
+	if pending.is_empty():
+		return false
+	var id := pending[0]
+	Progress.mark_seen(StringName("rite_%s" % id))
+	var rite := RiteData.get_rite(id)
+	var veil := ColorRect.new()
+	veil.color = Color(0.0, 0.0, 0.03, 0.72)
+	veil.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	veil.mouse_filter = Control.MOUSE_FILTER_STOP
+	add_child(veil)
+	_rite_card = veil
+	var center := CenterContainer.new()
+	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	veil.add_child(center)
+	var card := PanelContainer.new()
+	card.add_theme_stylebox_override("panel", Theatre.panel_box(0.97))
+	center.add_child(card)
+	var column := VBoxContainer.new()
+	column.add_theme_constant_override("separation", 8)
+	column.custom_minimum_size = Vector2(560.0, 0.0)
+	card.add_child(column)
+	column.add_child(Theatre.label("Nouveau rite de combat", 22, Theatre.MUTED, GameFonts.italic()))
+	var head := HBoxContainer.new()
+	head.add_theme_constant_override("separation", 14)
+	head.add_child(SkillBook.RiteBadge.new(id, 40.0, true))
+	var name_box := VBoxContainer.new()
+	name_box.add_theme_constant_override("separation", 0)
+	name_box.add_child(Theatre.label(rite["name"], 40, Theatre.AMBER, GameFonts.title()))
+	var cost := int(rite["cost"])
+	name_box.add_child(Theatre.label("%s · %d braise%s" % [rite["kind"], cost, "s" if cost > 1 else ""], 18, Theatre.EMBER, GameFonts.italic()))
+	head.add_child(name_box)
+	column.add_child(head)
+	var preview := RitePreview.new(Vector2(560.0, 220.0))
+	preview.rite = id
+	column.add_child(preview)
+	for line: String in [rite["text"], "Quand : " + String(rite["use"])]:
+		var label := Theatre.label(line, 18, Theatre.CREAM if line == rite["text"] else Theatre.MUTED)
+		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		label.custom_minimum_size = Vector2(560.0, 0.0)
+		column.add_child(label)
+	var hint := Theatre.label("Chaque Repos donné allume une braise. Les rites se portent dans le CARNET, onglet Combat.", 16, Theatre.MUTED, GameFonts.italic())
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	hint.custom_minimum_size = Vector2(560.0, 0.0)
+	column.add_child(hint)
+	var ok := Button.new()
+	ok.text = "Compris"
+	Theatre.primary(ok, 22)
+	ok.size_flags_horizontal = Control.SIZE_SHRINK_END
+	ok.pressed.connect(func() -> void: show_next_rite())
+	column.add_child(ok)
+	Audio.play(&"page")
+	return true
+
+
+func rite_card_shown() -> bool:
+	return _rite_card != null and is_instance_valid(_rite_card) and not _rite_card.is_queued_for_deletion()
 
 
 ## Les portraits montrés dans la fiche du lieu (pour les essais).

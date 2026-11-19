@@ -17,8 +17,12 @@ signal rest_given(enemy: Enemy)
 signal interacted
 ## Le héros a fini de boire une fiole : `Level` en retire une et le soigne.
 signal flask_drunk
+## Un rite de combat part : `Level` dépense les braises.
+signal rite_cast(rite_id: StringName, cost: int)
+## Un rite ne peut pas partir : pas assez de braises, ou pas de cible.
+signal rite_denied(slot: int, reason: String)
 
-enum State { MOVE, ATTACK, DODGE, HIT, RITE, DEAD, DRINK }
+enum State { MOVE, ATTACK, DODGE, HIT, RITE, DEAD, DRINK, CAST }
 
 const TURN_SPEED := 16.0
 const ATTACK_RANGE := 2.7
@@ -83,6 +87,16 @@ var rite_enabled := true
 ## Fioles portées, tenues à jour par `Level`.
 var flasks := 0
 var _interact_was_held := false
+## Les rites de combat portés (un par bouton) et les braises pour les payer :
+## donnés par `Level` d'après `Progress`.
+var rite_slots: Array[StringName] = [&"", &"", &""]
+var embers := 0
+## Le dernier Repos donné : où, et quand (pour le Rappel).
+var last_rest_position := Vector3.ZERO
+var last_rest_time := -1.0
+## Temps écoulé depuis le début du niveau.
+var clock := 0.0
+var _rites: HeroRites
 
 
 func setup(class_id: StringName, input: TouchControls) -> void:
@@ -114,6 +128,8 @@ func setup(class_id: StringName, input: TouchControls) -> void:
 	controls.attack_pressed.connect(_on_attack_pressed)
 	controls.dodge_pressed.connect(_on_dodge_pressed)
 	controls.flask_pressed.connect(_on_flask_pressed)
+	controls.rite_slot_pressed.connect(cast_slot)
+	_rites = HeroRites.new(self)
 	_loop(_animation("idle"))
 
 
@@ -121,6 +137,7 @@ func _physics_process(delta: float) -> void:
 	if _model == null:
 		return
 	_state_time += delta
+	clock += delta
 	_dodge_cooldown = maxf(0.0, _dodge_cooldown - delta)
 	var wish := _wish_direction()
 	var body := _nearest_body()
@@ -179,6 +196,10 @@ func _physics_process(delta: float) -> void:
 				flask_drunk.emit()
 		State.DEAD:
 			velocity = Vector3.ZERO
+		State.CAST:
+			if _rites.update(delta):
+				_rites.id = &""
+				state = State.MOVE
 
 	# Le bouton du Repos n'apparaît que près d'un corps, ou d'une corde.
 	var can_interact := interaction_label != "" and body == null and rope == null
@@ -189,6 +210,8 @@ func _physics_process(delta: float) -> void:
 		else (interaction_label if can_interact else "REPOS")
 	_interact_was_held = controls.rite_held
 	controls.rite_progress = _rite_progress if state == State.RITE else 0.0
+	controls.rite_slots = rite_slots
+	controls.embers = embers
 
 	# Les modèles regardent vers +Z.
 	var target_yaw := atan2(_facing.x, _facing.z)
@@ -208,6 +231,9 @@ func is_dead() -> bool:
 func take_damage(amount: int, from: Vector3, attacker: Node = null) -> void:
 	if state == State.DODGE or state == State.DEAD:
 		return
+	# La ruée du Cortège et le bond de la Tombée passent au-dessus des coups.
+	if state == State.CAST and _rites.untouchable():
+		return
 	# Agenouillé (Repos, corde), le bouclier couvre une part des coups.
 	if state == State.RITE and guard > 0.0:
 		amount = maxi(1, int(round(float(amount) * (1.0 - guard))))
@@ -221,7 +247,11 @@ func take_damage(amount: int, from: Vector3, attacker: Node = null) -> void:
 	_rite_target = null
 	_cut_target = null
 	_rite_progress = 0.0
+	# Pendant un rite, le coup blesse sans interrompre le geste.
+	if state == State.CAST and health > 0:
+		return
 	if health == 0:
+		_rites.finish()
 		state = State.DEAD
 		_state_time = 0.0
 		_once(_animation("death"), 1.0)
@@ -299,8 +329,10 @@ func _on_flask_pressed() -> void:
 func _on_dodge_pressed() -> void:
 	if _dodge_cooldown > 0.0:
 		return
-	if state != State.MOVE and state != State.ATTACK and state != State.RITE and state != State.DRINK:
+	if state != State.MOVE and state != State.ATTACK and state != State.RITE and state != State.DRINK and state != State.CAST:
 		return
+	if state == State.CAST:
+		_rites.finish()
 	var wish := _wish_direction()
 	_dodge_direction = wish.normalized() if wish.length() > 0.1 else _facing
 	_facing = _dodge_direction
@@ -441,11 +473,80 @@ func _update_rite(delta: float) -> void:
 		_rite_target = null
 		_rite_progress = 0.0
 		state = State.MOVE
+		last_rest_position = body.body_position()
+		last_rest_time = clock
 		body.give_rest()
 		if rest_heal > 0:
 			heal(rest_heal)
 		Audio.play(&"rest_done")
 		rest_given.emit(body)
+
+
+# --- Rites de combat -----------------------------------------------------------
+
+## Lance le rite porté à l'emplacement `slot`, s'il y a assez de braises et une
+## raison de le faire. Renvoie vrai s'il part.
+func cast_slot(slot: int) -> bool:
+	if state != State.MOVE and state != State.ATTACK:
+		return false
+	if slot < 0 or slot >= rite_slots.size() or rite_slots[slot] == &"":
+		return false
+	var rite_id := rite_slots[slot]
+	var cost := RiteData.cost(rite_id)
+	if embers < cost:
+		rite_denied.emit(slot, "Pas assez de braises : donne le Repos aux morts.")
+		return false
+	var reason := _rites.check(rite_id)
+	if reason != "":
+		rite_denied.emit(slot, reason)
+		return false
+	embers -= cost
+	state = State.CAST
+	_state_time = 0.0
+	_queued = false
+	_rites.start(rite_id)
+	rite_cast.emit(rite_id, cost)
+	return true
+
+
+## Le rite en cours, ou &"" .
+func current_rite() -> StringName:
+	return _rites.id if state == State.CAST else &""
+
+
+func class_data() -> Dictionary:
+	return _data
+
+
+func wish() -> Vector3:
+	return _wish_direction()
+
+
+func facing() -> Vector3:
+	return _facing
+
+
+func face(direction: Vector3) -> void:
+	if direction.length() > 0.01:
+		_facing = Vector3(direction.x, 0.0, direction.z).normalized()
+
+
+func play_once(anim_name: String, speed: float) -> float:
+	return _once(anim_name, speed)
+
+
+func play_loop(anim_name: String, speed: float) -> void:
+	if _anim == null or not _anim.has_animation(anim_name):
+		return
+	_anim.get_animation(anim_name).loop_mode = Animation.LOOP_LINEAR
+	_anim.play(anim_name, 0.1, speed)
+
+
+## Soulève le modèle (le bond de la Tombée) sans quitter le sol : les murs
+## arrêtent toujours le héros.
+func lift(height: float) -> void:
+	if _model != null:
+		_model.position.y = height
 
 
 # --- Animations ---------------------------------------------------------------

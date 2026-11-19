@@ -257,7 +257,9 @@ Retour de l'auteur encore attendu : les sensations de combat sur téléphone
 | `scripts/levels/arena.gd` | Salle d'essai, utilisée par le test automatique |
 | `scripts/progress.gd` | Chargé en permanence (`Progress`) : souvenirs, niveau, or, compétences, sauvegarde |
 | `scripts/skill_book.gd` | Le carnet : écran des compétences |
-| `scripts/hero.gd` | Le héros : états MOVE, ATTACK, DODGE, HIT, RITE, DEAD |
+| `scripts/hero.gd` | Le héros : états MOVE, ATTACK, DODGE, HIT, RITE, DEAD, DRINK, CAST (rite de combat) |
+| `scripts/data/rites.gd`, `scripts/rites/` | Les rites de combat (`RiteData`) ; leur exécution (`HeroRites`), le cierge, la lame de l'Absoute, l'allié du Rappel |
+| `scripts/ui/rite_icons.gd`, `rite_preview.gd` | Icônes des rites, dessinées en code ; courte animation de chaque rite (carnet, découverte) |
 | `scripts/enemy.gd` | Un mort : CHASE, WINDUP, STAGGER, DOWN, RISING, RESTED |
 | `scripts/touch_controls.gd` | Joystick, boutons tactiles, clavier |
 | `scripts/game_camera.gd` | Caméra qui suit le héros et tremble à l'impact |
@@ -414,7 +416,11 @@ Règles à garder :
 - **Sol** : `pave()` dessine tous les carreaux en un seul appel. Ne pas
   poser les carreaux un par un.
 - **Entrées** : le jeu ne lit que `TouchControls.move`, `rite_held` et les
-  signaux `attack_pressed`, `dodge_pressed`, `flask_pressed` et `book_pressed`.
+  signaux `attack_pressed`, `dodge_pressed`, `flask_pressed`, `book_pressed`
+  et `rite_slot_pressed`.
+- **Hasard du joueur automatique** : jamais l'identifiant interne d'un objet
+  (`get_instance_id`) pour décider : il change dès qu'un objet de plus est
+  créé (un élément d'interface suffit). Utiliser `Enemy.spawn_index`.
 - **Caractéristiques du héros** : la progression les calcule
   (`Progress.hero_stats()`) et le niveau les applique avec
   `hero.apply_stats()`. Le héros ne lit jamais `Progress` lui-même.
@@ -423,6 +429,24 @@ Règles à garder :
   test qui réussit une fois doit réussir toujours.
 - **Tests et sauvegarde** : en mode test ou capture, `Main` écrit dans
   `user://essai.json`, jamais dans la vraie sauvegarde du joueur.
+
+**Les rites de combat** (`RiteData`) : les attaques spéciales. Chaque Repos
+donné allume une **braise** (cinq au plus, gardées par la sauvegarde) ; un
+rite coûte une à trois braises, rien ne se recharge avec le temps. Trois
+rites portés, un bouton chacun en arc autour de FRAPPER (icône dessinée en
+code, coût en losanges, **nom dessous**) ; clavier 1, 2, 3. Neuf rites : Glas
+(onde qui renverse), Linceul (tourbillon), Cortège (ruée qui traverse),
+Tombée (bond, impact), Requiem (garde fendue : le coup suivant abat), Litanie
+(cinq coups, le dernier abat), Cierge (zone où les corps ne se relèvent pas),
+Absoute (lame qui file), Rappel (un mort apaisé combat pour le héros, après
+le Sceau des Armes). Chacun s'ouvre avec un niveau (`unlock`), se présente
+une fois sur la carte avec son animation (`WorldMap.show_next_rite`), se
+porte dans le carnet (onglet Combat). Un rite n'est pas interrompu par les
+coups (il blesse quand même) ; la ruée et le bond sont intouchables et
+traversent les morts. Renverser un boss ne l'abat pas : il encaisse
+`boss_damage`. Valeurs dans `rites.gd`, gestes dans `hero_classes.gd`
+(`rite_animations`). Le test vérifie chaque rite dans l'arène ; le joueur
+automatique les lance quand la situation s'y prête.
 
 **Le son** : un nouveau bruit s'ajoute à `Audio.EVENTS` (fichier dans
 `assets/audio/sfx/`, ou `kenney/`) et s'appelle par `Audio.play(&"nom")` ; le

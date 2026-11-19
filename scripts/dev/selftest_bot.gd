@@ -72,6 +72,8 @@ func _physics_process(delta: float) -> void:
 	if _levy_step(level, hero, controls):
 		return
 	_drink_if_needed(level, hero, controls)
+	if _use_rite(level, hero, controls, delta):
+		return
 
 	var target := _choose_target(hero)
 	if target != null:
@@ -175,13 +177,66 @@ func _dodge_if_needed(level: Level, hero: Hero, controls: TouchControls) -> void
 		elif enemy.state == Enemy.State.WINDUP and not enemy._struck:
 			var close := enemy.global_position.distance_to(hero.global_position) < maxf(2.6, float(enemy._type["attack_range"]) + 0.4)
 			threat = close and enemy._state_time > float(enemy._type["attack_windup"]) - 0.25 \
-				and (enemy.get_instance_id() % 4 != 0 or bool(enemy._type.get("armor", false)))
+				and (enemy.spawn_index % 4 != 0 or bool(enemy._type.get("armor", false)))
 		if threat:
 			var away := hero.global_position - enemy.global_position
 			var side := Vector2(away.x, away.z).normalized().orthogonal()
 			controls.simulated_move = side
 			controls.press_dodge()
 			return
+
+
+## Les rites lancés par le joueur automatique, par rite (bilan des essais).
+var rites_cast := {}
+var _rite_wait := 0.0
+
+
+## Lance un rite de combat quand la situation s'y prête : encerclé (Glas,
+## Linceul, Cortège), un groupe au loin (Tombée), une cible précise ou à
+## armure (Requiem, Litanie), un archer (Absoute), des corps qui vont se
+## relever près d'une cloche ou d'un boss (Cierge). Renvoie vrai s'il en lance un.
+func _use_rite(level: Level, hero: Hero, controls: TouchControls, delta: float) -> bool:
+	_rite_wait -= delta
+	if _rite_wait > 0.0 or (hero.state != Hero.State.MOVE and hero.state != Hero.State.ATTACK):
+		return false
+	_rite_wait = 0.5
+	var near := 0
+	var far := 0
+	var precise := false
+	var armored := false
+	var archer := false
+	var boss := false
+	for enemy in level.enemies():
+		if not enemy.is_standing():
+			continue
+		var distance := enemy.global_position.distance_to(hero.global_position)
+		if distance < 4.2:
+			near += 1
+		elif distance < 9.0:
+			far += 1
+		if distance < 3.0 and (enemy is CrierEnemy or enemy is Widow or enemy is BellRinger):
+			precise = true
+		if distance < 3.0 and (bool(enemy._type.get("armor", false)) or enemy.is_boss()):
+			armored = true
+		if enemy is ArcherEnemy and distance < 13.0:
+			archer = true
+		if enemy.is_boss():
+			boss = true
+	var bodies := get_tree().get_nodes_in_group(&"bodies").size()
+	var want := {
+		&"glas": near >= 3, &"linceul": near >= 2, &"cortege": near >= 3, &"tombee": far >= 3,
+		&"requiem": armored, &"litanie": precise, &"absoute": archer and near == 0,
+		&"cierge": bodies >= 2 and boss and get_tree().get_nodes_in_group(&"candles").is_empty(),
+		&"rappel": near >= 2,
+	}
+	for slot in hero.rite_slots.size():
+		var rite_id := hero.rite_slots[slot]
+		if rite_id != &"" and want.get(rite_id, false) and hero.embers >= RiteData.cost(rite_id):
+			controls.press_slot(slot)
+			if hero.state == Hero.State.CAST:
+				rites_cast[rite_id] = int(rites_cast.get(rite_id, 0)) + 1
+				return true
+	return false
 
 
 ## Un joueur boit une fiole quand sa vie est basse et qu'aucun coup n'est armé
@@ -303,6 +358,8 @@ func _run() -> void:
 	if not await _peseur_tests():
 		return
 	if not await _prevot_tests():
+		return
+	if not await _rite_tests():
 		return
 	if not await _trigger_tests():
 		return
@@ -1735,8 +1792,9 @@ func _traverse(id: StringName) -> bool:
 		return _fail("%s n'a pas été terminé (%d chutes)" % [id, falls[0]])
 	if not Progress.is_completed(id):
 		return _fail("la fin de %s n'a pas été enregistrée" % id)
-	print("test réussi : %s terminé, niveau %d, %d d'or, %d chute(s)" % [
-		_level().title, Progress.hero_level, Progress.gold, falls[0]])
+	print("test réussi : %s terminé, niveau %d, %d d'or, %d chute(s), rites lancés : %s" % [
+		_level().title, Progress.hero_level, Progress.gold, falls[0], rites_cast])
+	rites_cast.clear()
 	return true
 
 
@@ -1946,6 +2004,23 @@ func _map_life_tests() -> bool:
 	map._set_zoom(1.0)
 	print("test 12 réussi : la fiche du lieu montre ses morts, le zoom est borné")
 
+	# Un rite qui vient de s'ouvrir se présente une fois, avec son animation.
+	for key: String in Progress.seen.keys():
+		if key.begins_with("rite_"):
+			Progress.seen.erase(key)
+	var pending := map.pending_rites()
+	if not pending.has(&"glas"):
+		return _fail("le Glas, ouvert par la Grille, ne se présente pas sur la carte")
+	var shown := 0
+	while map.show_next_rite():
+		shown += 1
+		if not map.rite_card_shown() or map._rite_card.find_children("*", "RitePreview", true, false).is_empty():
+			return _fail("la fiche du rite nouveau n'a pas d'animation")
+	if shown != pending.size() or not map.pending_rites().is_empty():
+		return _fail("les rites nouveaux ne se présentent pas chacun une fois")
+	await get_tree().process_frame
+	print("test 12 réussi : chaque rite qui s'ouvre se présente une fois sur la carte")
+
 	# La plongée : le corbeau vole, la caméra plonge, puis le niveau s'ouvre.
 	map.cinematics = true
 	map.select_level(&"la_grille")
@@ -1961,6 +2036,247 @@ func _map_life_tests() -> bool:
 		return _fail("la plongée ne mène pas au niveau")
 	print("test 12 réussi : la plongée du corbeau mène au niveau")
 	return true
+
+
+## Les rites de combat : les braises, puis chacun des neuf rites dans l'arène,
+## le carnet, les icônes et les animations, la sauvegarde.
+func _rite_tests() -> bool:
+	main.load_level(&"arena")
+	await get_tree().process_frame
+	var arena := _level() as Arena
+	var hero := arena.hero
+	_passive = true
+	await _frames(10)
+
+	# Les rites s'ouvrent avec les niveaux, et prennent les emplacements libres.
+	Progress.completed.clear()
+	Progress.rite_slots = [&"", &"", &""]
+	if not Progress.unlocked_rites().is_empty():
+		return _fail("des rites sont ouverts sans niveau terminé")
+	Progress.mark_completed(&"la_grille")
+	if Progress.rite_slots != [&"glas", &"linceul", &"cortege"]:
+		return _fail("les rites de la Grille ne prennent pas les emplacements : %s" % [Progress.rite_slots])
+	if Progress.rite_unlocked(&"rappel"):
+		return _fail("le Rappel s'ouvre avant le Sceau des Armes")
+
+	# Un Repos donné allume une braise ; sans braise, pas de rite.
+	Progress.embers = 0
+	var first := arena.spawn(&"depouille", Vector3(0.0, 0.0, -3.0), false)
+	first.take_hit(hero.global_position, 999)
+	first.give_rest()
+	await _frames(2)
+	if Progress.embers != 1 or hero.embers != 1 or arena.hud.embers_shown() != 1:
+		return _fail("un Repos n'allume pas de braise (%d)" % Progress.embers)
+	Progress.embers = 0
+	Progress.add_ember()
+	Progress.embers = 0
+	await _frames(1)
+	if hero.cast_slot(0):
+		return _fail("le Glas part sans braises")
+
+	var checks := {
+		&"glas": func() -> String:
+			var foes: Array[Enemy] = []
+			for k in 3:
+				foes.append(arena.spawn(&"depouille", Vector3(cos(k * 2.1) * 2.5, 0.0, sin(k * 2.1) * 2.5), false))
+			if not _cast(hero, &"glas"):
+				return "il ne part pas"
+			await get_tree().create_timer(1.4).timeout
+			for foe in foes:
+				if not foe.is_down():
+					return "un mort à 2,5 m reste debout"
+			if Progress.embers != RiteData.MAX_EMBERS - 3:
+				return "il ne coûte pas trois braises (%d)" % Progress.embers
+			return "",
+		&"linceul": func() -> String:
+			var foes: Array[Enemy] = [arena.spawn(&"depouille", Vector3(1.8, 0.0, 0.0), false), arena.spawn(&"depouille", Vector3(-1.8, 0.0, 0.0), false)]
+			if not _cast(hero, &"linceul"):
+				return "il ne part pas"
+			await get_tree().create_timer(2.3).timeout
+			for foe in foes:
+				if foe.is_standing() and foe.health >= foe.max_health():
+					return "un mort tout près n'est pas touché"
+			return "",
+		&"cortege": func() -> String:
+			var foe := arena.spawn(&"depouille", Vector3(0.0, 0.0, -4.0), false)
+			var start := hero.global_position
+			hero.face(Vector3(0.0, 0.0, -1.0))
+			if not _cast(hero, &"cortege"):
+				return "il ne part pas"
+			if not hero._rites.untouchable():
+				return "la ruée n'est pas intouchable"
+			await get_tree().create_timer(0.7).timeout
+			if hero.global_position.distance_to(start) < 4.0:
+				return "la ruée n'avance pas (%.1f m)" % hero.global_position.distance_to(start)
+			if foe.is_standing() and foe.health >= foe.max_health():
+				return "le mort sur le chemin n'est pas frappé"
+			return "",
+		&"tombee": func() -> String:
+			var foes: Array[Enemy] = []
+			for offset: Vector3 in [Vector3(0.0, 0.0, -7.0), Vector3(1.0, 0.0, -7.5), Vector3(-1.0, 0.0, -6.5)]:
+				foes.append(arena.spawn(&"depouille", offset, false))
+			if not _cast(hero, &"tombee"):
+				return "il ne part pas"
+			await get_tree().create_timer(1.1).timeout
+			if hero.global_position.distance_to(Vector3(0.0, 0.0, -7.0)) > 3.0:
+				return "le bond ne mène pas au groupe"
+			for foe in foes:
+				if not foe.is_down():
+					return "un mort du groupe reste debout"
+			return "",
+		&"requiem": func() -> String:
+			var foe := arena.spawn(&"boucher", Vector3(0.0, 0.0, -2.2), false)
+			# Figé : il ne charge ni ne frappe pendant l'essai.
+			foe.set_physics_process(false)
+			if not _cast(hero, &"requiem"):
+				return "il ne part pas"
+			await get_tree().create_timer(1.1).timeout
+			if not foe.is_rent():
+				return "la garde du Boucher n'est pas fendue"
+			foe.take_hit(hero.global_position, 1)
+			if not foe.is_down():
+				return "le coup suivant n'abat pas le mort fendu"
+			return "",
+		&"litanie": func() -> String:
+			var foe := arena.spawn(&"crieur", Vector3(0.0, 0.0, -2.0), false)
+			if not _cast(hero, &"litanie"):
+				return "il ne part pas"
+			await get_tree().create_timer(1.3).timeout
+			if not foe.is_down():
+				return "le Crieur n'est pas abattu par la rafale"
+			return "",
+		&"cierge": func() -> String:
+			var foe := arena.spawn(&"depouille", Vector3(1.5, 0.0, 0.0), false)
+			foe.take_hit(hero.global_position, 999)
+			foe.rise_delay = 1.0
+			if not _cast(hero, &"cierge"):
+				return "il ne part pas"
+			await get_tree().create_timer(2.5).timeout
+			if not foe.is_down() or foe.rise_rate() != 0.0:
+				return "le corps dans la lueur se relève"
+			for candle in get_tree().get_nodes_in_group(&"candles"):
+				candle.queue_free()
+			await _frames(2)
+			foe.give_rest()
+			return "",
+		&"absoute": func() -> String:
+			var foe := arena.spawn(&"depouille", Vector3(0.0, 0.0, -9.0), false)
+			hero.face(Vector3(0.0, 0.0, -1.0))
+			if not _cast(hero, &"absoute"):
+				return "il ne part pas"
+			await get_tree().create_timer(1.2).timeout
+			if foe.is_standing() and foe.health >= foe.max_health():
+				return "la lame n'a pas touché le mort à 9 m"
+			return "",
+		&"rappel": func() -> String:
+			hero.last_rest_time = -1.0
+			Progress.embers = RiteData.MAX_EMBERS
+			Progress.rite_slots = [&"rappel", &"", &""]
+			hero.embers = RiteData.MAX_EMBERS
+			hero.rite_slots = Progress.rite_slots.duplicate()
+			if hero.cast_slot(0):
+				return "il part sans Repos donné"
+			hero.last_rest_position = hero.global_position + Vector3(1.0, 0.0, 0.0)
+			hero.last_rest_time = hero.clock
+			var foe := arena.spawn(&"depouille", Vector3(5.0, 0.0, 0.0), false)
+			if not _cast(hero, &"rappel"):
+				return "il ne part pas"
+			if not await _until(func() -> bool: return not get_tree().get_nodes_in_group(&"hittable").has(foe) or foe.health < foe.max_health(), 6.0):
+				return "le mort rappelé ne frappe pas"
+			return "",
+	}
+	for rite_id: StringName in RiteData.ORDER:
+		_clear_arena(arena)
+		await _frames(3)
+		hero.global_position = Vector3.ZERO
+		hero.heal(1000)
+		hero.state = Hero.State.MOVE
+		var problem: String = await (checks[rite_id] as Callable).call()
+		if problem != "":
+			return _fail("rite %s : %s" % [RiteData.RITES[rite_id]["name"], problem])
+		await get_tree().create_timer(0.6).timeout
+	_clear_arena(arena)
+	await _frames(3)
+	print("test réussi : les braises, et les neuf rites de combat (%s)" % ", ".join(RiteData.ORDER.map(func(id: StringName) -> String: return RiteData.RITES[id]["name"])))
+
+	# Requiem sans cible : refusé, sans rien coûter.
+	Progress.embers = RiteData.MAX_EMBERS
+	Progress.rite_slots = [&"requiem", &"", &""]
+	hero.embers = RiteData.MAX_EMBERS
+	hero.rite_slots = Progress.rite_slots.duplicate()
+	if hero.cast_slot(0) or Progress.embers != RiteData.MAX_EMBERS:
+		return _fail("le Requiem part, ou coûte, sans mort à portée")
+
+	# Le carnet : on voit un rite, on le porte ; l'animation tourne même en pause.
+	for level_id: StringName in [&"la_grille", &"les_allees", &"la_chapelle", &"l_ossuaire", &"la_fosse", &"les_etals"]:
+		Progress.mark_completed(level_id)
+	arena.open_book()
+	await get_tree().process_frame
+	var book := arena.book
+	book.show_rite(&"litanie")
+	if not book.wear_rite(1) or Progress.rite_slots[1] != &"litanie":
+		return _fail("le carnet ne porte pas la Litanie à l'emplacement 2")
+	book.show_rite(&"rappel")
+	if book.wear_rite(2):
+		return _fail("le carnet porte un rite encore fermé")
+	var previews := book.find_children("*", "RitePreview", true, false)
+	if previews.is_empty():
+		return _fail("le carnet ne montre pas l'animation du rite")
+	var preview := previews[0] as RitePreview
+	var before := preview.phase()
+	await _frames(20)
+	if is_equal_approx(preview.phase(), before):
+		return _fail("l'animation du rite ne tourne pas, carnet ouvert")
+	book.close_book()
+	await get_tree().process_frame
+
+	# Chaque rite a son animation et son icône (elles se dessinent sans erreur).
+	var canvas := Control.new()
+	canvas.size = Vector2(400.0, 300.0)
+	arena.hud.add_child(canvas)
+	canvas.draw.connect(func() -> void:
+		for k in RiteData.ORDER.size():
+			RiteIcons.draw(canvas, RiteData.ORDER[k], Vector2(40.0 + 40.0 * k, 40.0), 18.0))
+	for rite_id: StringName in RiteData.ORDER:
+		var anim := RitePreview.new(Vector2(160.0, 90.0))
+		anim.rite = rite_id
+		canvas.add_child(anim)
+	canvas.queue_redraw()
+	await _frames(10)
+	canvas.queue_free()
+
+	# Braises et emplacements sont gardés par la sauvegarde.
+	Progress.embers = 4
+	Progress.rite_slots = [&"tombee", &"glas", &"absoute"]
+	Progress.save()
+	Progress.reset()
+	Progress.load_save()
+	if Progress.embers != 4 or Progress.rite_slots != [&"tombee", &"glas", &"absoute"]:
+		return _fail("braises ou rites portés perdus à la sauvegarde : %d, %s" % [Progress.embers, Progress.rite_slots])
+	_passive = false
+	print("test réussi : le carnet porte les rites, animations et icônes, sauvegarde")
+	return true
+
+
+## Lance un rite comme le ferait le joueur, avec toutes les braises.
+func _cast(hero: Hero, rite_id: StringName) -> bool:
+	Progress.embers = RiteData.MAX_EMBERS
+	Progress.rite_slots = [rite_id, &"", &""]
+	hero.embers = RiteData.MAX_EMBERS
+	hero.rite_slots = Progress.rite_slots.duplicate()
+	return hero.cast_slot(0)
+
+
+func _clear_arena(arena: Arena) -> void:
+	for enemy in arena.enemies().duplicate():
+		arena._enemies.erase(enemy)
+		enemy.queue_free()
+	for group: StringName in [&"bodies", &"candles"]:
+		for node in get_tree().get_nodes_in_group(group):
+			node.queue_free()
+	for node in arena.get_children():
+		if node is RiteAlly or node is RiteBlade:
+			node.queue_free()
 
 
 func _frames(count: int) -> void:
@@ -2374,6 +2690,22 @@ func _capture_map() -> void:
 	await get_tree().create_timer(0.3).timeout
 	await _shoot("map_09_pres")
 	map._set_zoom(1.0)
+	# Les rites : la fiche d'un rite qui s'ouvre, le carnet, les boutons en jeu.
+	for level_id: StringName in [&"la_grille", &"les_allees", &"la_chapelle", &"l_ossuaire"]:
+		Progress.mark_completed(level_id)
+	Progress.embers = 3
+	map.show_next_rite()
+	await get_tree().create_timer(1.2).timeout
+	await _shoot("map_12_rite_nouveau")
+	while map.show_next_rite():
+		pass
+	map.open_book()
+	await get_tree().process_frame
+	map._book.show_rite(&"tombee")
+	await get_tree().create_timer(1.0).timeout
+	await _shoot("map_13_carnet_combat")
+	map._book.close_book()
+	await get_tree().create_timer(0.2).timeout
 	map.cinematics = true
 	map.select_level(&"la_chapelle")
 	map.enter_selected()
@@ -2381,6 +2713,8 @@ func _capture_map() -> void:
 	await _shoot("map_10_plongee_a")
 	await get_tree().create_timer(0.55).timeout
 	await _shoot("map_11_plongee_b")
+	await get_tree().create_timer(2.5).timeout
+	await _shoot("map_14_jeu_rites")
 	get_tree().quit(0)
 
 

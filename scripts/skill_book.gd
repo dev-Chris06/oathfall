@@ -14,8 +14,10 @@ signal leave_requested
 ## Vrai quand le carnet est ouvert en plein niveau : il propose alors de le
 ## quitter.
 var can_leave := false
-## L'onglet de la page de droite : « rites » ou « equipement ».
+## L'onglet de la page de droite : « rites », « combat » ou « equipement ».
 var tab := &"rites"
+## Le rite de combat montré dans l'onglet « combat ».
+var shown_rite: StringName = &""
 
 var _left: CutPage
 var _right: CutPage
@@ -161,11 +163,11 @@ func _fill_right() -> void:
 	var page := _right.column
 	var head := HBoxContainer.new()
 	head.add_theme_constant_override("separation", 10)
-	head.add_child(Theatre.label("Rites" if tab == &"rites" else "Équipement", 50, Theatre.AMBER, GameFonts.title()))
+	head.add_child(Theatre.label({&"rites": "Rites", &"combat": "Combat", &"equipement": "Équipement"}[tab], 50, Theatre.AMBER, GameFonts.title()))
 	var spacer := Control.new()
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	head.add_child(spacer)
-	for entry: Array in [[&"rites", "Rites"], [&"equipement", "Équipement"]]:
+	for entry: Array in [[&"rites", "Rites"], [&"combat", "Combat"], [&"equipement", "Équipement"]]:
 		var button := Button.new()
 		button.text = entry[1]
 		Theatre.pill(button, 18, Theatre.AMBER if tab == entry[0] else Theatre.MUTED)
@@ -175,6 +177,9 @@ func _fill_right() -> void:
 	page.add_child(_rule())
 	if tab == &"equipement":
 		_fill_equipment(page)
+		return
+	if tab == &"combat":
+		_fill_combat(page)
 		return
 	for skill: Dictionary in Progression.skills_for(Progress.class_id):
 		page.add_child(_skill_entry(skill))
@@ -187,6 +192,118 @@ func _fill_right() -> void:
 	var summary := Theatre.label(note, 18, Theatre.AMBER if not known.is_empty() else Theatre.MUTED, GameFonts.italic())
 	summary.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	page.add_child(summary)
+
+
+# --- Onglet « Combat » : les rites de combat ------------------------------------
+
+## Montre un rite de combat, comme si le joueur avait touché son icône.
+func show_rite(rite_id: StringName) -> void:
+	shown_rite = rite_id
+	tab = &"combat"
+	_refresh()
+
+
+## Porte le rite montré à l'emplacement `slot`.
+func wear_rite(slot: int) -> bool:
+	var done := Progress.equip_rite(shown_rite, slot)
+	_refresh()
+	return done
+
+
+## Le rite montré : son animation, sa fiche, les trois emplacements ; puis
+## les neuf rites, en icônes, leur nom dessous.
+func _fill_combat(page: VBoxContainer) -> void:
+	if shown_rite == &"":
+		for id in Progress.rite_slots:
+			if id != &"":
+				shown_rite = id
+				break
+		if shown_rite == &"":
+			shown_rite = RiteData.ORDER[0]
+	var rite := RiteData.get_rite(shown_rite)
+	var open := Progress.rite_unlocked(shown_rite)
+	var preview := RitePreview.new(Vector2(520.0, 172.0))
+	preview.rite = shown_rite
+	page.add_child(preview)
+
+	var info := HBoxContainer.new()
+	info.add_theme_constant_override("separation", 12)
+	var badge := RiteBadge.new(shown_rite, 54.0, open)
+	info.add_child(badge)
+	var lines := VBoxContainer.new()
+	lines.add_theme_constant_override("separation", 0)
+	lines.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var title := HBoxContainer.new()
+	title.add_theme_constant_override("separation", 12)
+	title.add_child(Theatre.label(rite["name"], 26, Theatre.CREAM if open else Theatre.MUTED))
+	var cost := int(rite["cost"])
+	title.add_child(Theatre.label("%s · %d braise%s" % [String(rite["kind"]).to_lower(), cost, "s" if cost > 1 else ""], 16, Theatre.EMBER, GameFonts.italic()))
+	lines.add_child(title)
+	var text := Theatre.label(rite["text"] if open else RiteData.unlock_text(shown_rite), 16, Theatre.MUTED, GameFonts.italic())
+	text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	lines.add_child(text)
+	info.add_child(lines)
+	page.add_child(info)
+
+	var slots := HBoxContainer.new()
+	slots.add_theme_constant_override("separation", 8)
+	slots.add_child(Theatre.label("Porter :", 18, Theatre.AMBER))
+	for i in RiteData.SLOTS:
+		var worn: StringName = Progress.rite_slots[i]
+		var button := Button.new()
+		button.text = "%d · %s" % [i + 1, RiteData.RITES[worn]["name"] if worn != &"" else "vide"]
+		Theatre.pill(button, 16, Theatre.AMBER if worn == shown_rite else Theatre.MUTED)
+		button.disabled = not open
+		button.pressed.connect(wear_rite.bind(i))
+		slots.add_child(button)
+	page.add_child(slots)
+
+	var grid := GridContainer.new()
+	grid.columns = 5
+	grid.add_theme_constant_override("h_separation", 6)
+	grid.add_theme_constant_override("v_separation", 2)
+	for id: StringName in RiteData.ORDER:
+		var cell := VBoxContainer.new()
+		cell.add_theme_constant_override("separation", 0)
+		cell.custom_minimum_size = Vector2(98.0, 0.0)
+		var unlocked := Progress.rite_unlocked(id)
+		var icon := RiteBadge.new(id, 44.0, unlocked, id == shown_rite)
+		icon.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		icon.pressed.connect(show_rite.bind(id))
+		cell.add_child(icon)
+		var name_label := Theatre.label(RiteData.RITES[id]["name"], 15, Theatre.CREAM if unlocked else Theatre.MUTED)
+		name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		cell.add_child(name_label)
+		grid.add_child(cell)
+	page.add_child(grid)
+
+
+## Une icône de rite cliquable : un disque sombre, l'icône dessinée en code,
+## pâle si le rite est ouvert, sombre sinon ; liseré d'or s'il est montré.
+class RiteBadge extends Button:
+	var rite_id: StringName
+	var radius := 44.0
+	var open := true
+	var chosen := false
+
+	func _init(id: StringName, r: float, unlocked: bool, selected := false) -> void:
+		rite_id = id
+		radius = r
+		open = unlocked
+		chosen = selected
+		custom_minimum_size = Vector2(r * 1.6, r * 1.6)
+		flat = true
+		focus_mode = Control.FOCUS_NONE
+		process_mode = Node.PROCESS_MODE_ALWAYS
+		draw.connect(_paint)
+
+	func _paint() -> void:
+		var c := size / 2.0
+		var r := minf(size.x, size.y) / 2.0 - 2.0
+		draw_circle(c, r, Color(0.045, 0.05, 0.1, 0.95))
+		draw_arc(c, r, 0.0, TAU, 40, Color(Theatre.AMBER, 0.95 if chosen else (0.55 if open else 0.2)), 3.0 if chosen else 2.0, true)
+		RiteIcons.draw(self, rite_id, c, r * 0.62, Theatre.CREAM if open else Color(0.3, 0.3, 0.38),
+			Theatre.EMBER if open else Color(0.3, 0.28, 0.34))
 
 
 ## L'équipement porté : le héros qui tourne, et ce qu'on possède par emplacement.

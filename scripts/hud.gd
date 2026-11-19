@@ -17,6 +17,7 @@ var _boss_fill: ColorRect
 var _boss_label: Label
 var _guide: Polygon2D
 var _balance: BalanceMeter
+var _embers: EmberGauge
 
 
 func _ready() -> void:
@@ -61,11 +62,16 @@ func _ready() -> void:
 	_level_label = _make_label(18, Color(1.0, 0.93, 0.78))
 	_level_label.position = Vector2(BAR_SIZE.x + 40.0, 18.0)
 
+	# Sous les souvenirs, les braises des rites de combat.
+	_embers = EmberGauge.new()
+	_embers.position = Vector2(25.0, 64.0)
+	add_child(_embers)
+
 	_info = _make_label(18, Color(0.85, 0.9, 1.0))
-	_info.position = Vector2(24.0, 64.0)
+	_info.position = Vector2(24.0, 86.0)
 
 	_debug = _make_label(13, Color(1.0, 1.0, 1.0, 0.5))
-	_debug.position = Vector2(24.0, 92.0)
+	_debug.position = Vector2(24.0, 112.0)
 
 	_message = _make_label(34, Color(1.0, 0.93, 0.78))
 	# Toute la largeur de l'écran : le texte se centre quelle que soit sa longueur.
@@ -78,6 +84,36 @@ func _ready() -> void:
 	_balance = BalanceMeter.new()
 	_balance.visible = false
 	add_child(_balance)
+
+
+func set_embers(count: int) -> void:
+	_embers.count = count
+	_embers.queue_redraw()
+
+
+func embers_shown() -> int:
+	return _embers.count
+
+
+## Les braises : cinq losanges, allumés un par Repos donné.
+class EmberGauge extends Control:
+	var count := 0
+
+	func _init() -> void:
+		custom_minimum_size = Vector2(130.0, 18.0)
+		size = custom_minimum_size
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	func _draw() -> void:
+		for k in RiteData.MAX_EMBERS:
+			var at := Vector2(9.0 + 22.0 * k, 9.0)
+			var points := PackedVector2Array([at + Vector2(0.0, -8.0), at + Vector2(8.0, 0.0), at + Vector2(0.0, 8.0), at + Vector2(-8.0, 0.0)])
+			if k < count:
+				draw_circle(at, 11.0, Color(1.0, 0.54, 0.35, 0.25))
+				draw_colored_polygon(points, Color(1.0, 0.54, 0.35))
+			else:
+				draw_colored_polygon(points, Color(0.0, 0.0, 0.0, 0.55))
+				draw_polyline(PackedVector2Array([points[0], points[1], points[2], points[3], points[0]]), Color(1.0, 0.54, 0.35, 0.6), 1.5, true)
 
 
 ## L'indicateur de la balance du Peseur : le fléau penche du côté des morts

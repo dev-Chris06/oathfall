@@ -48,6 +48,10 @@ var rests := {}
 ## Ce que la carte a déjà montré au joueur (identifiant → vrai) : un quartier
 ## que la brume a quitté sous ses yeux ne le refait pas à chaque visite.
 var seen := {}
+## Les braises des rites de combat (voir `RiteData`) : une par Repos donné.
+var embers := 0
+## Les rites portés, un par bouton ; &"" pour un emplacement vide.
+var rite_slots: Array[StringName] = [&"", &"", &""]
 
 
 func reset() -> void:
@@ -70,6 +74,8 @@ func reset() -> void:
 	met = {}
 	rests = {}
 	seen = {}
+	embers = 0
+	rite_slots = [&"", &"", &""]
 	changed.emit()
 
 
@@ -90,6 +96,7 @@ func is_completed(id: StringName) -> bool:
 
 func mark_completed(id: StringName) -> void:
 	completed[String(id)] = true
+	_fill_rite_slots()
 	changed.emit()
 	save()
 
@@ -213,6 +220,75 @@ func note_rest(type_id: StringName) -> void:
 
 func rest_count(type_id: StringName) -> int:
 	return int(rests.get(String(type_id), 0))
+
+
+# --- Rites de combat ------------------------------------------------------------
+
+## Un rite est ouvert quand son niveau est terminé (ou, pour le Rappel, quand
+## son chapitre est accompli).
+func rite_unlocked(id: StringName) -> bool:
+	var rite := RiteData.get_rite(id)
+	if rite.is_empty():
+		return false
+	var unlock: Dictionary = rite["unlock"]
+	if unlock.has("level"):
+		return is_completed(unlock["level"])
+	var chapter := int(unlock["chapter"])
+	var levels := WorldData.chapter_levels()
+	var first := (chapter - 1) * WorldData.LEVELS_PER_CHAPTER
+	if first + WorldData.LEVELS_PER_CHAPTER > levels.size():
+		return false
+	for i in range(first, first + WorldData.LEVELS_PER_CHAPTER):
+		if not is_completed(levels[i]["id"]):
+			return false
+	return true
+
+
+func unlocked_rites() -> Array[StringName]:
+	var ids: Array[StringName] = []
+	for id: StringName in RiteData.ORDER:
+		if rite_unlocked(id):
+			ids.append(id)
+	return ids
+
+
+## Porte le rite `id` à l'emplacement `slot` ; s'il était déjà porté ailleurs,
+## les deux emplacements s'échangent.
+func equip_rite(id: StringName, slot: int) -> bool:
+	if not rite_unlocked(id) or slot < 0 or slot >= RiteData.SLOTS:
+		return false
+	var previous := rite_slots.find(id)
+	if previous >= 0:
+		rite_slots[previous] = rite_slots[slot]
+	rite_slots[slot] = id
+	changed.emit()
+	save()
+	return true
+
+
+## Un rite qui vient de s'ouvrir prend le premier emplacement libre.
+func _fill_rite_slots() -> void:
+	for id in unlocked_rites():
+		if rite_slots.has(id):
+			continue
+		var free := rite_slots.find(&"")
+		if free < 0:
+			return
+		rite_slots[free] = id
+
+
+func add_ember() -> void:
+	if embers < RiteData.MAX_EMBERS:
+		embers += 1
+		changed.emit()
+
+
+func spend_embers(amount: int) -> bool:
+	if embers < amount:
+		return false
+	embers -= amount
+	changed.emit()
+	return true
 
 
 func has_seen(id: StringName) -> bool:
@@ -404,6 +480,8 @@ func save() -> bool:
 		"met": met.keys(),
 		"rests": rests,
 		"seen": seen.keys(),
+		"embers": embers,
+		"rite_slots": rite_slots.map(func(id: StringName) -> String: return String(id)),
 	}
 	var file := FileAccess.open(save_path, FileAccess.WRITE)
 	if file == null:
@@ -463,6 +541,16 @@ func load_save() -> bool:
 	if typeof(saved_seen) == TYPE_ARRAY:
 		for id in saved_seen:
 			seen[String(id)] = true
+	embers = clampi(int(data.get("embers", 0)), 0, RiteData.MAX_EMBERS)
+	rite_slots = [&"", &"", &""]
+	var saved_slots = data.get("rite_slots", [])
+	if typeof(saved_slots) == TYPE_ARRAY:
+		for i in mini(saved_slots.size(), RiteData.SLOTS):
+			var id := StringName(saved_slots[i])
+			if RiteData.RITES.has(id) and not rite_slots.has(id):
+				rite_slots[i] = id
+	# Une ancienne partie : ses niveaux faits ouvrent déjà des rites.
+	_fill_rite_slots()
 	equipped = {}
 	var saved_equipped = data.get("equipped", {})
 	if typeof(saved_equipped) == TYPE_DICTIONARY:
