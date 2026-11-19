@@ -67,6 +67,7 @@ var _light_base: Array[float] = []
 var _time := 0.0
 var _hud_timer := 0.0
 var _finished := false
+var _crier_called := false
 var _solids: StaticBody3D
 ## Les vantaux de chaque grille, et l'obstacle qui la ferme.
 var _gates: Array[Dictionary] = []
@@ -358,11 +359,37 @@ func spawn(type_id: StringName, where: Vector3, from_grave := true) -> Enemy:
 	enemy.apply_chapter(chapter)
 	enemy.rested.connect(_on_enemy_rested)
 	enemy.rose.connect(_on_enemy_rose)
+	if enemy is CrierEnemy:
+		(enemy as CrierEnemy).call_requested.connect(_on_crier_call.bind(enemy))
 	_enemies.append(enemy)
 	Progress.meet(type_id)
 	if from_grave:
 		enemy.emerge()
 	return enemy
+
+
+## Un Crieur appelle du renfort : des Dépouilles sortent de terre près de lui,
+## sans dépasser neuf morts à la fois.
+func _on_crier_call(count: int, crier: Enemy) -> void:
+	if not is_instance_valid(crier) or enemies_left() >= 9:
+		return
+	if not _crier_called:
+		_crier_called = true
+		hud.show_message("Le Crieur appelle du renfort.\nAbats-le en premier.", 3.5)
+	# Du côté du héros : une barrière fermée ne doit jamais isoler un renfort.
+	var toward := hero.global_position - crier.global_position
+	toward.y = 0.0
+	toward = toward.normalized() if toward.length() > 0.1 else Vector3(0.0, 0.0, 1.0)
+	var side := toward.cross(Vector3.UP)
+	var placed := 0
+	for attempt in 16:
+		if placed >= count:
+			break
+		var at := crier.global_position + toward * randf_range(2.0, 4.0) + side * randf_range(-2.5, 2.5)
+		if not play_area.has_area() or play_area.grow(-1.2).has_point(Vector2(at.x, at.z)):
+			if at.distance_to(hero.global_position) > 2.5:
+				spawn(&"depouille", at)
+				placed += 1
 
 
 func enemies() -> Array[Enemy]:
@@ -458,7 +485,7 @@ func _on_hero_died() -> void:
 		var near := []
 		for enemy in _enemies:
 			if enemy.is_standing():
-				near.append("%s %.1f" % [enemy.type_id_name, enemy.global_position.distance_to(hero.global_position)])
+				near.append("%s %.1f (%d pv)" % [enemy.type_id_name, enemy.global_position.distance_to(hero.global_position), enemy.health])
 		print("chute du héros en %s, morts debout : %s" % [hero.global_position.snapped(Vector3.ONE * 0.1), near])
 	objective = null
 	hud.show_message("Nul ne meurt en Orvana.\nTu te relèves.", 3.5)

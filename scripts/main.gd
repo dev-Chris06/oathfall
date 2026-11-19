@@ -47,6 +47,7 @@ var _checkpoint := 0
 func _ready() -> void:
 	var capture_dir := ""
 	var capture_map := false
+	var only_level: StringName = &""
 	var direct := false
 	var forced_checkpoint := -1
 	for arg in OS.get_cmdline_user_args():
@@ -57,6 +58,8 @@ func _ready() -> void:
 			capture_dir = arg.trim_prefix("--capture=")
 		elif arg == "--map":
 			capture_map = true
+		elif arg.begins_with("--only="):
+			only_level = StringName(arg.trim_prefix("--only="))
 		elif arg == "--portraits" or arg == "--icons":
 			var tool := PortraitTool.new()
 			add_child(tool)
@@ -87,6 +90,7 @@ func _ready() -> void:
 		bot.main = self
 		bot.capture_dir = capture_dir
 		bot.capture_map = capture_map
+		bot.only_level = only_level
 		bot.start_checkpoint = maxi(forced_checkpoint, 0)
 		add_child(bot)
 		return

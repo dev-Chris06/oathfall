@@ -15,19 +15,24 @@ enum Phase { NONE, EDICT, LEVY }
 signal stage_changed(stage: int)
 ## Une levée est annoncée ; le cercle d'or est à cet endroit.
 signal levy_called(center: Vector3)
-## La levée a frappé ; `hit` dit si elle a touché le héros.
-signal levied(hit: bool)
+## La levée a frappé ; `hit` dit si elle a touché le héros, `raised` combien de
+## corps se sont relevés (ceux qui n'étaient pas dans le cercle).
+signal levied(hit: bool, raised: int)
 
 ## Le centre de la salle et son rayon : la levée choisit son cercle dedans.
 var home := Vector3.ZERO
 var arena_radius := 11.0
 var levy_center := Vector3.ZERO
+## Le faux cercle du dernier tiers : il ne protège de rien.
+var levy_fake := Vector3.ZERO
 var levy_pending := false
 
 var _stage := 1
 var _phase := Phase.NONE
 var _levy_timer := 6.0
 var _levy_marker: MeshInstance3D
+var _fake_marker: MeshInstance3D
+var _drift := Vector3.ZERO
 var _invulnerable := false
 
 
@@ -68,11 +73,25 @@ func levy_interval() -> float:
 	return interval * float(factors[_stage - 1])
 
 
+## Rayon du cercle sûr et durée de l'annonce, selon le tiers de sa vie.
+func safe_radius() -> float:
+	return float((_type["safe_radius"] as Array)[_stage - 1])
+
+
+func levy_windup() -> float:
+	return float((_type["levy_windup"] as Array)[_stage - 1])
+
+
+## Vrai au dernier tiers de sa vie : un faux cercle accompagne le vrai.
+func has_fake() -> bool:
+	return _stage >= 3
+
+
 ## Secondes avant que la levée ne frappe, ou -1 s'il n'y en a pas.
 func levy_time_left() -> float:
 	if not levy_pending:
 		return -1.0
-	return maxf(0.0, float(_type["levy_windup"]) - _state_time)
+	return maxf(0.0, levy_windup() - _state_time)
 
 
 func _begin_edict(stage_number: int) -> void:
@@ -86,23 +105,32 @@ func _begin_edict(stage_number: int) -> void:
 
 
 func _begin_levy() -> void:
-	# Le cercle d'or tombe à l'écart du héros : il faut aller le chercher.
+	# Le cercle d'or tombe loin du héros : il faut aller le chercher.
 	var center := home
-	for attempt in 12:
+	for attempt in 16:
 		var angle := randf() * TAU
-		var reach := randf_range(2.0, maxf(2.0, arena_radius - 4.0))
+		var reach := randf_range(2.0, maxf(2.0, arena_radius - 3.0))
 		center = home + Vector3(cos(angle), 0.0, sin(angle)) * reach
-		if center.distance_to(_hero.global_position) >= 5.0:
+		if center.distance_to(_hero.global_position) >= 8.0:
 			break
 	levy_center = Vector3(center.x, 0.0, center.z)
+	var drift_angle := randf() * TAU
+	_drift = Vector3(cos(drift_angle), 0.0, sin(drift_angle)) * float(_type["circle_drift"])
 	levy_pending = true
 	_phase = Phase.LEVY
 	_begin_special()
 	_once(_animation("levy"), 0.8)
-	var radius := float(_type["safe_radius"])
+	var radius := safe_radius()
 	_levy_marker = Fx.disc(radius, Color(1.0, 0.8, 0.3, 0.2))
 	_levy_marker.position = Vector3(levy_center.x, 0.09, levy_center.z)
 	get_parent().add_child(_levy_marker)
+	if has_fake():
+		# Le faux cercle est terne et ne bouge pas : le vrai brille et dérive.
+		var mirrored := home - (levy_center - home)
+		levy_fake = Vector3(mirrored.x, 0.0, mirrored.z)
+		_fake_marker = Fx.disc(radius, Color(0.55, 0.38, 0.2, 0.2))
+		_fake_marker.position = Vector3(levy_fake.x, 0.09, levy_fake.z)
+		get_parent().add_child(_fake_marker)
 	levy_called.emit(levy_center)
 
 
@@ -113,10 +141,17 @@ func _special(_delta: float) -> void:
 		_facing = offset.normalized()
 	match _phase:
 		Phase.LEVY:
-			var windup := float(_type["levy_windup"])
+			var windup := levy_windup()
+			# Le vrai cercle dérive, sans sortir de la salle.
+			var moved := levy_center + _drift * _delta
+			if moved.distance_to(home) <= arena_radius - 1.0:
+				levy_center = moved
 			if is_instance_valid(_levy_marker):
+				_levy_marker.position = Vector3(levy_center.x, 0.09, levy_center.z)
 				var pulse := 0.3 + 0.2 * sin(_state_time * 7.0) + 0.3 * clampf(_state_time / windup, 0.0, 1.0)
 				(_levy_marker.material_override as StandardMaterial3D).albedo_color.a = pulse
+			if is_instance_valid(_fake_marker):
+				(_fake_marker.material_override as StandardMaterial3D).albedo_color.a = 0.25
 			if _state_time >= windup:
 				_levy()
 		Phase.EDICT:
@@ -134,22 +169,36 @@ func _levy() -> void:
 	if _hero != null and not _hero.is_dead() and not _hero.is_dodging():
 		var offset := _hero.global_position - levy_center
 		offset.y = 0.0
-		if offset.length() > float(_type["safe_radius"]):
+		if offset.length() > safe_radius():
 			hit = true
 			_hero.take_damage(int(_type["levy_damage"]), global_position)
+	# Les corps qui ne sont pas dans le cercle d'or sont repris : ils se relèvent.
+	var raised := 0
+	for node in get_tree().get_nodes_in_group(&"bodies"):
+		var body := node as Enemy
+		if body == null or body == self:
+			continue
+		var gap := body.body_position() - levy_center
+		gap.y = 0.0
+		if gap.length() > safe_radius():
+			body.force_rise()
+			raised += 1
 	_clear_levy()
 	_phase = Phase.NONE
 	state = State.CHASE
 	_cooldown = 0.8
 	_levy_timer = levy_interval()
-	levied.emit(hit)
+	levied.emit(hit, raised)
 
 
 func _clear_levy() -> void:
 	levy_pending = false
-	if _levy_marker != null and is_instance_valid(_levy_marker):
-		_levy_marker.queue_free()
+	levy_fake = Vector3.ZERO
+	for marker in [_levy_marker, _fake_marker]:
+		if marker != null and is_instance_valid(marker):
+			(marker as Node).queue_free()
 	_levy_marker = null
+	_fake_marker = null
 
 
 func take_hit(from: Vector3, damage: int) -> void:

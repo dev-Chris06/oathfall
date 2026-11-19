@@ -95,12 +95,13 @@ func _last_room() -> void:
 	await reach(Vector3(0.0, 0.0, -78.0), 3.0)
 	hud.show_message("Toute la boucherie est descendue ici.", 3.5)
 	spawn(&"veuve", Vector3(-6.0, 0.0, -91.0))
-	spawn(&"crieur", Vector3(6.0, 0.0, -91.0))
 	spawn(&"boucher", Vector3(0.0, 0.0, -86.0))
 	spawn_group(&"depouille", [Vector3(-3.0, 0.0, -83.0), Vector3(3.0, 0.0, -84.0)], 16.0)
-	await wait_until(func() -> bool: return standing_count() <= 2)
-	spawn(&"boucher", Vector3(-4.0, 0.0, -88.0))
+	await wait_until(func() -> bool: return standing_count() <= 1)
+	spawn(&"crieur", Vector3(6.0, 0.0, -91.0))
 	spawn(&"fouisseur", Vector3(7.0, 0.0, -82.0))
+	await wait_until(func() -> bool: return standing_count() <= 1)
+	spawn(&"boucher", Vector3(-4.0, 0.0, -88.0))
 	await until_peace()
 
 

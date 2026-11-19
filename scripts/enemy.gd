@@ -25,6 +25,7 @@ const BEHAVIORS := {
 	"fossoyeuse": "res://scripts/enemies/fossoyeuse.gd",
 	"crier": "res://scripts/enemies/crier.gd",
 	"peseur": "res://scripts/enemies/peseur.gd",
+	"butcher": "res://scripts/enemies/butcher.gd",
 	"prevot": "res://scripts/enemies/prevot.gd",
 }
 ## Portée et force des cloches : chaque Porte-cloche debout dans ce rayon
@@ -253,7 +254,7 @@ func take_hit(from: Vector3, damage: int) -> void:
 	# Un mort « à armure » n'est pas interrompu pendant son coup, ni ébranlé
 	# deux fois de suite : on esquive puis on frappe, on n'enchaîne pas.
 	if bool(_type.get("armor", false)):
-		if state == State.WINDUP or _stagger_guard > 0.0:
+		if state == State.WINDUP or state == State.SPECIAL or _stagger_guard > 0.0:
 			return
 		_stagger_guard = float(_type.get("stagger_guard", 2.5))
 	var push := global_position - from

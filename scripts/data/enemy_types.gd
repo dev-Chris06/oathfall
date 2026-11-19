@@ -208,10 +208,10 @@ const TYPES := {
 		"name": "Boucher",
 		# La fiche du bestiaire de Tibert.
 		"bestiary": {
-			"text": "Il tient encore son étal. Lent et robuste, il frappe d'un grand coup de hachoir.",
-			"tip": "Son geste est long : esquive quand il lève le hachoir, puis frappe-le dans son élan.",
+			"text": "Il tient encore son étal. Robuste, il frappe d'un grand coup de hachoir, parfois deux. Il n'est pas arrêté en plein geste.",
+			"tip": "Esquive son coup, puis frappe-le quand il a fini : il reste ouvert un instant. S'il charge, écarte-toi : un mur l'assomme.",
 		},
-		"behavior": "melee",
+		"behavior": "butcher",
 		"model": "res://assets/kaykit/skeletons/Skeleton_Warrior.glb",
 		"hidden_parts": ["Skeleton_Warrior_Helmet"],
 		"props": [{"model": "res://assets/kaykit/skeletons/Skeleton_Axe.gltf", "bone": "handslot.r", "scale": 1.3}],
@@ -232,6 +232,17 @@ const TYPES := {
 		"stagger_guard": 3.0,
 		"combo_chance": 0.55,
 		"combo_gap": 0.35,
+		# La charge : il piétine (annoncé par une bande rouge), puis fonce ; un
+		# mur l'assomme. Elle part quand le héros est entre `charge_min` et
+		# `charge_max`.
+		"charge_interval": 9.0,
+		"charge_min": 6.0,
+		"charge_max": 13.0,
+		"stomp_time": 0.9,
+		"charge_speed": 8.5,
+		"charge_time": 1.1,
+		"charge_damage": 26,
+		"stun_time": 2.2,
 		"rise_delay": 26.0,
 		"rise_health": 0.5,
 		"memories": 16,
@@ -250,8 +261,8 @@ const TYPES := {
 		"name": "Crieur",
 		# La fiche du bestiaire de Tibert.
 		"bestiary": {
-			"text": "Il ne frappe pas. Son cri presse tous les morts debout : ils vont et frappent plus vite.",
-			"tip": "Frappe-le quand il prend son souffle : cela interrompt son cri.",
+			"text": "Il ne frappe pas. Son cri presse les morts qui te combattent : ils vont plus vite et frappent plus fort. Seul, il appelle du renfort.",
+			"tip": "Les morts pressés ont un anneau rouge aux pieds. Abats le Crieur en premier, ou frappe-le quand il prend son souffle.",
 		},
 		"behavior": "crier",
 		"model": "res://assets/kaykit/skeletons/Skeleton_Rogue.glb",
@@ -263,10 +274,14 @@ const TYPES := {
 		"keep_max": 10.0,
 		# Le cri : préparation (le frapper l'interrompt), intervalle, portée,
 		# durée de la hâte qu'il donne.
-		"shout_windup": 1.4,
-		"shout_interval": 9.0,
-		"shout_radius": 14.0,
-		"haste_time": 5.0,
+		"shout_windup": 1.2,
+		"shout_interval": 7.0,
+		"shout_radius": 16.0,
+		"engage_radius": 9.0,
+		"haste_time": 6.0,
+		# L'appel : seul (moins de trois morts debout), il fait surgir du renfort.
+		"call_interval": 16.0,
+		"call_count": 2,
 		"attack_range": 0.0,
 		"attack_damage": 0,
 		"attack_windup": 0.5,
@@ -346,8 +361,8 @@ const TYPES := {
 		"name": "Le Prévôt",
 		# La fiche du bestiaire de Tibert.
 		"bestiary": {
-			"text": "Il lève encore l'impôt. Un cercle d'or paraît au sol : quelques secondes plus tard, la levée frappe toute la salle.",
-			"tip": "Rejoins le cercle d'or avant que la levée ne tombe. À chaque tiers de sa vie, il convoque ses percepteurs.",
+			"text": "Il lève encore l'impôt. Un cercle d'or paraît au sol et dérive : quelques secondes plus tard, la levée frappe toute la salle et relève les corps qui n'y sont pas.",
+			"tip": "Tiens-toi dans le cercle d'or (le vrai brille, le faux est terne) avant que la levée ne tombe. Donne le Repos aux corps avant. À chaque tiers de sa vie, il convoque ses percepteurs.",
 		},
 		"behavior": "prevot",
 		"boss": true,
@@ -356,24 +371,28 @@ const TYPES := {
 		"props": [{"kind": "mace", "bone": "handslot.r", "offset": Vector3(0.0, 0.1, 0.0)}],
 		"tint": Color(0.92, 0.75, 0.42),
 		"scale": 1.8,
-		"health": 720,
+		"health": 560,
 		"move_speed": 2.0,
 		"attack_range": 3.0,
-		"attack_damage": 22,
+		"attack_damage": 18,
 		"attack_windup": 1.0,
 		"attack_cooldown": 2.4,
 		"attack_speed": 1.0,
 		"attack_impact": 0.52,
 		"armor": true,
-		"open_time": 1.4,
+		"open_time": 1.9,
 		"stagger_guard": 3.5,
-		"combo_chance": 0.4,
-		# La levée : annonce, intervalle, rayon du cercle sûr, dégâts. Les
-		# percepteurs arrivent à `edict_time` secondes d'immobilité du Prévôt.
-		"levy_windup": 3.0,
+		"combo_chance": 0.25,
+		# La levée : annonce, rayon du cercle sûr (un par tiers de sa vie, de plus en
+		# plus petit), intervalle, dégâts. Le cercle dérive pendant l'annonce ; au
+		# dernier tiers un faux cercle l'accompagne. Les corps hors du cercle se
+		# relèvent. Les percepteurs arrivent à `edict_time` secondes
+		# d'immobilité du Prévôt.
+		"levy_windup": [2.2, 2.0, 1.8],
 		"levy_interval": 14.0,
-		"safe_radius": 3.2,
-		"levy_damage": 30,
+		"safe_radius": [2.2, 1.9, 1.6],
+		"circle_drift": 0.9,
+		"levy_damage": 26,
 		"edict_time": 1.6,
 		"stage2_at": 0.66,
 		"stage3_at": 0.33,

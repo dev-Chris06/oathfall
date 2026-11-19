@@ -30,6 +30,9 @@ extends Node
 var main: Node
 var capture_dir := ""
 var capture_map := false
+## Avec `--selftest --only=<niveau>` : ne traverse que ce niveau (mise au point).
+var only_level: StringName = &""
+var _drinks := 0
 var start_checkpoint := 0
 
 var _allow_rest := true
@@ -68,13 +71,20 @@ func _physics_process(delta: float) -> void:
 	_dodge_if_needed(level, hero, controls)
 	if _levy_step(level, hero, controls):
 		return
+	_drink_if_needed(level, hero, controls)
 
 	var target := _choose_target(hero)
 	if target != null:
 		var offset := target.global_position - hero.global_position
 		var direction := Vector2(offset.x, offset.z).normalized()
+		var striking := target is Enemy and bool((target as Enemy)._type.get("armor", false)) \
+				and (target as Enemy).state == Enemy.State.WINDUP and not (target as Enemy)._struck
 		if offset.length() > 2.1:
 			controls.simulated_move = direction
+		elif striking:
+			# Un mort à armure arme son coup : on recule et on attend qu'il ait fini,
+			# au lieu d'échanger les coups.
+			controls.simulated_move = -direction
 		else:
 			controls.simulated_move = direction * 0.25
 			_attack_timer -= delta
@@ -125,6 +135,12 @@ func _dodge_if_needed(level: Level, hero: Hero, controls: TouchControls) -> void
 			return
 	for enemy in level.enemies():
 		var threat := false
+		if enemy is ButcherEnemy and enemy._phase == ButcherEnemy.Phase.CHARGE \
+				and enemy.global_position.distance_to(hero.global_position) < 4.0:
+			var charge_side := Vector2(enemy._charge_direction.x, enemy._charge_direction.z).orthogonal()
+			controls.simulated_move = charge_side
+			controls.press_dodge()
+			return
 		if enemy is ArcherEnemy and enemy.state == Enemy.State.SPECIAL:
 			threat = enemy._state_time > float(enemy._type["aim_time"]) - 0.2 and not enemy._fired
 		elif enemy is Burrower and enemy.state == Enemy.State.SPECIAL:
@@ -159,13 +175,26 @@ func _dodge_if_needed(level: Level, hero: Hero, controls: TouchControls) -> void
 		elif enemy.state == Enemy.State.WINDUP and not enemy._struck:
 			var close := enemy.global_position.distance_to(hero.global_position) < maxf(2.6, float(enemy._type["attack_range"]) + 0.4)
 			threat = close and enemy._state_time > float(enemy._type["attack_windup"]) - 0.25 \
-				and enemy.get_instance_id() % 4 != 0
+				and (enemy.get_instance_id() % 4 != 0 or bool(enemy._type.get("armor", false)))
 		if threat:
 			var away := hero.global_position - enemy.global_position
 			var side := Vector2(away.x, away.z).normalized().orthogonal()
 			controls.simulated_move = side
 			controls.press_dodge()
 			return
+
+
+## Un joueur boit une fiole quand sa vie est basse et qu'aucun coup n'est armé
+## tout près de lui (boire laisse sans défense 0,85 s).
+func _drink_if_needed(level: Level, hero: Hero, controls: TouchControls) -> void:
+	if hero.flasks <= 0 or hero.health * 100 > hero.max_health * 45 or hero.state != Hero.State.MOVE:
+		return
+	for enemy in level.enemies():
+		if enemy.is_standing() and enemy.state == Enemy.State.WINDUP \
+				and enemy.global_position.distance_to(hero.global_position) < 4.0:
+			return
+	_drinks += 1
+	controls.flask_pressed.emit()
 
 
 ## La levée du Prévôt : le joueur rejoint le cercle d'or et s'y tient jusqu'au
@@ -175,7 +204,7 @@ func _levy_step(level: Level, hero: Hero, controls: TouchControls) -> bool:
 		if enemy is PrevotEnemy and enemy.levy_pending:
 			var offset: Vector3 = enemy.levy_center - hero.global_position
 			offset.y = 0.0
-			if offset.length() > float(enemy._type["safe_radius"]) - 0.9:
+			if offset.length() > enemy.safe_radius() - 0.7:
 				controls.simulated_move = Vector2(offset.x, offset.z).normalized()
 				return true
 			return enemy.levy_time_left() < 2.2
@@ -216,7 +245,7 @@ func _choose_target(hero: Hero) -> Node3D:
 			boss = enemy
 			continue
 		var score := hero.global_position.distance_to(enemy.global_position)
-		if enemy is ArcherEnemy or enemy is BellRinger or enemy is Widow:
+		if enemy is ArcherEnemy or enemy is BellRinger or enemy is Widow or enemy is CrierEnemy:
 			score -= 7.0
 		if score < best_score:
 			best_score = score
@@ -244,6 +273,11 @@ func _nearest(group: StringName, hero: Hero) -> Node3D:
 
 
 func _run() -> void:
+	if only_level != &"":
+		var result := await _traverse(only_level)
+		print("ESSAI SEUL %s : %s (fioles bues : %d, restantes : %d)" % [only_level, "réussi" if result else "échec", _drinks, Progress.flasks])
+		get_tree().quit(0 if result else 1)
+		return
 	if not await _arena_tests():
 		return
 	if not await _progress_tests():
@@ -263,6 +297,8 @@ func _run() -> void:
 	if not await _blow_alignment_tests():
 		return
 	if not await _crier_tests():
+		return
+	if not await _butcher_tests():
 		return
 	if not await _peseur_tests():
 		return
@@ -285,6 +321,11 @@ func _run() -> void:
 			return _fail("le portrait de %s manque" % type_id)
 		if not EnemyTypes.get_type(type_id).has("bestiary"):
 			return _fail("la fiche de %s manque" % type_id)
+	for type_id: StringName in EnemyTypes.TYPES:
+		if not BestiaryScreen.ORDER.has(type_id):
+			return _fail("%s n'est pas dans la liste du bestiaire" % type_id)
+	if BestiaryScreen.ORDER.size() != EnemyTypes.TYPES.size():
+		return _fail("la liste du bestiaire ne correspond pas aux types déclarés")
 	print("test réussi : les %d types de morts ont leur fiche et leur portrait, et sont au bestiaire" % EnemyTypes.TYPES.size())
 	if not await _grille_tests():
 		return
@@ -1335,40 +1376,146 @@ func _reachable_zone(level: Level) -> Dictionary:
 	return zone
 
 
-## Le Crieur : son cri presse les morts debout, l'interrompre le retarde.
+## Le Crieur : il ne crie que si au moins deux morts se battent contre le héros,
+## son cri rend les morts plus rapides et plus forts, seul il appelle du renfort,
+## et le frapper pendant qu'il prend son souffle interrompt son cri.
 func _crier_tests() -> bool:
 	var arena := _level() as Arena
 	var hero := arena.hero
 	hero.heal(1000)
-	hero.global_position = Vector3(0.0, 0.0, 30.0)
+	hero.global_position = Vector3(0.0, 0.0, 0.0)
 	_passive = true
-	var crier := arena.spawn(&"crieur", Vector3(0.0, 0.0, -8.0), false) as CrierEnemy
-	var ally := arena.spawn(&"depouille", Vector3(2.0, 0.0, -10.0), false)
+	var crier := arena.spawn(&"crieur", Vector3(0.0, 0.0, -9.0), false) as CrierEnemy
 	var shouted := [false]
+	var called := [0]
 	crier.shouted.connect(func(_n: int) -> void: shouted[0] = true)
+	crier.call_requested.connect(func(n: int) -> void: called[0] += n)
+	# Seul, il ne crie pas (personne ne se bat) : il n'appelle qu'après un temps.
+	crier._shout_timer = 0.0
+	await _frames(40)
+	if shouted[0]:
+		return _fail("le Crieur crie alors qu'aucun mort ne se bat")
+	# Deux morts sur le héros : il crie, et ils sont pressés et plus forts.
+	var first := arena.spawn(&"depouille", Vector3(2.0, 0.0, -2.0), false)
+	var second := arena.spawn(&"depouille", Vector3(-2.0, 0.0, -2.0), false)
 	crier._shout_timer = 0.0
 	if not await _until(func() -> bool: return shouted[0], 12.0):
-		return _fail("le Crieur ne crie pas alors qu'un mort est debout près de lui")
-	if ally.haste_time <= 0.0:
-		return _fail("le cri du Crieur ne presse pas les morts debout")
+		return _fail("le Crieur ne crie pas alors que deux morts se battent")
+	if first.haste_time <= 0.0 or first._haste_aura == null or not first._haste_aura.visible:
+		return _fail("le cri du Crieur ne presse pas les morts qui se battent (ni anneau rouge)")
+	if first.damage_of(10) != 14:
+		return _fail("un mort pressé ne frappe pas plus fort (%d au lieu de 14)" % first.damage_of(10))
 	# Interrompu, il ne crie pas.
 	shouted[0] = false
 	await _frames(5)
 	crier._shout_timer = 0.0
-	await _frames(2)
+	await _frames(3)
 	if crier.state != Enemy.State.SPECIAL:
 		return _fail("le Crieur ne prend pas son souffle")
 	crier.take_hit(hero.global_position, 1)
 	await _frames(70)
 	if shouted[0]:
 		return _fail("frapper le Crieur n'interrompt pas son cri")
-	crier.take_hit(hero.global_position, 100000)
-	ally.take_hit(hero.global_position, 100000)
-	print("test réussi : le Crieur presse les morts debout, et le frapper interrompt son cri")
+	# Les morts tombés, il appelle du renfort.
+	first.take_hit(hero.global_position, 100000)
+	second.take_hit(hero.global_position, 100000)
+	await _frames(3)
+	first.give_rest()
+	second.give_rest()
+	var before := arena.enemies_left()
+	crier._call_timer = 0.0
+	crier._shout_timer = 1000.0
+	if not await _until(func() -> bool: return called[0] > 0, 12.0):
+		return _fail("seul, le Crieur n'appelle pas de renfort")
+	await _frames(5)
+	if arena.enemies_left() < before + 1:
+		return _fail("l'appel du Crieur ne fait surgir personne")
+	print("test réussi : le Crieur presse ceux qui se battent, appelle du renfort seul, et se laisse interrompre")
 	_passive = false
-	hero.global_position = Vector3(0.0, 0.0, 3.0)
+	_allow_rest = true
+	crier.take_hit(hero.global_position, 100000)
+	await _frames(3)
+	crier.give_rest()
 	if not await _until(func() -> bool: return arena.enemies_left() == 0, 240.0):
 		return _fail("les morts de l'essai du Crieur n'ont pas été mis au repos")
+	return true
+
+
+## Le Boucher : l'armure, l'enchaînement, la fenêtre ouverte, la charge et l'assommement.
+func _butcher_tests() -> bool:
+	var arena := _level() as Arena
+	var hero := arena.hero
+	hero.heal(1000)
+	hero.global_position = Vector3(0.0, 0.0, 0.0)
+	_passive = true
+	var butcher := arena.spawn(&"boucher", Vector3(1.4, 0.0, 0.0), false) as ButcherEnemy
+	var data := EnemyTypes.get_type(&"boucher")
+	butcher._charge_timer = 1000.0
+	butcher._cooldown = 0.0
+	if not await _until(func() -> bool:
+		hero.heal(1000)
+		return butcher.state == Enemy.State.WINDUP, 20.0):
+		return _fail("le Boucher n'arme pas son coup")
+	var life := butcher.health
+	butcher.take_hit(hero.global_position, 10)
+	if butcher.state != Enemy.State.WINDUP or butcher.health >= life:
+		return _fail("le Boucher est interrompu en plein coup (ou n'est pas blessé)")
+	# Son coup fini, il reste ouvert : il subit plus.
+	if not await _until(func() -> bool:
+		hero.heal(1000)
+		return butcher.state != Enemy.State.WINDUP, 10.0):
+		return _fail("le coup du Boucher ne finit pas")
+	var combo_pending := butcher._combo > 0
+	if not combo_pending and butcher._open_time <= 0.0:
+		return _fail("le Boucher n'est pas ouvert après son coup")
+	butcher._combo = 0
+	butcher._open_time = 1.0
+	life = butcher.health
+	butcher.take_hit(hero.global_position, 40)
+	if life - butcher.health != 60:
+		return _fail("ouvert, le Boucher a subi %d au lieu de 60" % (life - butcher.health))
+	# Ébranlé une fois, il ne l'est pas deux fois de suite.
+	butcher._open_time = 0.0
+	butcher.state = Enemy.State.CHASE
+	butcher._cooldown = 100.0
+	butcher._stagger_guard = 0.0
+	butcher.take_hit(hero.global_position, 5)
+	if butcher.state != Enemy.State.STAGGER:
+		return _fail("le Boucher n'est pas ébranlé par un coup hors de son geste")
+	await _frames(30)
+	butcher.take_hit(hero.global_position, 5)
+	if butcher.state == Enemy.State.STAGGER:
+		return _fail("le Boucher est ébranlé deux fois de suite")
+	# La charge : annoncée, puis il fonce ; un mur l'assomme et l'ouvre.
+	butcher._cooldown = 100.0
+	hero.global_position = Vector3(0.0, 0.0, 20.0)
+	butcher.global_position = Vector3(0.0, 0.0, 8.0)
+	butcher._charge_timer = 0.0
+	await _frames(3)
+	if butcher._phase != ButcherEnemy.Phase.STOMP:
+		return _fail("le Boucher ne piétine pas avant de charger")
+	await _frames(int(float(data["stomp_time"]) * 60.0) + 8)
+	if butcher._phase != ButcherEnemy.Phase.CHARGE:
+		return _fail("le Boucher ne charge pas après son piétinement")
+	butcher._crash()
+	if butcher._phase != ButcherEnemy.Phase.STUN or butcher._open_time < float(data["stun_time"]):
+		return _fail("le Boucher qui s'écrase n'est ni assommé ni ouvert")
+	await _frames(int(float(data["stun_time"]) * 60.0) + 10)
+	if butcher.state == Enemy.State.SPECIAL:
+		return _fail("le Boucher reste assommé trop longtemps")
+	# Sous la moitié de sa vie, il enrage.
+	butcher.health = int(float(data["health"]) * 0.4)
+	await _frames(3)
+	if butcher.haste_time <= 0.0:
+		return _fail("le Boucher n'enrage pas sous la moitié de sa vie")
+	print("test réussi : le Boucher a une armure, s'ouvre après son coup, charge, s'assomme et enrage")
+	butcher.take_hit(hero.global_position, 100000)
+	await _frames(3)
+	butcher.give_rest()
+	_passive = false
+	hero.global_position = Vector3(0.0, 0.0, 3.0)
+	if not await _until(func() -> bool: return arena.enemies_left() == 0, 60.0):
+		return _fail("les morts de l'essai du Boucher n'ont pas été mis au repos")
 	return true
 
 
@@ -1450,8 +1597,9 @@ func _peseur_tests() -> bool:
 	return true
 
 
-## Le Prévôt : la levée frappe hors du cercle d'or seulement, et à chaque
-## tiers de sa vie il décrète, intouchable un instant, avant de convoquer.
+## Le Prévôt : la levée frappe hors du cercle d'or seulement et reprend les
+## corps qui n'y sont pas ; à chaque tiers de sa vie il décrète, intouchable un
+## instant, le cercle rétrécit, et au dernier tiers un faux cercle paraît.
 func _prevot_tests() -> bool:
 	var arena := _level() as Arena
 	var hero := arena.hero
@@ -1464,27 +1612,35 @@ func _prevot_tests() -> bool:
 	boss._levy_timer = 1000.0
 	await _frames(3)
 
+	# Un corps loin du cercle : la levée le relève.
+	var corpse := arena.spawn(&"depouille", Vector3(11.0, 0.0, -20.0), false)
+	corpse.take_hit(hero.global_position, 100000)
+	await _frames(3)
 	# Dans le cercle d'or : la levée ne blesse pas.
 	boss._begin_levy()
 	if not boss.levy_pending or boss.levy_time_left() <= 0.0:
 		return _fail("la levée n'est pas annoncée")
 	hero.global_position = boss.levy_center
 	var life := hero.health
-	await _frames(200)
+	var windup := boss.levy_windup()
+	await _frames(int(windup * 60.0) + 25)
 	if boss.levy_pending or hero.health != life:
 		return _fail("la levée a blessé le héros qui se tenait dans le cercle d'or")
+	if corpse.state == Enemy.State.DOWN:
+		return _fail("la levée n'a pas relevé un corps hors du cercle")
 	# Hors du cercle : elle frappe.
 	boss._levy_timer = 1000.0
 	boss._begin_levy()
-	hero.global_position = boss.levy_center + Vector3(float(data["safe_radius"]) + 4.0, 0.0, 0.0)
+	hero.global_position = boss.levy_center + Vector3(boss.safe_radius() + 4.0, 0.0, 0.0)
 	life = hero.health
-	await _frames(200)
+	await _frames(int(boss.levy_windup() * 60.0) + 25)
 	if hero.health >= life:
 		return _fail("la levée n'a pas blessé le héros hors du cercle")
 
 	# Un nouveau tiers de sa vie : il décrète, intouchable, puis redevient vulnérable.
 	var stages := [0]
 	boss.stage_changed.connect(func(_s: int) -> void: stages[0] += 1)
+	var radius_one := boss.safe_radius()
 	boss.health = int(float(data["health"]) * 0.6)
 	await _frames(4)
 	if boss.stage() != 2 or stages[0] != 1:
@@ -1499,15 +1655,30 @@ func _prevot_tests() -> bool:
 		return _fail("le Prévôt reste intouchable après avoir décrété")
 	if boss.levy_interval() >= float(data["levy_interval"]):
 		return _fail("la levée ne se rapproche pas au deuxième tiers")
+	if boss.safe_radius() >= radius_one:
+		return _fail("le cercle d'or ne rétrécit pas au deuxième tiers")
+	# Dernier tiers : un faux cercle accompagne le vrai.
+	boss.health = int(float(data["health"]) * 0.25)
+	await _frames(4)
+	await _frames(int(float(data["edict_time"]) * 60.0) + 15)
+	boss._levy_timer = 1000.0
+	boss._begin_levy()
+	if not boss.has_fake() or boss.levy_fake == Vector3.ZERO:
+		return _fail("aucun faux cercle au dernier tiers de la vie du Prévôt")
+	if boss.levy_fake.distance_to(boss.levy_center) < 2.0 * boss.safe_radius():
+		return _fail("le faux cercle est confondu avec le vrai")
 
-	print("test réussi : la levée du Prévôt épargne le cercle d'or et frappe ailleurs, et il décrète à chaque tiers")
+	print("test réussi : la levée du Prévôt épargne le cercle d'or, relève les corps hors du cercle, le cercle rétrécit et se double d'un faux")
 	boss.take_hit(hero.global_position, 100000)
+	corpse.take_hit(hero.global_position, 100000)
 	await _frames(3)
 	boss.give_rest()
+	if corpse.state == Enemy.State.DOWN:
+		corpse.give_rest()
 	_passive = false
 	_allow_rest = true
 	hero.global_position = Vector3(0.0, 0.0, 3.0)
-	if not await _until(func() -> bool: return arena.enemies_left() == 0, 60.0):
+	if not await _until(func() -> bool: return arena.enemies_left() == 0, 90.0):
 		return _fail("les morts de l'essai du Prévôt n'ont pas été mis au repos")
 	return true
 
@@ -1517,6 +1688,14 @@ func _prevot_tests() -> bool:
 func _traverse(id: StringName) -> bool:
 	_completed = false
 	_checkpoint = 0
+	# Un joueur emporte ses fioles : le robot en a trois, comme après un achat.
+	Progress.flasks = 3
+	# Au chapitre II, un joueur s'est équipé avec l'or du premier chapitre : le
+	# robot achète la lame longue et la rondache.
+	if WorldData.level_index(id) >= WorldData.LEVELS_PER_CHAPTER:
+		Progress.add_gold(900)
+		Progress.buy_gear(&"lame_longue")
+		Progress.buy_gear(&"rondache")
 	var falls := [0]
 	var on_load := func(level: Level) -> void:
 		falls[0] += 1
@@ -1524,7 +1703,10 @@ func _traverse(id: StringName) -> bool:
 	main.level_loaded.connect(on_load)
 	main.load_level(id)
 	falls[0] = 0
-	var done := await _until(func() -> bool: return _completed or falls[0] > 6, 1500.0, false)
+	# Le joueur automatique n'a pas de fiole : un combat de boss du chapitre II
+	# lui est permis plus de chutes (il reprend alors au point de reprise).
+	var limit := 12 if id in [&"la_balance", &"la_halle_du_prevot"] else 6
+	var done := await _until(func() -> bool: return _completed or falls[0] > limit, 1500.0, false)
 	main.level_loaded.disconnect(on_load)
 	if not done or not _completed:
 		return _fail("%s n'a pas été terminé (%d chutes)" % [id, falls[0]])

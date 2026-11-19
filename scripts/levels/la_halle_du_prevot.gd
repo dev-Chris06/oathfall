@@ -95,22 +95,25 @@ func _leave() -> void:
 func _on_levy_called(_center: Vector3) -> void:
 	if _first_levy:
 		_first_levy = false
-		hud.show_message("Un cercle d'or paraît au sol.\nTiens-toi dedans avant que la levée ne tombe.", 5.0)
+		hud.show_message("Un cercle d'or paraît au sol, et il dérive.\nTiens-toi dedans avant que la levée ne tombe : elle reprend aussi les corps.", 6.0)
 
 
-func _on_levied(_hit: bool) -> void:
+func _on_levied(_hit: bool, raised: int) -> void:
 	shake(1.1)
+	if raised > 0:
+		hud.show_message("La levée reprend les corps : %d se relèvent." % raised, 2.5)
 
 
 func _on_stage(stage: int) -> void:
 	hud.show_message("Le Prévôt décrète : ses percepteurs arrivent.", 3.5)
 	if stage == 2:
-		for at: Vector3 in COLLECTORS.slice(0, 3):
-			spawn(&"depouille", at)
-	else:
 		spawn(&"boucher", COLLECTORS[0])
-		spawn(&"depouille", COLLECTORS[1])
-		spawn(&"depouille", COLLECTORS[2])
+		spawn(&"depouille", Vector3(0.0, 0.0, -32.0))
+		spawn(&"depouille", Vector3(4.0, 0.0, -34.0))
+	else:
+		spawn(&"boucher", COLLECTORS[1])
+		for at: Vector3 in [Vector3(-3.0, 0.0, -34.0), Vector3(3.0, 0.0, -35.0)]:
+			spawn(&"depouille", at)
 
 
 func _on_boss_fell(_enemy: Enemy) -> void:
