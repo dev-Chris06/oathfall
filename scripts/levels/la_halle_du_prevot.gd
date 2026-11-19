@@ -29,6 +29,7 @@ var _first_stage := true
 
 func _init() -> void:
 	title = "La Halle du Prévôt"
+	chapter = 2
 	play_area = Rect2(-10.6, -60.0, 21.2, 66.0)
 	underground = true
 

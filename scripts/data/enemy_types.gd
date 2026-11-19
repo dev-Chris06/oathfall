@@ -217,7 +217,7 @@ const TYPES := {
 		"props": [{"model": "res://assets/kaykit/skeletons/Skeleton_Axe.gltf", "bone": "handslot.r", "scale": 1.3}],
 		"tint": Color(0.78, 0.58, 0.5),
 		"scale": 1.3,
-		"health": 105,
+		"health": 150,
 		"move_speed": 1.9,
 		"attack_range": 2.4,
 		"attack_damage": 22,
@@ -225,6 +225,13 @@ const TYPES := {
 		"attack_cooldown": 2.0,
 		"attack_speed": 1.0,
 		"attack_impact": 0.52,
+		# Armure : son coup n'est pas interrompu, il n'est pas ébranlé deux fois
+		# de suite ; après un coup, il reste ouvert un moment. Il enchaîne.
+		"armor": true,
+		"open_time": 1.3,
+		"stagger_guard": 3.0,
+		"combo_chance": 0.55,
+		"combo_gap": 0.35,
 		"rise_delay": 26.0,
 		"rise_health": 0.5,
 		"memories": 16,
@@ -305,6 +312,10 @@ const TYPES := {
 		"attack_cooldown": 2.8,
 		"attack_speed": 1.0,
 		"attack_impact": 0.52,
+		"armor": true,
+		"open_time": 1.4,
+		"stagger_guard": 3.5,
+		"combo_chance": 0.3,
 		# Les poids : intervalle, délai d'annonce, rayon, dégâts.
 		"weight_interval": 7.5,
 		"weight_windup": 1.5,
@@ -353,6 +364,10 @@ const TYPES := {
 		"attack_cooldown": 2.4,
 		"attack_speed": 1.0,
 		"attack_impact": 0.52,
+		"armor": true,
+		"open_time": 1.4,
+		"stagger_guard": 3.5,
+		"combo_chance": 0.4,
 		# La levée : annonce, intervalle, rayon du cercle sûr, dégâts. Les
 		# percepteurs arrivent à `edict_time` secondes d'immobilité du Prévôt.
 		"levy_windup": 3.0,

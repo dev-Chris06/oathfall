@@ -84,7 +84,7 @@ func _special(delta: float) -> void:
 			if not _burst_hit and _state_time >= 0.15:
 				_burst_hit = true
 				if _hero != null and offset.length() <= float(_type["burst_distance"]) + 1.0:
-					_hero.take_damage(int(_type["burst_damage"]), global_position)
+					_hero.take_damage(damage_of(int(_type["burst_damage"])), global_position)
 			if _state_time >= 0.9:
 				state = State.CHASE
 				_cooldown = 0.5

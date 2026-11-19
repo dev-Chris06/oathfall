@@ -47,13 +47,13 @@ const ITEMS := {
 		"stats": {},
 	},
 	&"lame_longue": {
-		"slot": &"weapon", "name": "Lame longue", "part": "2H_Sword", "cost": 300,
+		"slot": &"weapon", "name": "Lame longue", "part": "2H_Sword", "cost": 600,
 		"text": "Plus longue et plus lourde. Elle fend davantage, mais l'esquive revient plus lentement.",
 		"stats": {"damage_scale": 0.25, "dodge_cooldown": 0.2},
 	},
 	&"hache": {
 		"slot": &"weapon", "name": "Hache", "model": "res://assets/kaykit/skeletons/Skeleton_Axe.gltf",
-		"hand": "handslot_r", "cost": 280,
+		"hand": "handslot_r", "cost": 560,
 		"text": "Un gros coup, un geste plus lent.",
 		"stats": {"damage_scale": 0.45, "attack_speed": -0.2},
 	},

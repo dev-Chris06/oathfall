@@ -36,6 +36,7 @@ var _first_balance := true
 
 func _init() -> void:
 	title = "La Balance"
+	chapter = 2
 	play_area = Rect2(-14.6, -46.5, 29.2, 56.5)
 	next_level = &"les_caves"
 

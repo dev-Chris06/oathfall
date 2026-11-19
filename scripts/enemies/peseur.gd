@@ -28,7 +28,6 @@ var balance_state := Balance.EVEN
 var _weights: Array[Dictionary] = []
 var _weight_timer := 4.0
 var _check_timer := 0.0
-var _poise := 0.0
 
 
 func setup(type_id: StringName, hero: Hero) -> void:
@@ -38,7 +37,6 @@ func setup(type_id: StringName, hero: Hero) -> void:
 
 
 func _physics_process(delta: float) -> void:
-	_poise = maxf(0.0, _poise - delta)
 	if is_standing():
 		_check_timer -= delta
 		if _check_timer <= 0.0:
@@ -106,15 +104,6 @@ func take_hit(from: Vector3, damage: int) -> void:
 	if state == State.DOWN or state == State.RISING or state == State.RESTED:
 		return
 	var scaled := maxi(1, int(round(float(damage) * damage_factor())))
-	# Un coup ne l'ébranle pas juste après un autre : sans cela, un
-	# enchaînement le tiendrait sans fin.
-	if _poise > 0.0:
-		health -= scaled
-		health_changed.emit(health, int(_type["health"]))
-		if health <= 0:
-			_fall()
-		return
-	_poise = 1.8
 	super.take_hit(from, scaled)
 
 

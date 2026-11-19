@@ -38,6 +38,8 @@ var start_checkpoint := 0
 var scripted := false
 ## Musique du niveau (vide : selon le décor, souterrain ou cimetière).
 var music_track: StringName = &""
+## Chapitre du niveau : il règle la difficulté des morts (`Enemy.apply_chapter`).
+var chapter := 1
 ## Terrain jouable (x, z, largeur, profondeur), pour habiller ses abords.
 var play_area := Rect2()
 ## Décor des abords (voir `Scenery`) : cimetière par défaut.
@@ -353,6 +355,7 @@ func spawn(type_id: StringName, where: Vector3, from_grave := true) -> Enemy:
 	enemy.position = Vector3(where.x, 0.0, where.z)
 	add_child(enemy)
 	enemy.setup(type_id, hero)
+	enemy.apply_chapter(chapter)
 	enemy.rested.connect(_on_enemy_rested)
 	enemy.rose.connect(_on_enemy_rose)
 	_enemies.append(enemy)

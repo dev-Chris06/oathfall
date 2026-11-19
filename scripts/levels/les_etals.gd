@@ -20,6 +20,7 @@ const CLOTHS: Array[Color] = [Color(0.38, 0.07, 0.06), Color(0.3, 0.1, 0.08), Co
 
 func _init() -> void:
 	title = "Les Étals"
+	chapter = 2
 	play_area = Rect2(-6.6, -89.0, 13.2, 99.0)
 	next_level = &"la_balance"
 
@@ -81,11 +82,11 @@ func _last_stretch() -> void:
 	hud.show_message("Ils tiennent le fond de la rue.", 3.5)
 	spawn(&"crieur", Vector3(0.0, 0.0, -82.0))
 	spawn(&"boucher", Vector3(-3.0, 0.0, -70.0))
-	spawn(&"archer_creux", Vector3(4.5, 0.0, -78.0))
 	spawn_group(&"depouille", [Vector3(3.0, 0.0, -68.0), Vector3(-2.0, 0.0, -73.0)], 15.0)
 	await wait_until(func() -> bool: return standing_count() <= 2)
+	spawn(&"archer_creux", Vector3(4.5, 0.0, -78.0))
+	await wait_until(func() -> bool: return standing_count() <= 1)
 	spawn(&"boucher", Vector3(3.0, 0.0, -75.0))
-	spawn(&"archer_creux", Vector3(-4.5, 0.0, -80.0))
 	await until_peace()
 
 

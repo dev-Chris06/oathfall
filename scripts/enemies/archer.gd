@@ -93,7 +93,7 @@ func _shoot() -> void:
 	var target := _hero.global_position + Vector3(0.0, 1.0, 0.0)
 	bolt.direction = (target - start).normalized()
 	bolt.speed = float(_type["bolt_speed"])
-	bolt.damage = int(_type["bolt_damage"])
+	bolt.damage = damage_of(int(_type["bolt_damage"]))
 	bolt.hero = _hero
 	get_parent().add_child(bolt)
 	bolt.global_position = start

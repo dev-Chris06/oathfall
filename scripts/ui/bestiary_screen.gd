@@ -7,7 +7,10 @@ extends CanvasLayer
 signal closed
 
 ## Les types, dans l'ordre où on les rencontre.
-const ORDER: Array[StringName] = [&"depouille", &"archer_creux", &"porte_cloche", &"fouisseur", &"veuve", &"sonneur", &"fossoyeuse"]
+## Tout type déclaré dans `EnemyTypes` doit y figurer (le test le vérifie) : un
+## mort rencontré s'affiche, un mort inconnu reste une silhouette.
+const ORDER: Array[StringName] = [&"depouille", &"archer_creux", &"porte_cloche", &"fouisseur", &"veuve", &"sonneur", &"fossoyeuse",
+	&"boucher", &"crieur", &"peseur", &"prevot"]
 const PORTRAITS := "res://assets/ui/portraits/"
 
 var selected: StringName = &"depouille"

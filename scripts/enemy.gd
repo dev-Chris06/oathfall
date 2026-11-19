@@ -32,8 +32,12 @@ const BEHAVIORS := {
 const BELL_RADIUS := 15.0
 const BELL_BOOST := 1.5
 
-## Un mort pressé par un Crieur va et frappe plus vite pendant quelques secondes.
+## Un mort pressé par un Crieur va et frappe plus vite pendant quelques secondes,
+## et frappe plus fort.
 const HASTE := 1.45
+const RALLY_DAMAGE := 1.4
+## Après un coup raté, un mort « à armure » reste ouvert : il subit plus.
+const OPEN_FACTOR := 1.5
 
 const TURN_SPEED := 9.0
 const STAGGER_TIME := 0.35
@@ -66,6 +70,14 @@ var _rise_duration := 0.0
 var _emerging := false
 ## Secondes de hâte restantes (voir `hasten`).
 var haste_time := 0.0
+## Échelle de difficulté du chapitre (voir `apply_chapter`).
+var health_scale := 1.0
+var damage_scale := 1.0
+
+var _open_time := 0.0
+var _stagger_guard := 0.0
+var _combo := 0
+var _haste_aura: MeshInstance3D
 
 
 ## Crée un mort du bon comportement pour ce type.
@@ -121,9 +133,13 @@ func _physics_process(delta: float) -> void:
 		return
 	_state_time += delta
 	_cooldown = maxf(0.0, _cooldown - delta)
+	_open_time = maxf(0.0, _open_time - delta)
+	_stagger_guard = maxf(0.0, _stagger_guard - delta)
 	if haste_time > 0.0:
 		haste_time = maxf(0.0, haste_time - delta)
 		_cooldown = maxf(0.0, _cooldown - delta * (HASTE - 1.0))
+		if haste_time <= 0.0 and _haste_aura != null:
+			_haste_aura.visible = false
 
 	match state:
 		State.CHASE:
@@ -135,7 +151,7 @@ func _physics_process(delta: float) -> void:
 				_strike()
 			if _state_time >= _attack_duration:
 				state = State.CHASE
-				_cooldown = float(_type["attack_cooldown"])
+				_end_attack()
 		State.STAGGER:
 			velocity = _knockback * (1.0 - _state_time / STAGGER_TIME)
 			if _state_time >= STAGGER_TIME:
@@ -227,14 +243,22 @@ func rise_progress() -> float:
 func take_hit(from: Vector3, damage: int) -> void:
 	if state == State.DOWN or state == State.RISING or state == State.RESTED:
 		return
+	if _open_time > 0.0:
+		damage = int(round(float(damage) * OPEN_FACTOR))
 	health -= damage
-	health_changed.emit(health, int(_type["health"]))
-	var push := global_position - from
-	push.y = 0.0
-	_knockback = push.normalized() * 5.0
+	health_changed.emit(health, max_health())
 	if health <= 0:
 		_fall()
 		return
+	# Un mort « à armure » n'est pas interrompu pendant son coup, ni ébranlé
+	# deux fois de suite : on esquive puis on frappe, on n'enchaîne pas.
+	if bool(_type.get("armor", false)):
+		if state == State.WINDUP or _stagger_guard > 0.0:
+			return
+		_stagger_guard = float(_type.get("stagger_guard", 2.5))
+	var push := global_position - from
+	push.y = 0.0
+	_knockback = push.normalized() * 5.0
 	state = State.STAGGER
 	_state_time = 0.0
 	_once(_animation("hit"), 1.5)
@@ -242,8 +266,48 @@ func take_hit(from: Vector3, damage: int) -> void:
 
 ## Le presse pour `seconds` secondes : il va et frappe plus vite.
 func hasten(seconds: float) -> void:
-	if is_standing():
-		haste_time = maxf(haste_time, seconds)
+	if not is_standing():
+		return
+	haste_time = maxf(haste_time, seconds)
+	# Un anneau rouge sous ses pieds : on voit qui est pressé.
+	if _haste_aura == null:
+		_haste_aura = Fx.disc(0.9, Color(1.0, 0.2, 0.1, 0.55))
+		add_child(_haste_aura)
+	_haste_aura.visible = true
+
+
+## Vie maximale, selon la difficulté du chapitre.
+func max_health() -> int:
+	return int(round(float(_type["health"]) * health_scale))
+
+
+## Dégâts d'un coup : l'échelle du chapitre, et la rage d'un cri de Crieur.
+func damage_of(base: int) -> int:
+	return int(round(float(base) * damage_scale * (RALLY_DAMAGE if haste_time > 0.0 else 1.0)))
+
+
+## Chaque chapitre rend les morts plus solides et plus durs, et ils se
+## relèvent plus vite. Les boss sont réglés un par un.
+func apply_chapter(chapter: int) -> void:
+	if chapter <= 1 or bool(_type.get("boss", false)):
+		return
+	health_scale = 1.0 + 0.3 * float(chapter - 1)
+	damage_scale = 1.0 + 0.2 * float(chapter - 1)
+	rise_delay *= pow(0.8, float(chapter - 1))
+	health = max_health()
+
+
+## Fin d'un coup : parfois un second tout de suite (enchaînement), sinon le
+## temps de reprise, pendant lequel un mort à armure reste ouvert.
+func _end_attack() -> void:
+	if _combo < int(_type.get("combo_max", 1)) and randf() < float(_type.get("combo_chance", 0.0)):
+		_combo += 1
+		_cooldown = float(_type.get("combo_gap", 0.35))
+		return
+	_combo = 0
+	_cooldown = float(_type["attack_cooldown"])
+	if bool(_type.get("armor", false)):
+		_open_time = float(_type.get("open_time", 1.2))
 
 
 ## Donne le Repos : le mort ne se relèvera plus.
@@ -343,7 +407,7 @@ func _strike() -> void:
 		return
 	if offset.length() > 0.3 and _facing.angle_to(offset) > deg_to_rad(70.0):
 		return
-	_hero.take_damage(int(_type["attack_damage"]), global_position, self)
+	_hero.take_damage(damage_of(int(_type["attack_damage"])), global_position, self)
 
 
 func _fall() -> void:
@@ -390,8 +454,8 @@ func _finish_rising() -> void:
 	if _emerging:
 		_emerging = false
 		return
-	health = int(ceil(float(_type["health"]) * float(_type["rise_health"])))
-	health_changed.emit(health, int(_type["health"]))
+	health = int(ceil(float(max_health()) * float(_type["rise_health"])))
+	health_changed.emit(health, max_health())
 	rose.emit(self)
 
 

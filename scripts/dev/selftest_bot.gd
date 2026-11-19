@@ -159,7 +159,7 @@ func _dodge_if_needed(level: Level, hero: Hero, controls: TouchControls) -> void
 		elif enemy.state == Enemy.State.WINDUP and not enemy._struck:
 			var close := enemy.global_position.distance_to(hero.global_position) < maxf(2.6, float(enemy._type["attack_range"]) + 0.4)
 			threat = close and enemy._state_time > float(enemy._type["attack_windup"]) - 0.25 \
-				and enemy.get_instance_id() % 2 == 0
+				and enemy.get_instance_id() % 4 != 0
 		if threat:
 			var away := hero.global_position - enemy.global_position
 			var side := Vector2(away.x, away.z).normalized().orthogonal()
@@ -1389,7 +1389,6 @@ func _peseur_tests() -> bool:
 	boss._weight_timer = 1000.0
 
 	var hit := func(amount: int) -> int:
-		boss._poise = 0.0
 		var before := boss.health
 		boss.take_hit(hero.global_position, amount)
 		return before - boss.health

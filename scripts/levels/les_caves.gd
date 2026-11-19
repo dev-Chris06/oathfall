@@ -25,6 +25,7 @@ const EXIT := Vector3(0.0, 0.0, -92.0)
 
 func _init() -> void:
 	title = "Les Caves du marché"
+	chapter = 2
 	play_area = Rect2(-9.0, -96.0, 18.0, 101.0)
 	underground = true
 	next_level = &"la_halle_du_prevot"
