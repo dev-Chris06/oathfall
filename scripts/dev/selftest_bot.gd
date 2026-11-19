@@ -349,6 +349,8 @@ func _run() -> void:
 		return
 	if not await _map_tests():
 		return
+	if not await _map_life_tests():
+		return
 	if not await _refuge_tests():
 		return
 	if not await _menu_tests():
@@ -1866,6 +1868,83 @@ func _map_tests() -> bool:
 	return true
 
 
+## La carte vivante : le relief porte la route, la ville tient dans le budget
+## du téléphone, les quartiers perdus sont sous la brume, les niveaux faits
+## ont leur brasier, la fiche du lieu montre ses morts, et la plongée mène au
+## niveau.
+func _map_life_tests() -> bool:
+	# Le relief est à jour et la route y est posée, sans flotter ni s'enfoncer.
+	var relief := load(MapTerrain.MESH_PATH) as Mesh
+	if relief == null or int(relief.get_meta("version", 0)) != MapTerrain.VERSION:
+		return _fail("le relief de la carte manque ou n'est pas à jour : relancer -- --terrain")
+	Progress.completed.clear()
+	main.show_map()
+	await get_tree().process_frame
+	var map: WorldMap = main.world_map
+	var world: MapWorld = map._world
+	for p: Vector2 in map._scene.route:
+		var gap := absf(world.terrain.height(p) - MapWorld.height_at(p.y))
+		if gap > 0.06 and not (p.y > MapScene.RIVER_TOP and p.y < MapScene.RIVER_BOTTOM):
+			return _fail("la route quitte le relief en %s (écart %.2f)" % [p, gap])
+	if world.city.triangle_count() > 260000:
+		return _fail("la ville de la carte est trop lourde : %d triangles" % world.city.triangle_count())
+	print("test 12 réussi : la route suit le relief, la ville tient dans le budget (%d triangles)" % world.city.triangle_count())
+
+	# Au début, le quartier du chapitre II est perdu : brume, fenêtres éteintes,
+	# morts errants ; celui du chapitre I est atteint.
+	var life := world.life
+	if life.states[0] != MapLife.ATTEINT or life.states[1] != MapLife.PERDU:
+		return _fail("quartiers au départ : %s" % [life.states])
+	if life.fog_density(1) < 0.99 or world.city.district_light(1) > 0.0:
+		return _fail("le quartier perdu n'est pas sous la brume")
+	if life.fog_density(0) > 0.01 or world.city.district_light(0) <= 0.0:
+		return _fail("le quartier atteint reste dans la brume ou éteint")
+	if not (life._wanderers[0]["node"] as Node3D).visible:
+		return _fail("aucun mort n'erre dans les quartiers perdus")
+	# Le chapitre I terminé : son quartier est apaisé, celui du II atteint.
+	for level_data: Dictionary in WorldData.CHAPTER_1["levels"]:
+		Progress.mark_completed(level_data["id"])
+	map.refresh()
+	if life.states[0] != MapLife.APAISE or life.states[1] != MapLife.ATTEINT:
+		return _fail("quartiers après le chapitre I : %s" % [life.states])
+	if world.city.district_light(0) < 0.99 or life.fog_density(1) > 0.01 or world.city.district_light(1) <= 0.0:
+		return _fail("le chapitre I fini n'éclaire pas la ville basse ou ne lève pas la brume")
+	if not (world._nodes[0]["brazier"] as Node3D).visible or (world._nodes[5]["brazier"] as Node3D).visible:
+		return _fail("les brasiers ne suivent pas les niveaux faits")
+	print("test 12 réussi : brume sur les quartiers perdus, fenêtres et brasiers des niveaux faits")
+
+	# La fiche du lieu : les morts des Allées, en portraits ou en silhouettes.
+	map.select_level(&"les_allees")
+	if map.portrait_count() != (WorldData.level_at(1)["dead"] as Array).size():
+		return _fail("la fiche des Allées montre %d morts" % map.portrait_count())
+	for level_data: Dictionary in WorldData.chapter_levels():
+		for type_id: StringName in level_data["dead"]:
+			if not EnemyTypes.TYPES.has(type_id):
+				return _fail("%s nomme un mort inconnu : %s" % [level_data["id"], type_id])
+	# Le pincement reste dans ses bornes.
+	map._set_zoom(0.1)
+	if not is_equal_approx(map._zoom, WorldMap.ZOOM_MIN):
+		return _fail("le pincement rapproche trop la caméra")
+	map._set_zoom(1.0)
+	print("test 12 réussi : la fiche du lieu montre ses morts, le zoom est borné")
+
+	# La plongée : le corbeau vole, la caméra plonge, puis le niveau s'ouvre.
+	map.cinematics = true
+	map.select_level(&"la_grille")
+	map.enter_selected()
+	await get_tree().process_frame
+	if main.level != null or not map.is_moving() or not world.raven.visible:
+		return _fail("la plongée vers le niveau ne commence pas")
+	var waited := 0.0
+	while main.level == null and waited < WorldMap.DIVE_TIME + 1.0:
+		await get_tree().process_frame
+		waited += get_process_delta_time()
+	if main.level == null or main.level_id != &"la_grille":
+		return _fail("la plongée ne mène pas au niveau")
+	print("test 12 réussi : la plongée du corbeau mène au niveau")
+	return true
+
+
 func _frames(count: int) -> void:
 	for i in count:
 		await get_tree().physics_frame
@@ -2247,6 +2326,10 @@ func _capture_map() -> void:
 	await get_tree().create_timer(0.6).timeout
 	var map: WorldMap = main.world_map
 	await _shoot("map_01_depart")
+	print("carte : %d triangles dessinés, %d commandes de dessin, ville %d triangles en tout" % [
+		RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_PRIMITIVES_IN_FRAME),
+		RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME),
+		map._world.city.triangle_count()])
 	map.select_level(&"l_ossuaire")
 	await get_tree().create_timer(0.4).timeout
 	await _shoot("map_02_choix")
@@ -2264,6 +2347,22 @@ func _capture_map() -> void:
 	map.open_book()
 	await get_tree().create_timer(0.4).timeout
 	await _shoot("map_07_carnet")
+	if map._book != null and is_instance_valid(map._book):
+		map._book.close_book()
+	await get_tree().create_timer(0.3).timeout
+	# De près, et la plongée du corbeau vers un niveau.
+	map.scroll_to(2300.0)
+	map._set_zoom(0.6)
+	await get_tree().create_timer(0.3).timeout
+	await _shoot("map_09_pres")
+	map._set_zoom(1.0)
+	map.cinematics = true
+	map.select_level(&"la_chapelle")
+	map.enter_selected()
+	await get_tree().create_timer(0.7).timeout
+	await _shoot("map_10_plongee_a")
+	await get_tree().create_timer(0.55).timeout
+	await _shoot("map_11_plongee_b")
 	get_tree().quit(0)
 
 

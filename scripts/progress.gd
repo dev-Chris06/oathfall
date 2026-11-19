@@ -45,6 +45,9 @@ var heard := {}
 ## ont reçu le Repos : c'est ce que le bestiaire de Tibert raconte.
 var met := {}
 var rests := {}
+## Ce que la carte a déjà montré au joueur (identifiant → vrai) : un quartier
+## que la brume a quitté sous ses yeux ne le refait pas à chaque visite.
+var seen := {}
 
 
 func reset() -> void:
@@ -66,6 +69,7 @@ func reset() -> void:
 	heard = {}
 	met = {}
 	rests = {}
+	seen = {}
 	changed.emit()
 
 
@@ -209,6 +213,15 @@ func note_rest(type_id: StringName) -> void:
 
 func rest_count(type_id: StringName) -> int:
 	return int(rests.get(String(type_id), 0))
+
+
+func has_seen(id: StringName) -> bool:
+	return seen.has(String(id))
+
+
+func mark_seen(id: StringName) -> void:
+	seen[String(id)] = true
+	save()
 
 
 func has_heard(conversation_id: StringName) -> bool:
@@ -390,6 +403,7 @@ func save() -> bool:
 		"heard": heard.keys(),
 		"met": met.keys(),
 		"rests": rests,
+		"seen": seen.keys(),
 	}
 	var file := FileAccess.open(save_path, FileAccess.WRITE)
 	if file == null:
@@ -444,6 +458,11 @@ func load_save() -> bool:
 		for id in saved_owned:
 			if Gear.ITEMS.has(StringName(id)):
 				owned[String(id)] = true
+	seen = {}
+	var saved_seen = data.get("seen", [])
+	if typeof(saved_seen) == TYPE_ARRAY:
+		for id in saved_seen:
+			seen[String(id)] = true
 	equipped = {}
 	var saved_equipped = data.get("equipped", {})
 	if typeof(saved_equipped) == TYPE_DICTIONARY:

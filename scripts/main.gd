@@ -10,6 +10,7 @@ extends Node
 ##   --capture=DOSSIER     même chose, en enregistrant des images
 ##   --portraits           fabrique les portraits du bestiaire (outil)
 ##   --icons               fabrique les icônes des objets (outil)
+##   --terrain             fabrique le relief de la carte (outil)
 ##   --map                 avec --capture : photographie la carte
 ##   --arena               lance la salle d'essai au lieu de l'écran-titre
 ##   --level=ID            lance ce niveau (la_grille, les_allees…)
@@ -64,6 +65,12 @@ func _ready() -> void:
 			var tool := PortraitTool.new()
 			add_child(tool)
 			tool.call_deferred("run" if arg == "--portraits" else "run_icons")
+			return
+		elif arg == "--terrain":
+			var plan := MapScene.new()
+			var error := MapTerrain.bake(plan.route)
+			plan.free()
+			get_tree().quit(0 if error == OK else 1)
 			return
 		elif arg == "--arena":
 			level_id = &"arena"
@@ -137,6 +144,8 @@ func start_new_game() -> void:
 
 ## Affiche la carte. Le niveau en cours, s'il y en a un, est abandonné.
 func show_map() -> void:
+	# La caméra de la carte recule depuis le niveau qu'on quitte.
+	var came_from: StringName = level_id if level != null else &""
 	Progress.end_level_meal()
 	_drop_level()
 	_drop_map()
@@ -146,6 +155,9 @@ func show_map() -> void:
 	Audio.music(&"map")
 	world_map = WorldMap.new()
 	world_map.available = ready_levels()
+	# Les essais ne regardent pas les mouvements de caméra.
+	world_map.cinematics = not scripted
+	world_map.arrived_from = came_from
 	world_map.level_chosen.connect(_on_level_chosen)
 	world_map.menu_requested.connect(show_title)
 	add_child(world_map)

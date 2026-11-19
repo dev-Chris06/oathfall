@@ -15,25 +15,27 @@ const ACTS := [
 	{"name": "Le palais", "title": "Acte IV"},
 ]
 
+## Chaque niveau nomme les morts qu'on y croise (`dead`, types de
+## `EnemyTypes`) : la fiche du lieu, sur la carte, montre leurs portraits.
 const CHAPTER_1 := {
 	"title": "Les Faubourgs muets",
 	"levels": [
-		{"id": &"la_grille", "name": "La Grille"},
-		{"id": &"les_allees", "name": "Les Allées"},
-		{"id": &"la_chapelle", "name": "La Chapelle des cendres"},
-		{"id": &"l_ossuaire", "name": "L'Ossuaire"},
-		{"id": &"la_fosse", "name": "La Fosse"},
+		{"id": &"la_grille", "name": "La Grille", "dead": [&"depouille"]},
+		{"id": &"les_allees", "name": "Les Allées", "dead": [&"depouille", &"archer_creux", &"porte_cloche"]},
+		{"id": &"la_chapelle", "name": "La Chapelle des cendres", "dead": [&"depouille", &"archer_creux", &"porte_cloche", &"sonneur"]},
+		{"id": &"l_ossuaire", "name": "L'Ossuaire", "dead": [&"depouille", &"archer_creux", &"porte_cloche", &"fouisseur", &"veuve"]},
+		{"id": &"la_fosse", "name": "La Fosse", "dead": [&"depouille", &"fouisseur", &"fossoyeuse"]},
 	],
 }
 
 const CHAPTER_2 := {
 	"title": "Le Marché aux absents",
 	"levels": [
-		{"id": &"la_porte_des_halles", "name": "La Porte des halles"},
-		{"id": &"les_etals", "name": "Les Étals"},
-		{"id": &"la_balance", "name": "La Balance"},
-		{"id": &"les_caves", "name": "Les Caves du marché"},
-		{"id": &"la_halle_du_prevot", "name": "La Halle du Prévôt"},
+		{"id": &"la_porte_des_halles", "name": "La Porte des halles", "dead": [&"depouille", &"archer_creux", &"porte_cloche"]},
+		{"id": &"les_etals", "name": "Les Étals", "dead": [&"depouille", &"archer_creux", &"boucher", &"crieur"]},
+		{"id": &"la_balance", "name": "La Balance", "dead": [&"depouille", &"archer_creux", &"crieur", &"peseur"]},
+		{"id": &"les_caves", "name": "Les Caves du marché", "dead": [&"depouille", &"porte_cloche", &"fouisseur", &"veuve", &"boucher", &"crieur"]},
+		{"id": &"la_halle_du_prevot", "name": "La Halle du Prévôt", "dead": [&"depouille", &"archer_creux", &"boucher", &"crieur", &"prevot"]},
 	],
 }
 

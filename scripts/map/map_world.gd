@@ -21,12 +21,22 @@ const WATER_LEVEL := -0.8
 
 var camera: Camera3D
 var data: MapScene
+var terrain: MapTerrain
+var city: MapCity
+var life: MapLife
+## Le corbeau qui guide la caméra vers un niveau.
+var raven: MeshInstance3D
+## Rapprochement de la caméra : 1, la vue normale ; moins, plus près.
+var zoom := 1.0
+## Faux pendant les essais : la brume se lève d'un coup.
+var animate_reveal := true
 
 var _nodes: Array[Dictionary] = []
 var _labels: Array[Label3D] = []
 var _circles: Array[MeshInstance3D] = []
 var _qmark: Label3D
 var _sails: Node3D
+var _sails_basis := Basis.IDENTITY
 var _wheel: Node3D
 var _beam: MeshInstance3D
 var _ring: MeshInstance3D
@@ -70,14 +80,27 @@ func _init() -> void:
 func build(model: MapScene) -> void:
 	data = model
 	_build_environment()
-	_build_terraces()
-	_build_town()
+	terrain = MapTerrain.new(model.route)
+	_build_ground()
+	city = MapCity.new()
+	add_child(city)
+	city.build(terrain, model.route)
+	life = MapLife.new()
+	add_child(life)
+	life.build(city)
 	_build_road()
 	_build_river()
 	_build_mill()
 	_build_foundations()
 	_build_nodes()
 	_build_labels()
+	raven = MeshInstance3D.new()
+	raven.mesh = MapLife.crow_mesh()
+	raven.material_override = MapLife.crow_material()
+	raven.scale = Vector3.ONE * 2.4
+	raven.visible = false
+	raven.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(raven)
 	camera = Camera3D.new()
 	camera.fov = 45.0
 	camera.current = true
@@ -133,7 +156,7 @@ func _build_environment() -> void:
 	env.background_color = Color(0.012, 0.015, 0.035)
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	env.ambient_light_color = Color(0.4, 0.45, 0.7)
-	env.ambient_light_energy = 0.7
+	env.ambient_light_energy = 0.55
 	env.fog_enabled = true
 	env.fog_light_color = Color(0.03, 0.04, 0.08)
 	env.fog_density = 0.012
@@ -147,108 +170,16 @@ func _build_environment() -> void:
 	moon.rotation_degrees = Vector3(-50.0, 30.0, 0.0)
 	moon.shadow_enabled = false
 	add_child(moon)
-	# Un sol sombre très bas, loin sous la ville, pour que rien ne flotte dans le noir.
-	var plane := PlaneMesh.new()
-	plane.size = Vector2(400.0, 400.0)
-	var floor_node := MeshInstance3D.new()
-	floor_node.mesh = plane
-	floor_node.material_override = _mat(Color(0.03, 0.04, 0.08), 0.8)
-	floor_node.position = Vector3(0.0, -4.0, 0.0)
-	floor_node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	add_child(floor_node)
-	# Des étoiles, pour que le haut de l'écran ne soit jamais vide.
-	var rng := RandomNumberGenerator.new()
-	rng.seed = 21
-	var stars: Array[Transform3D] = []
-	for i in 160:
-		stars.append(Transform3D(Basis.from_scale(Vector3.ONE * rng.randf_range(0.5, 1.4)),
-			Vector3(rng.randf_range(-50.0, 50.0), rng.randf_range(14.0, 40.0), rng.randf_range(-95.0, 10.0))))
-	var star_mesh := BoxMesh.new()
-	star_mesh.size = Vector3(0.12, 0.12, 0.12)
-	_multi(star_mesh, _unshaded(Color(0.8, 0.85, 1.0, 0.8)), stars)
 
 
-## Les quatre étages : un socle en gradin chacun, un rempart devant, des tours.
-func _build_terraces() -> void:
-	var tints := [Color(0.1, 0.11, 0.2), Color(0.14, 0.17, 0.3), Color(0.19, 0.23, 0.38), Color(0.25, 0.3, 0.46)]
-	for i in MapScene.TERRACES.size():
-		var terrace: Dictionary = MapScene.TERRACES[i]
-		var x0 := float(terrace["x0"]) - 22.0
-		var x1 := float(terrace["x1"]) + 22.0
-		var y0 := float(terrace["y0"])
-		var y1 := float(terrace["y1"])
-		var height := float(HEIGHTS[i])
-		var depth := 3.2
-		var size := Vector3((x1 - x0) * S, depth, (y0 - y1) * S)
-		var center := to_world(Vector2((x0 + x1) / 2.0, (y0 + y1) / 2.0))
-		_box(self, size, Vector3(center.x, height - depth / 2.0, center.z), _mat(tints[i] as Color, 1.0))
-		# Le rempart, le long du bord sud de l'étage, et deux tours aux angles.
-		var tint: Color = tints[i]
-		var wall_color := tint.darkened(0.4)
-		_box(self, Vector3(size.x, 0.55, 0.28), Vector3(center.x, height + 0.27, center.z + size.z / 2.0 - 0.14), _mat(wall_color, 0.9))
-		for side: float in [-1.0, 1.0]:
-			var tower_at := Vector3(center.x + side * (size.x / 2.0 - 0.7), height + 1.0, center.z + size.z / 2.0 - 0.7)
-			_box(self, Vector3(1.0, 2.0, 1.0), tower_at, _mat(wall_color, 0.9))
-			_box(self, Vector3(1.2, 0.3, 1.2), tower_at + Vector3(0.0, 1.1, 0.0), _mat(wall_color.lightened(0.1), 0.9))
-
-
-## Les maisons, de part et d'autre de la route, leurs toits et leurs fenêtres
-## allumées ; et les grands édifices : donjon, cathédrale, palais.
-func _build_town() -> void:
-	var rng := RandomNumberGenerator.new()
-	rng.seed = 5
-	var walls: Array[Transform3D] = []
-	var roofs: Array[Transform3D] = []
-	var windows: Array[Transform3D] = []
-	for i in MapScene.TERRACES.size():
-		var terrace: Dictionary = MapScene.TERRACES[i]
-		var height := float(HEIGHTS[i])
-		for lane_y: float in terrace["lanes"]:
-			var x := float(terrace["x0"]) + 60.0
-			while x < float(terrace["x1"]) - 60.0:
-				x += 70.0
-				if rng.randf() < 0.3 or (absf(x - 640.0) < 90.0 and i >= 1):
-					continue
-				var w := rng.randf_range(1.1, 1.6)
-				var h := rng.randf_range(0.7, 1.2)
-				var d := rng.randf_range(0.8, 1.1)
-				var at := to_world(Vector2(x + rng.randf_range(-12.0, 12.0), lane_y - 24.0))
-				walls.append(Transform3D(Basis.from_scale(Vector3(w, h, d)), Vector3(at.x, height + h / 2.0, at.z)))
-				roofs.append(Transform3D(Basis.from_scale(Vector3(w + 0.25, 0.7, d + 0.25)), Vector3(at.x, height + h + 0.35, at.z)))
-				if rng.randf() < 0.7:
-					windows.append(Transform3D(Basis.from_scale(Vector3(0.24, 0.3, 0.06)),
-						Vector3(at.x + rng.randf_range(-0.3, 0.3), height + h * 0.55, at.z + d / 2.0 + 0.02)))
-	var box_mesh := BoxMesh.new()
-	box_mesh.size = Vector3.ONE
-	var prism := PrismMesh.new()
-	prism.size = Vector3.ONE
-	_multi(box_mesh, _mat(Color(0.12, 0.15, 0.28), 1.5), walls)
-	_multi(prism, _mat(Color(0.2, 0.12, 0.16), 1.3), roofs)
-	_multi(box_mesh, _unshaded(Color(1.0, 0.7, 0.28, 1.0)), windows)
-	# Le donjon de la citadelle, la nef et la flèche de la cathédrale, le palais.
-	var keep := to_world(Vector2(640.0, 1575.0))
-	_box(self, Vector3(5.4, 2.6, 4.0), Vector3(keep.x, HEIGHTS[1] + 1.3, keep.z), _mat(Color(0.16, 0.2, 0.34), 1.2))
-	var nave := to_world(Vector2(640.0, 1205.0))
-	_box(self, Vector3(5.4, 3.0, 2.8), Vector3(nave.x, HEIGHTS[2] + 1.5, nave.z), _mat(Color(0.2, 0.24, 0.4), 1.2))
-	_box(self, Vector3(1.7, 3.6, 1.7), Vector3(nave.x, HEIGHTS[2] + 1.8, nave.z - 2.4), _mat(Color(0.2, 0.24, 0.4), 1.2))
-	var spire := MeshInstance3D.new()
-	var cone := PrismMesh.new()
-	cone.size = Vector3(1.9, 3.4, 1.9)
-	spire.mesh = cone
-	spire.material_override = _mat(Color(0.18, 0.2, 0.36), 1.2)
-	spire.position = Vector3(nave.x, HEIGHTS[2] + 5.3, nave.z - 2.4)
-	add_child(spire)
-	var palace := to_world(Vector2(640.0, 520.0))
-	_box(self, Vector3(8.4, 3.0, 3.0), Vector3(palace.x, HEIGHTS[3] + 1.5, palace.z), _mat(Color(0.26, 0.31, 0.48), 1.3))
-	for dx: float in [-3.0, 0.0, 3.0]:
-		var tower := _box(self, Vector3(1.6, 4.2, 1.6), Vector3(palace.x + dx, HEIGHTS[3] + 2.1, palace.z - 0.4), _mat(Color(0.28, 0.33, 0.5), 1.3))
-		var dome := MeshInstance3D.new()
-		var roof := PrismMesh.new()
-		roof.size = Vector3(1.9, 1.6, 1.9)
-		dome.mesh = roof
-		dome.material_override = _mat(Color(0.3, 0.2, 0.26), 1.3)
-		dome.position = tower.position + Vector3(0.0, 2.9, 0.0)
-		add_child(dome)
+## Le relief, fabriqué d'avance (`MapTerrain`).
+func _build_ground() -> void:
+	var ground := MeshInstance3D.new()
+	ground.name = "Relief"
+	ground.mesh = load(MapTerrain.MESH_PATH)
+	ground.material_override = MapTerrain.material()
+	ground.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(ground)
 
 
 ## La route : un ruban sombre et des braises qui la jalonnent.
@@ -277,7 +208,7 @@ func _build_road() -> void:
 		while at < length:
 			if at >= 0.0:
 				var p := a.lerp(b, at / maxf(length, 0.01))
-				var basis := Basis.looking_at(direction, Vector3.UP) * Basis.from_scale(Vector3(0.14, 0.08, 0.4))
+				var basis := Basis.looking_at(direction, Vector3.UP) * Basis.from_scale(Vector3(0.09, 0.06, 0.26))
 				dashes.append(Transform3D(basis, p + Vector3(0.0, 0.05, 0.0)))
 			at += 0.7
 		carry = fmod(carry + length, 0.7)
@@ -299,61 +230,38 @@ func _build_river() -> void:
 	var water := ShaderMaterial.new()
 	water.shader = shader
 	var plane := PlaneMesh.new()
-	# Le fleuve seulement, et l'anse du moulin : pas une mer autour de la ville.
-	plane.size = Vector2(1240.0 * S, (2770.0 - 2540.0) * S)
+	# Le fleuve traverse tout le relief ; le lit est creusé dans le terrain.
+	plane.size = Vector2(MapTerrain.X_SPAN.y - MapTerrain.X_SPAN.x, (2770.0 - 2540.0) * S)
 	var node := MeshInstance3D.new()
 	node.mesh = plane
 	node.material_override = water
 	node.position = Vector3(0.0, WATER_LEVEL, to_world(Vector2(640.0, 2655.0)).z)
 	node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(node)
-	# La rive sud, avec l'anse où plonge la roue ; le pont vers la ville.
-	var bank := _mat(Color(0.08, 0.1, 0.18), 1.2)
-	var south := to_world(Vector2(660.0, 2865.0))
-	_box(self, Vector3(1200.0 * S, 1.6, 150.0 * S), Vector3(south.x, -0.8, south.z), bank)
-	var strip := to_world(Vector2(700.0, 2745.0))
-	_box(self, Vector3(1090.0 * S, 1.6, 90.0 * S), Vector3(strip.x + 0.0, -0.8, strip.z), bank)
+	# Le pont vers la ville.
 	var deck := to_world(Vector2(MapScene.BRIDGE_X, 2634.0))
 	_box(self, Vector3(1.1, 0.16, (MapScene.RIVER_BOTTOM - MapScene.RIVER_TOP + 24.0) * S), Vector3(deck.x, -0.05, deck.z), _mat(Color(0.25, 0.17, 0.1), 1.2))
 	for side: float in [-1.0, 1.0]:
 		_box(self, Vector3(0.08, 0.35, (MapScene.RIVER_BOTTOM - MapScene.RIVER_TOP) * S), Vector3(deck.x + side * 0.52, 0.15, deck.z), _mat(Color(0.3, 0.2, 0.12), 1.2))
 
 
-## Le moulin : une tour de pierre, un toit, des ailes qui tournent, et la roue
-## à aubes qui plonge dans l'anse.
+## Le moulin : le moulin à vent du pack, agrandi, ses ailes qui tournent, et
+## la roue à aubes qui plonge dans l'anse.
 func _build_mill() -> void:
 	var base := to_world(Vector2(MapScene.MILL_X, 2700.0))
-	var tower := MeshInstance3D.new()
-	var shaft := CylinderMesh.new()
-	shaft.top_radius = 0.7
-	shaft.bottom_radius = 0.95
-	shaft.height = 2.6
-	shaft.radial_segments = 12
-	tower.mesh = shaft
-	tower.material_override = _mat(Color(0.2, 0.22, 0.34), 1.3)
-	tower.position = base + Vector3(0.0, 1.3, 0.0)
-	add_child(tower)
-	var roof := MeshInstance3D.new()
-	var cap := CylinderMesh.new()
-	cap.top_radius = 0.0
-	cap.bottom_radius = 1.0
-	cap.height = 1.1
-	cap.radial_segments = 12
-	roof.mesh = cap
-	roof.material_override = _mat(Color(0.22, 0.12, 0.14), 1.3)
-	roof.position = base + Vector3(0.0, 3.15, 0.0)
-	add_child(roof)
-	_box(self, Vector3(0.28, 0.4, 0.06), base + Vector3(0.0, 1.5, 0.95), _unshaded(Color(1.0, 0.7, 0.28, 1.0)))
-	_sails = Node3D.new()
-	_sails.position = base + Vector3(0.0, 2.7, 1.05)
-	add_child(_sails)
+	var mill := (load(MapCity.DIR + "building_windmill_red.gltf") as PackedScene).instantiate() as Node3D
+	mill.position = base
+	mill.scale = Vector3.ONE * 2.3
+	add_child(mill)
+	for mesh: Node in mill.find_children("*", "MeshInstance3D", true, false):
+		(mesh as MeshInstance3D).material_override = city.night_material()
+	# Les fenêtres du refuge restent allumées.
+	for side: float in [-1.0, 1.0]:
+		_box(mill, Vector3(0.09, 0.12, 0.02), Vector3(side * 0.16, 0.42, 0.39), _unshaded(Color(1.0, 0.66, 0.3, 1.0)))
+	_sails = mill.find_child("building_windmill_top_fan_red", true, false) as Node3D
+	if _sails != null:
+		_sails_basis = _sails.basis
 	var wood := _mat(Color(0.15, 0.1, 0.07), 1.2)
-	for k in 4:
-		var blade := Node3D.new()
-		blade.rotation.z = k * PI / 2.0
-		_sails.add_child(blade)
-		_box(blade, Vector3(0.1, 2.0, 0.08), Vector3(0.0, 1.1, 0.0), wood)
-		_box(blade, Vector3(0.45, 1.3, 0.05), Vector3(0.28, 1.4, 0.0), _mat(Color(0.3, 0.26, 0.2), 1.2))
 	_wheel = Node3D.new()
 	_wheel.position = base + Vector3(-1.5, 0.7, 0.2)
 	add_child(_wheel)
@@ -434,7 +342,9 @@ func _build_nodes() -> void:
 		halo.mesh = disc
 		halo.position.y = 0.04
 		root.add_child(halo)
-		_nodes.append({"root": root, "core": core, "ring": ring, "halo": halo})
+		var brazier := _brazier(i)
+		root.add_child(brazier)
+		_nodes.append({"root": root, "core": core, "ring": ring, "halo": halo, "brazier": brazier})
 	var dot_mesh := SphereMesh.new()
 	dot_mesh.radius = 0.5
 	dot_mesh.height = 1.0
@@ -462,6 +372,74 @@ func _build_nodes() -> void:
 	_ring.material_override = _unshaded(Color(PALE, 0.95))
 	_ring.visible = false
 	add_child(_ring)
+
+
+const FIRE_SHADER := """
+shader_type spatial;
+render_mode unshaded, blend_add, depth_draw_never, cull_disabled;
+
+uniform float seed = 0.0;
+
+void vertex() {
+	// Toujours face a la camera.
+	MODELVIEW_MATRIX = VIEW_MATRIX * mat4(MAIN_CAM_INV_VIEW_MATRIX[0], MAIN_CAM_INV_VIEW_MATRIX[1], MAIN_CAM_INV_VIEW_MATRIX[2], MODEL_MATRIX[3]);
+}
+
+void fragment() {
+	vec2 uv = vec2(UV.x, 1.0 - UV.y);
+	float t = TIME * 3.0 + seed;
+	float x = (uv.x - 0.5) * 2.0 + sin(t * 2.1 + uv.y * 6.0) * 0.14 * uv.y;
+	float width = pow(1.0 - uv.y, 0.6) * (0.85 + 0.12 * sin(t * 3.3));
+	float shape = smoothstep(width, width * 0.2, abs(x)) * smoothstep(1.0, 0.45, uv.y + 0.1 * sin(t * 5.0)) * smoothstep(0.0, 0.06, uv.y);
+	vec3 color = mix(vec3(0.9, 0.2, 0.04), vec3(1.0, 0.62, 0.2), smoothstep(0.35, 1.0, shape));
+	ALBEDO = color * shape * 1.25;
+	ALPHA = shape;
+}
+"""
+
+
+## Le brasier qui s'allume sur un niveau terminé : une vasque de fer sur un
+## pied, et sa flamme.
+func _brazier(index: int) -> Node3D:
+	var root := Node3D.new()
+	root.visible = false
+	var iron := _mat(Color(0.09, 0.08, 0.1), 1.0)
+	_box(root, Vector3(0.06, 0.3, 0.06), Vector3(0.0, 0.15, 0.0), iron)
+	var bowl := MeshInstance3D.new()
+	var cup := CylinderMesh.new()
+	cup.top_radius = 0.17
+	cup.bottom_radius = 0.07
+	cup.height = 0.12
+	cup.radial_segments = 10
+	cup.rings = 1
+	bowl.mesh = cup
+	bowl.material_override = iron
+	bowl.position.y = 0.34
+	root.add_child(bowl)
+	var embers := MeshInstance3D.new()
+	var top := CylinderMesh.new()
+	top.top_radius = 0.15
+	top.bottom_radius = 0.15
+	top.height = 0.01
+	top.radial_segments = 10
+	embers.mesh = top
+	embers.material_override = _unshaded(Color(1.0, 0.45, 0.15, 1.0))
+	embers.position.y = 0.4
+	root.add_child(embers)
+	var flame := MeshInstance3D.new()
+	var quad := QuadMesh.new()
+	quad.size = Vector2(0.62, 1.05)
+	flame.mesh = quad
+	var shader := Shader.new()
+	shader.code = FIRE_SHADER
+	var material := ShaderMaterial.new()
+	material.shader = shader
+	material.set_shader_parameter("seed", float(index) * 1.37)
+	flame.material_override = material
+	flame.position.y = 0.88
+	flame.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	root.add_child(flame)
+	return root
 
 
 func _label(text: String, size: int, color: Color, at: Vector3, pixel := 0.0055) -> Label3D:
@@ -524,13 +502,34 @@ func set_states(states: PackedStringArray, flags: Array) -> void:
 				core.material_override = _mat(Color(0.35, 0.33, 0.48), 1.2)
 				ring.material_override = _unshaded(Color(0.35, 0.33, 0.48, 0.6))
 				halo.visible = false
+		# Un niveau terminé : son brasier brûle à la place de la braise.
+		var done := state == "fait"
+		(node["brazier"] as Node3D).visible = done
+		core.visible = not done
 		var ready: bool = i < flags.size() and flags[i]
 		_labels[i].modulate = PALE if ready else Color(0.6, 0.56, 0.69, 0.85)
 	for i in _circles.size():
 		var done: bool = i < data.chapters_done.size() and data.chapters_done[i]
 		_circles[i].material_override = _mat(AMBER if done else Color(0.29, 0.27, 0.38), 3.0 if done else 1.0)
+	life.set_states(zone_states(states), animate_reveal)
 	var all_done := data.chapters_done.size() == WorldData.ROUTE_CHAPTERS and not data.chapters_done.has(false)
 	_qmark.modulate = Color(AMBER, 0.95) if all_done else Color(0.6, 0.56, 0.69, 0.55)
+
+
+## L'état de chaque quartier de la ville, d'après les niveaux de son chapitre.
+func zone_states(states: PackedStringArray) -> Array[String]:
+	var result: Array[String] = []
+	for k in life.lanes.size():
+		var chapter := MapLife.chapter_of_zone(k)
+		var state := MapLife.PERDU
+		if chapter < data.chapters_done.size() and data.chapters_done[chapter]:
+			state = MapLife.APAISE
+		else:
+			for n in range(chapter * WorldData.LEVELS_PER_CHAPTER, (chapter + 1) * WorldData.LEVELS_PER_CHAPTER):
+				if n < states.size() and (states[n] == "fait" or states[n] == "ici"):
+					state = MapLife.ATTEINT
+		result.append(state)
+	return result
 
 
 func set_here(index: int) -> void:
@@ -556,9 +555,20 @@ func set_selected(index: int, refuge: bool) -> void:
 func focus(plane_y: float) -> void:
 	# Près du bas de la carte, la caméra se décale vers le moulin, à gauche.
 	var shift := clampf((plane_y - 2300.0) / 320.0, 0.0, 1.0) * 300.0
-	var target := to_world(Vector2(CENTER.x - shift, plane_y), 0.3)
-	camera.position = target + CAMERA_OFFSET
+	focus_point(Vector2(CENTER.x - shift, plane_y))
+
+
+## Place la caméra pour regarder le point `plane` du plan, au rapprochement
+## `zoom`.
+func focus_point(plane: Vector2) -> void:
+	var target := to_world(plane, 0.3)
+	camera.position = target + CAMERA_OFFSET * zoom
 	camera.look_at(target, Vector3.UP)
+
+
+## Où la caméra regarde : x du plan quand on ne la décale pas.
+func default_x(plane_y: float) -> float:
+	return CENTER.x - clampf((plane_y - 2300.0) / 320.0, 0.0, 1.0) * 300.0
 
 
 ## Position à l'écran d'un point du plan.
@@ -590,7 +600,7 @@ func pick(at: Vector2, radius: float, mill_radius: float) -> int:
 func _process(delta: float) -> void:
 	_time += delta
 	if _sails != null:
-		_sails.rotation.z = _time * 0.5
+		_sails.basis = _sails_basis * Basis(Vector3.BACK, _time * 0.5)
 	if _wheel != null:
 		_wheel.rotation.z = -_time * 0.9
 	var pulse := 0.5 + 0.5 * sin(_time * 2.4)

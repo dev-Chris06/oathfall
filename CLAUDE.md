@@ -251,7 +251,7 @@ Retour de l'auteur encore attendu : les sensations de combat sur téléphone
 | `scripts/audio.gd` | Chargé en permanence (`Audio`) : bruitages (`Audio.play(&"clang")`), musiques en fondu (`Audio.music(&"boss")`), volumes des options. Événements et fichiers déclarés dans ses tableaux `EVENTS` et `TRACKS` |
 | `tools/audio/generate.py` | Fabrique les bruitages lourds et les six musiques en boucle (`python3 -I tools/audio/generate.py assets/audio`), reproductible |
 | `scripts/fx.gd` | Effets partagés : ondes au sol, matériaux simples |
-| `scripts/map/` | La carte : `world_map.gd` (écran, défilement, choix), `map_scene.gd` (le **modèle** de la carte : positions de la route et des niveaux, états, étages ; il n'est plus affiché), `map_world.gd` (la carte en **3D**, un diorama de la capitale en terrasses, route de braises, moulin à ailes et roue, fleuve animé, plaque des fondations) |
+| `scripts/map/` | La carte : `world_map.gd` (écran, défilement, pincement, choix, fiche du lieu, travelling, plongée), `map_scene.gd` (le **modèle** de la carte : positions de la route et des niveaux, états, étages ; il n'est plus affiché), `map_world.gd` (la scène 3D : route de braises, brasiers, moulin, fleuve, fondations, corbeau, caméra), `map_terrain.gd` (le **relief** : plateaux pavés, falaises, rampes, lit du fleuve, collines ; maillage fabriqué d'avance), `map_city.gd` (les **bâtiments** KayKit Medieval, regroupés par quartier, matériau de nuit, fenêtres), `map_life.gd` (la **ville qui se souvient** : brume, fenêtres, morts errants, corbeaux) |
 | `scripts/data/world_data.gd` | Chapitres et niveaux dans l'ordre de la route |
 | `scripts/ui/` | Polices, thème « théâtre d'ombres » (`Theatre`), page découpée du carnet, ciel de nuit, boîte de dialogue, boutique, écran-titre, ouverture |
 | `scripts/levels/arena.gd` | Salle d'essai, utilisée par le test automatique |
@@ -363,6 +363,31 @@ Règles à garder :
   caméra vise un point de la route (`scroll_to`) ; on choisit un point en
   projetant les positions à l'écran (`MapWorld.pick`, `WorldMap.screen_of` pour
   les essais). Les objets sont regroupés (MultiMesh) et luisent.
+- **Relief de la carte** : `MapTerrain` calcule la hauteur du sol à partir du
+  plan de `MapScene` ; le maillage est trop long à fabriquer sur le téléphone,
+  il est fait d'avance (`godot --headless --path . -- --terrain`, fichier
+  `assets/terrain/orvana_terrain.res`). Changer le relief, c'est changer
+  `MapTerrain.VERSION` et relancer l'outil : le test vérifie la version, et
+  que la route reste posée sur le relief.
+- **Ville de la carte** : un quartier par voie de la route (donc par
+  chapitre, `MapLife.zone_of`). Les bâtiments sont regroupés en MultiMesh par
+  (modèle, quartier) : la caméra n'en dessine qu'une partie. Budget vérifié
+  par le test (260 000 triangles en tout ; ~100 000 dessinés à l'écran). Les
+  maisons KayKit n'ont pas de vitres dans l'atlas : de petites fenêtres sont
+  posées sur la façade, d'après la porte (case 5,0) ; les tours, le château et
+  la caserne ont leurs meurtrières (case 3,0, `MapCity.GLASS`).
+- **Ville qui se souvient** : un quartier est « perdu » (brume noire, fenêtres
+  éteintes, morts errants, corbeaux), « atteint » (un niveau fait ou « ici » ;
+  une partie des fenêtres) ou « apaisé » (chapitre fini ; toutes). La brume se
+  lève sous les yeux du joueur une seule fois (`Progress.seen`). Un niveau
+  fait porte un brasier.
+- **Mouvements de la carte** : travelling du fleuve au lieu « ici » en ouvrant
+  la partie, recul depuis le niveau qu'on quitte (`WorldMap.arrived_from`),
+  plongée derrière un corbeau en entrant. Pincement (ou Ctrl + molette) pour
+  zoomer, double toucher dans le vide pour revenir « ici ». Les essais les
+  coupent (`WorldMap.cinematics`), sauf la plongée, vérifiée à part.
+- **Fiche du lieu** : chaque niveau de `WorldData` nomme ses morts (`dead`) ;
+  la fiche montre leurs portraits, en silhouette s'ils sont inconnus.
 - **Sous la ville (carte)** : la plaque sombre, le « ? » et dix cercles ne
   sont pas jouables. Un cercle s'allume quand les cinq niveaux de son chapitre
   sont faits ; le « ? » s'allume quand les dix le sont. Aucun nom n'y est écrit.
