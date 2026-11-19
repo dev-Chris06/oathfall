@@ -87,6 +87,13 @@ func _ready() -> void:
 	_focus.call_deferred()
 
 
+## Le modèle de la carte n'est pas dans l'arbre : il faut le libérer à la main.
+func _exit_tree() -> void:
+	if is_instance_valid(_scene):
+		_scene.free()
+		_scene = null
+
+
 func _process(delta: float) -> void:
 	_time += delta
 	if not _dragging and absf(_velocity) > 2.0:
