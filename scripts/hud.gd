@@ -16,6 +16,7 @@ var _boss_box: Control
 var _boss_fill: ColorRect
 var _boss_label: Label
 var _guide: Polygon2D
+var _balance: BalanceMeter
 
 
 func _ready() -> void:
@@ -74,6 +75,19 @@ func _ready() -> void:
 	_message.modulate.a = 0.0
 	_build_boss_bar()
 	_build_guide()
+	_balance = BalanceMeter.new()
+	_balance.visible = false
+	add_child(_balance)
+
+
+## L'indicateur de la balance du Peseur : le fléau penche du côté des morts
+## debout (à gauche) ou des corps (à droite).
+func set_balance(standing: int, bodies: int) -> void:
+	_balance.set_counts(standing, bodies)
+
+
+func hide_balance() -> void:
+	_balance.visible = false
 
 
 ## La flèche d'or qui montre l'objectif quand il est hors de l'écran.
@@ -194,3 +208,67 @@ func _make_label(font_size: int, color: Color) -> Label:
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(label)
 	return label
+
+
+## Une petite balance, sous la barre du boss : un fléau, deux plateaux, deux
+## chiffres. Elle penche en direct et s'écrit « équilibre » quand elle est droite.
+class BalanceMeter extends Control:
+	var standing := 0
+	var bodies := 0
+	var _tilt := 0.0
+	var _left: Label
+	var _right: Label
+	var _caption: Label
+
+	func _init() -> void:
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	func _ready() -> void:
+		set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
+		offset_left = -170.0
+		offset_right = 170.0
+		offset_top = 74.0
+		offset_bottom = 190.0
+		_left = Theatre.label("", 20, Theatre.CREAM)
+		_left.position = Vector2(8.0, 78.0)
+		add_child(_left)
+		_right = Theatre.label("", 20, Theatre.CREAM)
+		_right.position = Vector2(206.0, 78.0)
+		add_child(_right)
+		_caption = Theatre.label("", 20, Theatre.AMBER)
+		_caption.position = Vector2(112.0, 82.0)
+		add_child(_caption)
+
+	func set_counts(new_standing: int, new_bodies: int) -> void:
+		standing = new_standing
+		bodies = new_bodies
+		visible = true
+		_left.text = "Debout %d" % standing
+		_right.text = "Au sol %d" % bodies
+		var even := absi(standing - bodies) < 2
+		_caption.text = "ÉQUILIBRE" if even else ""
+		_caption.position.x = 170.0 - _caption.get_minimum_size().x / 2.0
+
+	func _process(delta: float) -> void:
+		var target := clampf(float(standing - bodies) * 0.12, -0.42, 0.42)
+		_tilt = lerpf(_tilt, target, minf(1.0, delta * 4.0))
+		if visible:
+			queue_redraw()
+
+	func _draw() -> void:
+		var centre := Vector2(170.0, 22.0)
+		var gold := Color(Theatre.AMBER, 0.95)
+		draw_colored_polygon(PackedVector2Array([centre + Vector2(0.0, -4.0), centre + Vector2(12.0, 48.0), centre + Vector2(-12.0, 48.0)]), Color(0.3, 0.22, 0.12, 0.95))
+		var left_end := centre + Vector2(-cos(_tilt), sin(_tilt)) * 110.0
+		var right_end := centre + Vector2(cos(_tilt), -sin(_tilt)) * 110.0
+		draw_line(left_end, right_end, gold, 5.0)
+		for end in [left_end, right_end]:
+			var pan := (end as Vector2) + Vector2(0.0, 30.0)
+			draw_line(end, pan, Color(gold, 0.7), 2.0)
+			var dish := PackedVector2Array()
+			for k in 14:
+				var angle := TAU * k / 14.0
+				dish.append(pan + Vector2(cos(angle) * 34.0, sin(angle) * 6.0))
+			draw_colored_polygon(dish, Color(0.55, 0.4, 0.18, 0.95))
+			draw_polyline(dish + PackedVector2Array([dish[0]]), gold, 1.5)
+		draw_circle(centre, 6.0, gold)

@@ -1562,6 +1562,8 @@ func _peseur_tests() -> bool:
 	await _frames(3)
 	if boss.evaluate_balance() != PeseurEnemy.Balance.EVEN:
 		return _fail("un corps et aucun mort debout : la balance n'est pas à l'équilibre")
+	if not boss.is_stunned():
+		return _fail("l'équilibre n'assomme pas le Peseur")
 	var vulnerable: int = hit.call(100)
 	if absi(vulnerable - int(round(100.0 * float(data["even_factor"])))) > 1:
 		return _fail("à l'équilibre, le Peseur a subi %d au lieu de 140" % vulnerable)
@@ -1583,6 +1585,25 @@ func _peseur_tests() -> bool:
 	if hero.health != life:
 		return _fail("un poids tombé loin du héros l'a blessé")
 
+	# Les motifs de poids : rouleau (5), paire (2) ; trois à la fois s'il y a trop de corps.
+	boss._weights.clear()
+	boss.balance_state = PeseurEnemy.Balance.EVEN
+	boss._pattern = 2
+	boss.drop_pattern()
+	if boss._weights.size() != 5:
+		return _fail("le rouleau de poids n'en compte pas cinq (%d)" % boss._weights.size())
+	boss._pattern = 1
+	boss.drop_pattern()
+	if boss._weights.size() != 7:
+		return _fail("la paire de poids n'en ajoute pas deux")
+	boss.balance_state = PeseurEnemy.Balance.LYING
+	boss.drop_pattern()
+	if boss._weights.size() != 10:
+		return _fail("trop de corps : le Peseur ne lance pas trois poids à la fois")
+	await _frames(3)
+	boss.evaluate_balance()
+	if boss.balance_state != PeseurEnemy.Balance.EVEN and boss.haste_time <= 0.0 and boss.state != Enemy.State.SPECIAL:
+		pass
 	print("test réussi : la balance du Peseur règle ses dégâts, ses poids sont annoncés et blessent")
 	boss.take_hit(hero.global_position, 100000)
 	adds[2].take_hit(hero.global_position, 100000)
@@ -1792,10 +1813,10 @@ func _map_tests() -> bool:
 	map = main.world_map
 	var grille: Vector2 = map._scene.node_positions[0]
 	for offset: Vector2 in [Vector2.ZERO, Vector2(-45.0, 0.0), Vector2(0.0, 40.0), Vector2(30.0, -30.0)]:
-		map._tap(map._scene.position + grille + offset)
+		map._tap(map.screen_of(grille + offset))
 		if map.selected_id() != &"la_grille":
 			return _fail("un toucher à %s de la Grille a choisi « %s »" % [offset, map.selected_id()])
-	map._tap(map._scene.position + WorldMap.MILL_POINT)
+	map._tap(map.screen_of(WorldMap.MILL_POINT))
 	if map.selected_id() != &"refuge":
 		return _fail("un toucher sur le moulin ne le choisit pas")
 	print("test 12 réussi : la Grille et le moulin ne se disputent plus les touchers")

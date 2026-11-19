@@ -309,8 +309,8 @@ const TYPES := {
 		"name": "Le Peseur",
 		# La fiche du bestiaire de Tibert.
 		"bestiary": {
-			"text": "Il juge tout sur sa balance, les corps comme les vivants. Trop de morts debout, il est protégé ; trop de corps, ses poids tombent plus vite.",
-			"tip": "Garde l'équilibre : abats les morts debout, donne le Repos aux corps. À l'équilibre, il est vulnérable. Une zone rouge annonce chaque poids.",
+			"text": "Il juge tout sur sa balance. Trop de morts debout, il est protégé par la fonte ; trop de corps, il s'emballe et lance trois poids à la fois ; à l'équilibre, il est assommé.",
+			"tip": "Garde l'équilibre : abats les morts debout, donne le Repos aux corps. À l'équilibre, frappe sans attendre. Des zones rouges annoncent ses poids, visés, par paires ou en rouleau.",
 		},
 		"behavior": "peseur",
 		"boss": true,
@@ -332,19 +332,23 @@ const TYPES := {
 		"stagger_guard": 3.5,
 		"combo_chance": 0.3,
 		# Les poids : intervalle, délai d'annonce, rayon, dégâts.
-		"weight_interval": 7.5,
-		"weight_windup": 1.5,
+		"weight_interval": 6.0,
+		"weight_windup": 1.15,
 		"weight_radius": 2.4,
 		"weight_damage": 22,
 		# Part des dégâts reçus selon la balance : protégé (trop de morts
-		# debout) et à l'équilibre.
+		# debout) et à l'équilibre (assommé). Plus de corps que de morts
+		# debout : il s'emballe (hâte permanente) et lance trois poids à la fois.
 		"shield_factor": 0.35,
-		"even_factor": 1.4,
+		"even_factor": 2.0,
+		"stun_time": 3.0,
+		"stun_cooldown": 9.0,
 		"rise_delay": 40.0,
 		"rise_health": 0.3,
 		"memories": 70,
 		"gold": 45,
 		"animations": {
+			"stun": "Hit_B",
 			"idle": "Idle_Combat",
 			"walk": "Walking_D_Skeletons",
 			"attack": "2H_Melee_Attack_Chop",

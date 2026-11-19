@@ -12,8 +12,13 @@ signal menu_requested
 
 const TAP_SLOP := 14.0
 const PICK_RADIUS := 52.0
-const PARALLAX := 0.35
 const FRICTION := 5.0
+## La caméra de la carte regarde un point de la route ; ces bornes sont les
+## ordonnées du plan qu'elle peut viser, du haut du palais au moulin.
+const FOCUS_MIN := 520.0
+const FOCUS_MAX := 2720.0
+## Ordonnées du plan parcourues par pixel d'écran quand on fait glisser.
+const DRAG_RATIO := 1.15
 ## Le moulin, sur la carte : le refuge, hors des murs.
 ## Il se tient sur la rive sud, loin des niveaux : sa zone tactile est la tour.
 const MILL_POINT := Vector2(135.0, 2650.0)
@@ -23,10 +28,13 @@ const MILL_RADIUS := 70.0
 var available: Array = []
 
 var _view: Control
-var _sky: NightSky
+## Le modèle de la carte (positions, états), non affiché : c'est `_world` qui
+## le montre, en 3D.
 var _scene: MapScene
-var _glow: MapGlow
-var _scroll := 0.0
+var _container: SubViewportContainer
+var _viewport: SubViewport
+var _world: MapWorld
+var _focus_y := 1500.0
 var _velocity := 0.0
 var _dragging := false
 var _moved := 0.0
@@ -57,13 +65,19 @@ func _ready() -> void:
 	_view.gui_input.connect(_on_view_input)
 	add_child(_view)
 
-	_sky = NightSky.new()
-	_view.add_child(_sky)
 	_scene = MapScene.new()
-	_view.add_child(_scene)
-	_glow = MapGlow.new()
-	_glow.scene = _scene
-	_scene.add_child(_glow)
+	_container = SubViewportContainer.new()
+	_container.stretch = true
+	_container.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_container.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_view.add_child(_container)
+	_viewport = SubViewport.new()
+	_viewport.handle_input_locally = false
+	_viewport.msaa_3d = Viewport.MSAA_DISABLED
+	_container.add_child(_viewport)
+	_world = MapWorld.new()
+	_viewport.add_child(_world)
+	_world.build(_scene)
 
 	_build_ui()
 	Progress.changed.connect(refresh)
@@ -76,15 +90,12 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	_time += delta
 	if not _dragging and absf(_velocity) > 2.0:
-		_scroll = _clamp_scroll(_scroll + _velocity * delta)
+		_focus_y = _clamp_focus(_focus_y - _velocity * delta * DRAG_RATIO)
 		_velocity *= exp(-FRICTION * delta)
 	elif not _dragging:
 		_velocity = 0.0
 	_apply_scroll()
-	_glow.time = _time
-	_glow.queue_redraw()
 	_scene.river.time = _time
-	_scene.river.queue_redraw()
 
 
 # --- États --------------------------------------------------------------------
@@ -126,7 +137,8 @@ func refresh() -> void:
 		if new_states[i] == "fait":
 			done += 1
 	_scene.set_states(new_states, flags)
-	_glow.ici_index = WorldData.level_index(current_id())
+	_world.set_states(new_states, flags)
+	_world.set_here(WorldData.level_index(current_id()))
 	var focus := WorldData.level_index(current_id())
 	var chapter := WorldData.chapter_of(maxi(focus, 0) if focus >= 0 else levels.size() - 1)
 	_chapter_label.text = "Chapitre %s" % WorldData.roman(chapter)
@@ -161,8 +173,7 @@ func enter_selected() -> void:
 func _select_index(index: int) -> void:
 	_selected = index
 	_refuge_selected = false
-	_glow.selected_index = index
-	_glow.refuge_selected = false
+	_world.set_selected(index, false)
 	_show_selection()
 
 
@@ -170,8 +181,7 @@ func _select_index(index: int) -> void:
 func select_refuge() -> void:
 	_selected = -1
 	_refuge_selected = true
-	_glow.selected_index = -1
-	_glow.refuge_selected = true
+	_world.set_selected(-1, true)
 	_show_selection()
 
 
@@ -203,8 +213,10 @@ func _show_selection() -> void:
 
 # --- Défilement ---------------------------------------------------------------
 
-func scroll_to(content_y: float, anchor := 0.58) -> void:
-	_scroll = _clamp_scroll(size.y * anchor - content_y)
+## Vise le point du plan d'ordonnée `content_y` (`anchor` est gardé pour
+## compatibilité : la caméra centre toujours son point de visée).
+func scroll_to(content_y: float, _anchor := 0.58) -> void:
+	_focus_y = _clamp_focus(content_y)
 	_velocity = 0.0
 	_apply_scroll()
 
@@ -219,19 +231,22 @@ func _focus() -> void:
 	scroll_to(_scene.node_positions[index].y)
 
 
-func _clamp_scroll(value: float) -> float:
-	return clampf(value, minf(0.0, size.y - MapScene.H), 0.0)
+func _clamp_focus(value: float) -> float:
+	return clampf(value, FOCUS_MIN, FOCUS_MAX)
 
 
 func _apply_scroll() -> void:
-	_scene.position = Vector2(floorf((size.x - MapScene.W) / 2.0), _scroll)
-	_sky.position.y = _scroll * PARALLAX
-	_sky.shift = _scene.position.x
+	_world.focus(_focus_y)
 
 
 func _layout() -> void:
-	_scroll = _clamp_scroll(_scroll)
+	_focus_y = _clamp_focus(_focus_y)
 	_apply_scroll()
+
+
+## Position à l'écran d'un point du plan de la carte (pour les essais).
+func screen_of(plane: Vector2) -> Vector2:
+	return _world.screen_of(plane)
 
 
 func _on_view_input(event: InputEvent) -> void:
@@ -248,29 +263,23 @@ func _on_view_input(event: InputEvent) -> void:
 						_tap(button.position)
 					_dragging = false
 			MOUSE_BUTTON_WHEEL_UP:
-				_scroll = _clamp_scroll(_scroll + 140.0)
+				_focus_y = _clamp_focus(_focus_y - 160.0)
 			MOUSE_BUTTON_WHEEL_DOWN:
-				_scroll = _clamp_scroll(_scroll - 140.0)
+				_focus_y = _clamp_focus(_focus_y + 160.0)
 	elif event is InputEventMouseMotion and _dragging:
 		var motion := event as InputEventMouseMotion
 		_moved += absf(motion.relative.x) + absf(motion.relative.y)
-		_scroll = _clamp_scroll(_scroll + motion.relative.y)
+		_focus_y = _clamp_focus(_focus_y - motion.relative.y * DRAG_RATIO)
 		_velocity = lerpf(_velocity, motion.relative.y * 60.0, 0.5)
 
 
-## Un toucher sur la carte : le point de la route le plus proche est choisi.
+## Un toucher sur la carte : le point de la route le plus proche est choisi,
+## sinon le moulin.
 func _tap(at: Vector2) -> void:
-	var local := at - _scene.position
-	var best := -1
-	var best_distance := PICK_RADIUS
-	for i in _scene.node_positions.size():
-		var distance := _scene.node_positions[i].distance_to(local)
-		if distance < best_distance:
-			best_distance = distance
-			best = i
-	if best >= 0:
-		_select_index(best)
-	elif local.distance_to(MILL_POINT) <= MILL_RADIUS:
+	var found := _world.pick(at, PICK_RADIUS, MILL_RADIUS)
+	if found >= 0:
+		_select_index(found)
+	elif found == -2:
 		select_refuge()
 
 
@@ -347,34 +356,3 @@ func open_book() -> void:
 		return
 	_book = SkillBook.new()
 	add_child(_book)
-
-
-## Ce qui bouge sur la carte : la braise du prochain niveau, l'anneau du
-## niveau choisi.
-class MapGlow extends Control:
-	var scene: MapScene
-	var ici_index := -1
-	var selected_index := -1
-	var refuge_selected := false
-	var time := 0.0
-
-	func _init() -> void:
-		mouse_filter = Control.MOUSE_FILTER_IGNORE
-		size = Vector2(MapScene.W, MapScene.H)
-
-	func _draw() -> void:
-		if scene == null:
-			return
-		if ici_index >= 0:
-			var p := scene.node_positions[ici_index]
-			var pulse := 0.5 + 0.5 * sin(time * 2.4)
-			# Le halo ne dépasse pas le rond de sélection : tous les niveaux
-			# choisis ont la même taille.
-			for k in 4:
-				draw_circle(p, 12.0 + 5.0 * k + 3.0 * pulse, Color(Theatre.EMBER, 0.16 - 0.03 * k))
-			draw_circle(p, 11.0, Color(1.0, 0.35, 0.19))
-			draw_circle(p, 5.0, Color(1.0, 0.86, 0.7))
-		if selected_index >= 0:
-			draw_arc(scene.node_positions[selected_index], 25.0 + 2.0 * sin(time * 3.0), 0.0, TAU, 40, Theatre.CREAM, 3.0)
-		if refuge_selected:
-			draw_arc(WorldMap.MILL_POINT, 62.0 + 2.0 * sin(time * 3.0), 0.0, TAU, 48, Theatre.CREAM, 3.0)

@@ -20,6 +20,8 @@ enum Balance { EVEN, STANDING, LYING }
 signal balance_changed(state: int)
 ## Un poids est annoncé à cet endroit.
 signal weight_marked(at: Vector3)
+## L'équilibre l'assomme : c'est le moment de le frapper.
+signal stunned
 ## Un poids s'est abattu ; `hit` dit s'il a touché le héros.
 signal weight_fell(at: Vector3, hit: bool)
 
@@ -28,25 +30,46 @@ var balance_state := Balance.EVEN
 var _weights: Array[Dictionary] = []
 var _weight_timer := 4.0
 var _check_timer := 0.0
+var _pattern := 0
+var _stun_cooldown := 0.0
+var _aura: MeshInstance3D
 
 
 func setup(type_id: StringName, hero: Hero) -> void:
 	super.setup(type_id, hero)
 	add_to_group(&"boss")
 	_weight_timer = float(_type["weight_interval"]) * 0.6
+	# Un anneau sous ses pieds dit où penche la balance.
+	_aura = Fx.disc(2.0, Color(0.6, 0.65, 0.75, 0.4))
+	add_child(_aura)
 
 
 func _physics_process(delta: float) -> void:
+	_stun_cooldown = maxf(0.0, _stun_cooldown - delta)
 	if is_standing():
 		_check_timer -= delta
 		if _check_timer <= 0.0:
 			_check_timer = 0.25
 			evaluate_balance()
+		# Trop de corps : il s'emballe, la hâte et la force d'un cri, en
+		# permanence (l'anneau est rouge).
+		if balance_state == Balance.LYING:
+			hasten(0.3)
 		# Le minuteur des poids court tant qu'il se bat, qu'on le harcèle ou non.
-		_weight_timer = maxf(0.0, _weight_timer - delta)
-		if _weight_timer <= 0.0 and _hero != null and not _hero.is_dead():
-			drop_weight_at(_hero.global_position + _hero.velocity * 0.35)
-			_weight_timer = weight_interval()
+		if state != State.SPECIAL:
+			_weight_timer = maxf(0.0, _weight_timer - delta)
+			if _weight_timer <= 0.0 and _hero != null and not _hero.is_dead():
+				drop_pattern()
+				_weight_timer = weight_interval()
+		_aura.visible = true
+		var color := Color(0.6, 0.65, 0.75, 0.4)
+		if balance_state == Balance.LYING:
+			color = Color(1.0, 0.2, 0.1, 0.4)
+		elif balance_state == Balance.EVEN:
+			color = Color(1.0, 0.85, 0.3, 0.55)
+		(_aura.material_override as StandardMaterial3D).albedo_color = color
+	else:
+		_aura.visible = false
 	_update_weights(delta)
 	super._physics_process(delta)
 
@@ -77,14 +100,35 @@ func evaluate_balance() -> int:
 	if next != balance_state:
 		balance_state = next
 		balance_changed.emit(next)
+		# L'équilibre l'assomme (pas plus d'une fois toutes les quelques secondes).
+		if next == Balance.EVEN and _stun_cooldown <= 0.0 and state != State.SPECIAL and is_standing():
+			_begin_stun()
 	return balance_state
+
+
+func _begin_stun() -> void:
+	_stun_cooldown = float(_type["stun_cooldown"])
+	_begin_special()
+	_once(_animation("stun"), 0.8)
+	stunned.emit()
+
+
+func _special(_delta: float) -> void:
+	velocity = Vector3.ZERO
+	if _state_time >= float(_type["stun_time"]):
+		state = State.CHASE
+		_cooldown = 1.0
+
+
+func is_stunned() -> bool:
+	return state == State.SPECIAL
 
 
 func weight_interval() -> float:
 	var interval := float(_type["weight_interval"])
 	match balance_state:
 		Balance.LYING:
-			return interval * 0.6
+			return interval * 0.75
 		Balance.EVEN:
 			return interval * 1.5
 	return interval
@@ -107,13 +151,41 @@ func take_hit(from: Vector3, damage: int) -> void:
 	super.take_hit(from, scaled)
 
 
-## Annonce un poids à cet endroit : un disque rouge, puis il s'abat.
-func drop_weight_at(at: Vector3) -> void:
+## Lance les poids : visés avec de l'avance sur le héros, par paires, ou en
+## rouleau vers lui ; trois à la fois quand il y a trop de corps.
+func drop_pattern() -> void:
+	var lead := _hero.velocity * 0.9
+	var target := _hero.global_position + Vector3(lead.x, 0.0, lead.z)
+	var toward := _hero.global_position - global_position
+	toward.y = 0.0
+	toward = toward.normalized() if toward.length() > 0.1 else Vector3(0.0, 0.0, 1.0)
+	var side := toward.cross(Vector3.UP)
+	if balance_state == Balance.LYING:
+		drop_weight_at(target)
+		drop_weight_at(target + side * 3.6, 0.1)
+		drop_weight_at(target - side * 3.6, 0.1)
+	else:
+		match _pattern % 3:
+			0:
+				drop_weight_at(target)
+			1:
+				drop_weight_at(target)
+				drop_weight_at(target + side * 3.4, 0.2)
+			2:
+				# Le rouleau : une file de poids qui vient vers le héros.
+				for i in 5:
+					drop_weight_at(global_position + toward * (3.0 + 2.6 * i), 0.22 * i)
+	_pattern += 1
+
+
+## Annonce un poids à cet endroit : un disque rouge, puis il s'abat (après
+## `delay` secondes si on le décale).
+func drop_weight_at(at: Vector3, delay := 0.0) -> void:
 	var radius := float(_type["weight_radius"])
 	var marker := Fx.disc(radius, Color(1.0, 0.25, 0.1, 0.1))
 	marker.position = Vector3(at.x, 0.09, at.z)
 	get_parent().add_child(marker)
-	_weights.append({"at": Vector3(at.x, 0.0, at.z), "time": 0.0, "marker": marker})
+	_weights.append({"at": Vector3(at.x, 0.0, at.z), "time": -delay, "marker": marker})
 	weight_marked.emit(at)
 
 

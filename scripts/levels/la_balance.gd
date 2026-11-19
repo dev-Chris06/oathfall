@@ -81,17 +81,19 @@ func _boss_fight() -> void:
 	boss = spawn(&"peseur", CENTER, false) as PeseurEnemy
 	boss.health_changed.connect(hud.set_boss)
 	boss.balance_changed.connect(_on_balance)
+	boss.stunned.connect(func() -> void: hud.show_message("L'équilibre assomme le Peseur.\nFrappe sans attendre !", 3.0))
 	boss.weight_marked.connect(_on_weight_marked)
 	boss.weight_fell.connect(func(_at: Vector3, _hit: bool) -> void: shake(0.9))
 	boss.fell.connect(_on_boss_fell)
 	hud.show_boss("Le Peseur", boss.health, int(EnemyTypes.get_type(&"peseur")["health"]))
-	hud.show_message("Le Peseur. Sa balance compare les morts debout et les corps.\nÀ l'équilibre, il est vulnérable.", 6.0)
+	hud.show_message("Le Peseur. Sa balance compare les morts debout et les corps.\nÀ l'équilibre, il est assommé.", 6.0)
 	for at: Vector3 in [Vector3(-7.0, 0.0, -24.0), Vector3(7.0, 0.0, -25.0)]:
 		_lay_corpse(at)
 	_feed_balance()
 
 	await until_peace()
 	hud.hide_boss()
+	hud.hide_balance()
 	await say("Le Peseur repose. La balance s'immobilise.", 3.5)
 
 
@@ -104,13 +106,11 @@ func _leave() -> void:
 func _on_balance(state: int) -> void:
 	match state:
 		PeseurEnemy.Balance.STANDING:
-			hud.show_message("Trop de morts debout : la balance le protège.\nAbats-les.", 3.5)
+			hud.show_message("Trop de morts debout : la fonte le protège.\nAbats-les.", 3.5)
 		PeseurEnemy.Balance.LYING:
-			hud.show_message("Trop de corps : ses poids tombent plus vite.\nDonne le Repos.", 3.5)
+			hud.show_message("Trop de corps : le Peseur s'emballe,\nses poids tombent par trois. Donne le Repos.", 3.5)
 		_:
-			if _first_balance:
-				_first_balance = false
-				hud.show_message("La balance est en équilibre.\nFrappe le Peseur !", 3.0)
+			pass
 
 
 func _on_weight_marked(_at: Vector3) -> void:
@@ -161,6 +161,7 @@ func _process(delta: float) -> void:
 	var counts := Vector2i.ZERO
 	if is_instance_valid(boss) and boss.is_standing():
 		counts = boss.balance_counts()
+		hud.set_balance(counts.x, counts.y)
 	# Le côté le plus lourd descend : les morts debout à gauche, les corps à droite.
 	var target := deg_to_rad(clampf(float(counts.x - counts.y) * 4.0, -18.0, 18.0))
 	_tilt = lerpf(_tilt, target, minf(1.0, delta * 2.5))

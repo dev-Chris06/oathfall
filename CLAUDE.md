@@ -105,18 +105,42 @@ niveau ». Tout niveau construit reste jouable à tout moment (essais) ;
 dernier point de reprise. L'arène d'essai reste disponible (`-- --arena`).
 
 **Le chapitre II** (niveaux 6 à 10) est construit : la Porte des halles, les Étals,
-la Balance, les Caves du marché, la Halle du Prévôt. Nouveaux morts : le
-**Boucher** (hachoir lent et lourd, comportement `melee`) et le **Crieur** (il ne
-frappe pas : son cri presse les morts debout 5 s, `Enemy.hasten` ; le frapper
-pendant qu'il prend son souffle l'interrompt). Le **Peseur** compare, avec sa
-balance, les morts debout et les corps au sol : trop de morts debout, il ne
-subit que 35 % des coups ; trop de corps, ses poids (annoncés par un disque
-rouge) tombent plus vite ; à l'équilibre, il subit 140 %. On règle la balance
-en abattant les uns et en donnant le Repos aux autres. Le **Prévôt** lève
-l'impôt : un cercle d'or est annoncé, trois secondes plus tard la levée frappe
-toute la salle sauf le cercle ; à chaque tiers de sa vie il décrète (intouchable
-1,6 s) et convoque ses percepteurs. Le joueur automatique rejoint le cercle
-(`_levy_step`) et esquive les poids.
+la Balance, les Caves du marché, la Halle du Prévôt. Les morts y sont plus
+solides (+30 % de vie, +20 % de dégâts, corps qui se relèvent plus vite :
+`Enemy.apply_chapter`, `Level.chapter`). Les armes coûtent le double.
+
+**Armure d'élan** (`"armor": true` dans les données) : un mort à armure n'est
+pas interrompu pendant son coup, n'est pas ébranlé deux fois de suite
+(`stagger_guard`), enchaîne parfois deux coups (`combo_chance`) et reste
+**ouvert** après un coup (`open_time` : il subit ×1,5). On esquive puis on
+frappe, on n'enchaîne pas.
+
+- **Boucher** (`butcher.gd`, 150 de vie, armure) : charge annoncée par une bande
+  rouge quand le héros est loin ; il s'assomme s'il heurte un mur ; sous la
+  moitié de sa vie il enrage (hâte et force permanentes, anneau rouge).
+- **Crieur** (`crier.gd`) : il ne frappe pas. Il crie quand au moins deux morts
+  se battent contre le héros : ils sont **pressés** (×1,45 de vitesse, ×1,4 de
+  dégâts, anneau rouge aux pieds, `Enemy.hasten`). Seul, il **appelle du renfort**
+  (deux Dépouilles, `call_requested`, du côté du héros). Le frapper pendant qu'il
+  prend son souffle l'interrompt. La cloche agit sur les corps, lui sur les vivants.
+- **Peseur** (boss) : sa balance compare morts debout et corps. Trop de morts
+  debout : il ne subit que 35 % (anneau gris). Trop de corps : il s'emballe (hâte
+  permanente, anneau rouge) et lance trois poids à la fois. À l'**équilibre** : il
+  est assommé 3 s et subit ×2 (anneau doré ; au plus une fois toutes les 9 s).
+  Les poids sont annoncés au sol et varient : visés avec de l'avance, par paires,
+  en rouleau de cinq. Un indicateur de balance s'affiche sous la barre du boss
+  (`Hud.set_balance`).
+- **Prévôt** (boss) : armure et enchaînement. Il lève l'impôt : un cercle d'or
+  (de plus en plus petit selon le tiers de sa vie, qui dérive) est annoncé ; la
+  levée frappe tout hors du cercle et **relève les corps** hors du cercle ; au
+  dernier tiers un faux cercle terne l'accompagne. À chaque tiers il décrète
+  (intouchable 1,6 s) et convoque ses percepteurs.
+
+Le joueur automatique joue comme un joueur attentif : il esquive, recule devant
+un coup à armure et frappe quand le mort est ouvert, vise les Crieurs d'abord,
+rejoint le cercle d'or, boit ses fioles (il en a trois) et, au chapitre II,
+s'équipe (lame longue, rondache). `-- --selftest --only=<niveau>` ne traverse
+qu'un niveau (mise au point).
 
 **Le refuge** (`refuge.gd`) est le moulin, hors des murs : un niveau calme, sans
 mort. Maud (boutique d'**équipement** payé en or, `Gear` et `ShopScreen`), frère
@@ -223,11 +247,11 @@ Retour de l'auteur encore attendu : les sensations de combat sur téléphone
 | `scripts/data/refuge_texts.gd`, `gear.gd` | Conversations du refuge ; équipement (objets, effets, `Gear.apply`) |
 | `scripts/dev/portrait_tool.gd` | Fabrique les portraits du bestiaire (`-- --portraits`), rendus des vrais modèles |
 | `scripts/enemies/` | Comportements propres : archer (et son carreau), Porte-cloche, Fouisseur, Veuve, Sonneur, la grosse cloche avec ses cordes (`great_bell.gd`, `bell_rope.gd`), Fossoyeuse et ses pierres (`fossoyeuse.gd`, `grave_stone.gd`) |
-| `scripts/enemies/crier.gd`, `peseur.gd`, `prevot.gd` | Chapitre II : le Crieur (son cri donne la hâte, `Enemy.hasten`), le Peseur (boss : la balance), le Prévôt (boss : la levée et le cercle d'or) |
+| `scripts/enemies/butcher.gd`, `crier.gd`, `peseur.gd`, `prevot.gd` | Chapitre II : le Boucher (charge), le Crieur (hâte et renfort), le Peseur (boss : la balance), le Prévôt (boss : la levée et le cercle d'or) |
 | `scripts/audio.gd` | Chargé en permanence (`Audio`) : bruitages (`Audio.play(&"clang")`), musiques en fondu (`Audio.music(&"boss")`), volumes des options. Événements et fichiers déclarés dans ses tableaux `EVENTS` et `TRACKS` |
 | `tools/audio/generate.py` | Fabrique les bruitages lourds et les six musiques en boucle (`python3 -I tools/audio/generate.py assets/audio`), reproductible |
 | `scripts/fx.gd` | Effets partagés : ondes au sol, matériaux simples |
-| `scripts/map/` | La carte : `world_map.gd` (écran, défilement, choix), `map_scene.gd` (la ville dessinée par code ; un chapitre par voie de la route ; le moulin, le pont et le fleuve animé sur la rive sud, `MapRiver`) |
+| `scripts/map/` | La carte : `world_map.gd` (écran, défilement, choix), `map_scene.gd` (le **modèle** de la carte : positions de la route et des niveaux, états, étages ; il n'est plus affiché), `map_world.gd` (la carte en **3D**, un diorama de la capitale en terrasses, route de braises, moulin à ailes et roue, fleuve animé, plaque des fondations) |
 | `scripts/data/world_data.gd` | Chapitres et niveaux dans l'ordre de la route |
 | `scripts/ui/` | Polices, thème « théâtre d'ombres » (`Theatre`), page découpée du carnet, ciel de nuit, boîte de dialogue, boutique, écran-titre, ouverture |
 | `scripts/levels/arena.gd` | Salle d'essai, utilisée par le test automatique |
@@ -334,6 +358,11 @@ Règles à garder :
   carnet. La légende du bouton d'action est un `Label` (le texte dessiné dans la
   zone des boutons sortait en blocs). Le bouton pause (à côté du carnet, ou
   Échap/P) ouvre `PauseMenu` : Reprendre, volumes, Quitter après confirmation.
+- **La carte en 3D** : un point du plan de `MapScene` (x, y) se pose dans le monde
+  en (x, hauteur de l'étage, y) à l'échelle 0,03 (`MapWorld.to_world`). La
+  caméra vise un point de la route (`scroll_to`) ; on choisit un point en
+  projetant les positions à l'écran (`MapWorld.pick`, `WorldMap.screen_of` pour
+  les essais). Les objets sont regroupés (MultiMesh) et luisent.
 - **Sous la ville (carte)** : la plaque sombre, le « ? » et dix cercles ne
   sont pas jouables. Un cercle s'allume quand les cinq niveaux de son chapitre
   sont faits ; le « ? » s'allume quand les dix le sont. Aucun nom n'y est écrit.
