@@ -433,8 +433,15 @@ Règles à garder :
 **Les rites de combat** (`RiteData`) : les attaques spéciales. Chaque Repos
 donné allume une **braise** (cinq au plus, gardées par la sauvegarde) ; un
 rite coûte une à trois braises, rien ne se recharge avec le temps. Trois
-rites portés, un bouton chacun en arc autour de FRAPPER (icône dessinée en
-code, coût en losanges, **nom dessous**) ; clavier 1, 2, 3. Neuf rites : Glas
+rites portés, un bouton chacun sur un quart de cercle autour de FRAPPER, tous
+à la même distance (`TouchControls.SLOT_ARC`, disposition choisie par
+l'auteur : l'arc serré, l'esquive tout en bas à gauche de FRAPPER, REPOS à
+gauche de l'arc) ; icône dessinée en code, coût en losanges, **nom
+dessous** ; clavier 1, 2, 3. `TouchControls.layout_problems()` vérifie (test)
+qu'aucun bouton ne se chevauche, ne sort de l'écran, ni ne touche le nom d'un
+rite. **Les rites portés se choisissent sur la carte**, dans la fiche du
+lieu, au-dessus d'« Entrer » ; en plein niveau, le carnet les montre mais ne
+les change plus (`SkillBook.in_level`). Neuf rites : Glas
 (onde qui renverse), Linceul (tourbillon), Cortège (ruée qui traverse),
 Tombée (bond, impact), Requiem (garde fendue : le coup suivant abat), Litanie
 (cinq coups, le dernier abat), Cierge (zone où les corps ne se relèvent pas),

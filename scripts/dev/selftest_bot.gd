@@ -1997,6 +1997,19 @@ func _map_life_tests() -> bool:
 		for type_id: StringName in level_data["dead"]:
 			if not EnemyTypes.TYPES.has(type_id):
 				return _fail("%s nomme un mort inconnu : %s" % [level_data["id"], type_id])
+	# Les rites portés se choisissent dans la fiche du lieu, avant d'entrer.
+	if map.worn_rites_shown() != RiteData.SLOTS:
+		return _fail("la fiche du lieu ne montre pas les trois rites portés (%d)" % map.worn_rites_shown())
+	map.open_rite_picker(0)
+	if not map.rite_picker_shown():
+		return _fail("toucher un rite porté n'ouvre pas la liste des rites")
+	if not map.choose_rite(0, &"tombee") or Progress.rite_slots[0] != &"tombee" or map.rite_picker_shown():
+		return _fail("choisir la Tombée dans la liste ne la porte pas")
+	map.select_refuge()
+	if map.worn_rites_shown() != 0:
+		return _fail("la fiche du moulin montre des rites à porter")
+	map.select_level(&"les_allees")
+
 	# Le pincement reste dans ses bornes.
 	map._set_zoom(0.1)
 	if not is_equal_approx(map._zoom, WorldMap.ZOOM_MIN):
@@ -2199,6 +2212,13 @@ func _rite_tests() -> bool:
 	await _frames(3)
 	print("test réussi : les braises, et les neuf rites de combat (%s)" % ", ".join(RiteData.ORDER.map(func(id: StringName) -> String: return RiteData.RITES[id]["name"])))
 
+	# Les boutons : ni chevauchement, ni sortie d'écran, ni nom de rite qui
+	# touche un bouton, sur le téléphone de l'auteur (19,5:9) comme en 16:9.
+	for screen: Vector2 in [Vector2(1560.0, 720.0), Vector2(1280.0, 720.0)]:
+		var problems := arena.controls.layout_problems(screen)
+		if not problems.is_empty():
+			return _fail("disposition des boutons en %s : %s" % [screen, ", ".join(problems)])
+
 	# Requiem sans cible : refusé, sans rien coûter.
 	Progress.embers = RiteData.MAX_EMBERS
 	Progress.rite_slots = [&"requiem", &"", &""]
@@ -2214,6 +2234,10 @@ func _rite_tests() -> bool:
 	await get_tree().process_frame
 	var book := arena.book
 	book.show_rite(&"litanie")
+	var worn_before := Progress.rite_slots.duplicate()
+	if book.wear_rite(1) or Progress.rite_slots != worn_before:
+		return _fail("en plein niveau, le carnet change les rites portés")
+	book.in_level = false
 	if not book.wear_rite(1) or Progress.rite_slots[1] != &"litanie":
 		return _fail("le carnet ne porte pas la Litanie à l'emplacement 2")
 	book.show_rite(&"rappel")
@@ -2706,6 +2730,13 @@ func _capture_map() -> void:
 	await _shoot("map_13_carnet_combat")
 	map._book.close_book()
 	await get_tree().create_timer(0.2).timeout
+	map.select_level(&"l_ossuaire")
+	await get_tree().create_timer(0.3).timeout
+	await _shoot("map_15_fiche_rites")
+	map.open_rite_picker(1)
+	await get_tree().create_timer(0.3).timeout
+	await _shoot("map_16_choix_rite")
+	map._close_rite_picker()
 	map.cinematics = true
 	map.select_level(&"la_chapelle")
 	map.enter_selected()

@@ -18,6 +18,9 @@ var can_leave := false
 var tab := &"rites"
 ## Le rite de combat montré dans l'onglet « combat ».
 var shown_rite: StringName = &""
+## Ouvert en plein niveau : les rites portés ne changent pas (on les choisit
+## sur la carte, avant d'entrer).
+var in_level := false
 
 var _left: CutPage
 var _right: CutPage
@@ -205,6 +208,8 @@ func show_rite(rite_id: StringName) -> void:
 
 ## Porte le rite montré à l'emplacement `slot`.
 func wear_rite(slot: int) -> bool:
+	if in_level:
+		return false
 	var done := Progress.equip_rite(shown_rite, slot)
 	_refresh()
 	return done
@@ -253,10 +258,14 @@ func _fill_combat(page: VBoxContainer) -> void:
 		var button := Button.new()
 		button.text = "%d · %s" % [i + 1, RiteData.RITES[worn]["name"] if worn != &"" else "vide"]
 		Theatre.pill(button, 16, Theatre.AMBER if worn == shown_rite else Theatre.MUTED)
-		button.disabled = not open
+		button.disabled = not open or in_level
 		button.pressed.connect(wear_rite.bind(i))
 		slots.add_child(button)
 	page.add_child(slots)
+	if in_level:
+		var note := Theatre.label("En combat, on garde ses rites : ils se choisissent sur la carte, avant d'entrer.", 15, Theatre.MUTED, GameFonts.italic())
+		note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		page.add_child(note)
 
 	var grid := GridContainer.new()
 	grid.columns = 5

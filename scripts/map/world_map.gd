@@ -72,6 +72,9 @@ var _fade: ColorRect
 var _portraits: HBoxContainer
 ## La fiche d'un rite qui vient de s'ouvrir, s'il y en a une.
 var _rite_card: Control
+## Les trois rites portés, dans la fiche du lieu, et la liste pour en changer.
+var _rites_strip: HBoxContainer
+var _rite_picker: Control
 
 var _chapter_label: Label
 var _chapter_title: Label
@@ -315,6 +318,7 @@ func _show_selection() -> void:
 	var level := WorldData.level_at(_selected)
 	_bottom.visible = (_selected >= 0 or _refuge_selected) and _dive.is_empty()
 	_show_portraits(level.get("dead", []) if not _refuge_selected else [])
+	_show_worn_rites(not _refuge_selected and not level.is_empty() and is_ready(level.get("id", &"")))
 	if _refuge_selected:
 		_bottom_title.text = "Le moulin"
 		_bottom_text.text = "Le refuge, hors des murs. Maud, frère Anselme et Tibert y vivent encore : on y achète, on y apprend."
@@ -565,11 +569,22 @@ func _build_ui() -> void:
 	_portraits.add_theme_constant_override("separation", 6)
 	_portraits.alignment = BoxContainer.ALIGNMENT_END
 	row.add_child(_portraits)
+	# À droite : les trois rites portés (on les choisit ici, avant d'entrer),
+	# puis « Entrer ».
+	var right := VBoxContainer.new()
+	right.add_theme_constant_override("separation", 6)
+	right.alignment = BoxContainer.ALIGNMENT_END
+	row.add_child(right)
+	_rites_strip = HBoxContainer.new()
+	_rites_strip.add_theme_constant_override("separation", 6)
+	_rites_strip.alignment = BoxContainer.ALIGNMENT_END
+	right.add_child(_rites_strip)
 	_enter_button = Button.new()
 	_enter_button.text = "Entrer"
 	Theatre.primary(_enter_button, 26)
+	_enter_button.size_flags_horizontal = Control.SIZE_SHRINK_END
 	_enter_button.pressed.connect(enter_selected)
-	row.add_child(_enter_button)
+	right.add_child(_enter_button)
 	add_child(_bottom)
 
 	# Le noir de la plongée et du retour.
@@ -676,6 +691,117 @@ func show_next_rite() -> bool:
 
 func rite_card_shown() -> bool:
 	return _rite_card != null and is_instance_valid(_rite_card) and not _rite_card.is_queued_for_deletion()
+
+
+# --- Les rites portés, choisis avant d'entrer ----------------------------------
+
+## Montre les trois rites portés au-dessus d'« Entrer » ; toucher l'un d'eux
+## ouvre la liste des rites pour le remplacer. Rien tant qu'aucun rite n'est
+## ouvert.
+func _show_worn_rites(shown: bool) -> void:
+	for child in _rites_strip.get_children():
+		child.queue_free()
+	_rites_strip.visible = shown and not Progress.unlocked_rites().is_empty()
+	if not _rites_strip.visible:
+		return
+	_rites_strip.add_child(Theatre.label("Rites :", 18, Theatre.MUTED, GameFonts.italic()))
+	for i in RiteData.SLOTS:
+		var id: StringName = Progress.rite_slots[i]
+		var cell := VBoxContainer.new()
+		cell.add_theme_constant_override("separation", 0)
+		cell.custom_minimum_size = Vector2(76.0, 0.0)
+		var badge := SkillBook.RiteBadge.new(id, 26.0, id != &"")
+		badge.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		badge.pressed.connect(open_rite_picker.bind(i))
+		cell.add_child(badge)
+		var name_label := Theatre.label(RiteData.RITES[id]["name"] if id != &"" else "vide", 15, Theatre.CREAM if id != &"" else Theatre.MUTED)
+		name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		cell.add_child(name_label)
+		_rites_strip.add_child(cell)
+
+
+## Les rites portés montrés dans la fiche du lieu (pour les essais).
+func worn_rites_shown() -> int:
+	if not _rites_strip.visible:
+		return 0
+	return _rites_strip.get_children().filter(func(child: Node) -> bool: return child is VBoxContainer and not child.is_queued_for_deletion()).size()
+
+
+## Porte le rite `id` à l'emplacement `slot`, comme si le joueur l'avait
+## choisi dans la liste.
+func choose_rite(slot: int, id: StringName) -> bool:
+	var done := Progress.equip_rite(id, slot)
+	_close_rite_picker()
+	_show_selection()
+	return done
+
+
+## La liste des rites ouverts, pour l'emplacement `slot` : une icône, le nom
+## dessous, le coût ; celui qui est déjà porté là est cerclé d'or.
+func open_rite_picker(slot: int) -> void:
+	_close_rite_picker()
+	var veil := ColorRect.new()
+	veil.color = Color(0.0, 0.0, 0.03, 0.7)
+	veil.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	veil.mouse_filter = Control.MOUSE_FILTER_STOP
+	veil.gui_input.connect(func(event: InputEvent) -> void:
+		if event is InputEventMouseButton and event.pressed:
+			_close_rite_picker())
+	add_child(veil)
+	_rite_picker = veil
+	var center := CenterContainer.new()
+	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	veil.add_child(center)
+	var card := PanelContainer.new()
+	card.add_theme_stylebox_override("panel", Theatre.panel_box(0.97))
+	center.add_child(card)
+	var column := VBoxContainer.new()
+	column.add_theme_constant_override("separation", 10)
+	card.add_child(column)
+	column.add_child(Theatre.label("Rite %d : lequel porter ?" % (slot + 1), 30, Theatre.AMBER, GameFonts.title()))
+	var grid := GridContainer.new()
+	grid.columns = 5
+	grid.add_theme_constant_override("h_separation", 10)
+	grid.add_theme_constant_override("v_separation", 4)
+	column.add_child(grid)
+	for id in Progress.unlocked_rites():
+		var cell := VBoxContainer.new()
+		cell.add_theme_constant_override("separation", 0)
+		cell.custom_minimum_size = Vector2(104.0, 0.0)
+		var badge := SkillBook.RiteBadge.new(id, 40.0, true, Progress.rite_slots[slot] == id)
+		badge.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		badge.pressed.connect(choose_rite.bind(slot, id))
+		cell.add_child(badge)
+		var name_label := Theatre.label(RiteData.RITES[id]["name"], 17)
+		name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		cell.add_child(name_label)
+		var cost := RiteData.cost(id)
+		var cost_label := Theatre.label("◆".repeat(cost), 13, Theatre.EMBER)
+		cost_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		cell.add_child(cost_label)
+		grid.add_child(cell)
+	var hint := Theatre.label("Leurs animations sont dans le CARNET, onglet Combat. En plein niveau, les rites portés ne changent plus.", 16, Theatre.MUTED, GameFonts.italic())
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	hint.custom_minimum_size = Vector2(540.0, 0.0)
+	column.add_child(hint)
+	var cancel := Button.new()
+	cancel.text = "Garder"
+	Theatre.pill(cancel, 20, Theatre.MUTED)
+	cancel.size_flags_horizontal = Control.SIZE_SHRINK_END
+	cancel.pressed.connect(_close_rite_picker)
+	column.add_child(cancel)
+	Audio.play(&"page")
+
+
+func _close_rite_picker() -> void:
+	if _rite_picker != null and is_instance_valid(_rite_picker):
+		_rite_picker.queue_free()
+	_rite_picker = null
+
+
+func rite_picker_shown() -> bool:
+	return _rite_picker != null and is_instance_valid(_rite_picker) and not _rite_picker.is_queued_for_deletion()
 
 
 ## Les portraits montrés dans la fiche du lieu (pour les essais).

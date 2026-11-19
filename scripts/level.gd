@@ -427,6 +427,7 @@ func open_book() -> void:
 		return
 	book = SkillBook.new()
 	book.can_leave = true
+	book.in_level = true
 	book.leave_requested.connect(_on_leave)
 	add_child(book)
 

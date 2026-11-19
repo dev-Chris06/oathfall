@@ -20,7 +20,7 @@ const RITE_RADIUS := 66.0
 const BOOK_RADIUS := 44.0
 const FLASK_RADIUS := 50.0
 const PAUSE_RADIUS := 38.0
-const SLOT_RADIUS := 52.0
+const SLOT_RADIUS := 46.0
 
 ## Direction voulue, de longueur 0 à 1. x vers la droite, y vers le bas de l'écran.
 var move := Vector2.ZERO
@@ -178,6 +178,46 @@ func press_attack() -> void:
 	attack_pressed.emit()
 
 
+## Ce qui cloche dans la disposition des boutons pour un écran de `size`
+## (vide si tout va bien) : deux boutons qui se chevauchent, un bouton hors de
+## l'écran, le nom d'un rite qui touche un bouton.
+func layout_problems(screen: Vector2) -> Array[String]:
+	var saved := _pad.size
+	_pad.size = screen
+	var circles := {
+		"FRAPPER": [_attack_center(), ATTACK_RADIUS], "ESQUIVE": [_dodge_center(), DODGE_RADIUS],
+		"FIOLE": [_flask_center(), FLASK_RADIUS], "REPOS": [_rite_center(), RITE_RADIUS],
+		"CARNET": [_book_center(), BOOK_RADIUS], "PAUSE": [_pause_center(), PAUSE_RADIUS],
+	}
+	for i in 3:
+		circles["rite %d" % (i + 1)] = [slot_center(i), SLOT_RADIUS]
+	var problems: Array[String] = []
+	var names := circles.keys()
+	for a in names.size():
+		var ca: Vector2 = circles[names[a]][0]
+		var ra: float = circles[names[a]][1]
+		if ca.x - ra < 0.0 or ca.y - ra < 0.0 or ca.x + ra > screen.x or ca.y + ra > screen.y:
+			problems.append("%s sort de l'écran" % names[a])
+		for b in range(a + 1, names.size()):
+			var cb: Vector2 = circles[names[b]][0]
+			var rb: float = circles[names[b]][1]
+			if ca.distance_to(cb) < ra + rb + 8.0:
+				problems.append("%s et %s se touchent" % [names[a], names[b]])
+	# Le nom sous chaque rite : une bande de 110 × 26 sous le bouton.
+	for i in 3:
+		var c := slot_center(i)
+		var band := Rect2(c + Vector2(-55.0, SLOT_RADIUS + 6.0), Vector2(110.0, 26.0))
+		for key: String in names:
+			if key == "rite %d" % (i + 1):
+				continue
+			var center: Vector2 = circles[key][0]
+			var closest := Vector2(clampf(center.x, band.position.x, band.end.x), clampf(center.y, band.position.y, band.end.y))
+			if closest.distance_to(center) < float(circles[key][1]):
+				problems.append("le nom du rite %d touche %s" % [i + 1, key])
+	_pad.size = saved
+	return problems
+
+
 func press_slot(slot: int) -> void:
 	if slot < 0 or slot >= rite_slots.size() or rite_slots[slot] == &"":
 		return
@@ -198,15 +238,16 @@ func _slot_at(point: Vector2) -> int:
 	return -1
 
 
-## Les trois rites, en arc au-dessus et à gauche de FRAPPER.
+## Les trois rites, sur un quart de cercle autour de FRAPPER, tous à la même
+## distance de lui (210) : le pouce pivote sans quitter son appui. Le nom de
+## chaque rite tient dessous sans toucher un voisin (vérifié par le test).
+const SLOT_ARC := 210.0
+const SLOT_ANGLES := [162.0, 122.0, 84.0]
+
+
 func slot_center(slot: int) -> Vector2:
-	match slot:
-		0:
-			return Vector2(_pad.size.x - 345.0, _pad.size.y - 280.0)
-		1:
-			return Vector2(_pad.size.x - 262.0, _pad.size.y - 420.0)
-		_:
-			return Vector2(_pad.size.x - 475.0, _pad.size.y - 325.0)
+	var angle := deg_to_rad(float(SLOT_ANGLES[clampi(slot, 0, 2)]))
+	return _attack_center() + Vector2(cos(angle), -sin(angle)) * SLOT_ARC
 
 
 func press_dodge() -> void:
@@ -226,7 +267,7 @@ func _pause_center() -> Vector2:
 
 
 func _flask_center() -> Vector2:
-	return Vector2(_pad.size.x - 480.0, _pad.size.y - 100.0)
+	return Vector2(_pad.size.x - 525.0, _pad.size.y - 80.0)
 
 
 func _book_center() -> Vector2:
@@ -238,11 +279,12 @@ func _attack_center() -> Vector2:
 
 
 func _dodge_center() -> Vector2:
-	return Vector2(_pad.size.x - 335.0, _pad.size.y - 105.0)
+	return Vector2(_pad.size.x - 385.0, _pad.size.y - 68.0)
 
 
+## REPOS (et PARLER, COUPER…) : à gauche de l'arc des rites.
 func _rite_center() -> Vector2:
-	return Vector2(_pad.size.x - 140.0, _pad.size.y - 345.0)
+	return Vector2(_pad.size.x - 420.0, _pad.size.y - 330.0)
 
 
 ## Les icônes, dessinées en code : une épée, un bond de côté, une fiole, une
