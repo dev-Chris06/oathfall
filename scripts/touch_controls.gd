@@ -178,7 +178,7 @@ func _rite_center() -> Vector2:
 	return Vector2(_pad.size.x - 140.0, _pad.size.y - 345.0)
 
 
-## Les icônes, dessinées en code : une épée, une roulade, une fiole, une
+## Les icônes, dessinées en code : une épée, un bond de côté, une fiole, une
 ## pierre tombale (le Repos), une bulle, une porte, des ciseaux, un livre.
 const PALE := Color(0.94, 0.89, 0.76)
 const ACCENT_ATTACK := Color(0.9, 0.3, 0.2)
@@ -281,15 +281,20 @@ func _draw_icon(kind: StringName, c: Vector2, s: float, accent: Color) -> void:
 			_pad.draw_colored_polygon(_shape([Vector2(-0.07, 0.38), Vector2(0.07, 0.38), Vector2(0.07, 0.78), Vector2(-0.07, 0.78)], c, s, a), Color(0.55, 0.36, 0.2))
 			_pad.draw_circle(c + Vector2(0.0, 0.88).rotated(a) * s, 0.13 * s, accent.lightened(0.25))
 		&"roll":
-			var r := 0.72 * s
-			_pad.draw_arc(c, r, PI * 0.12, PI * 1.5, 28, PALE, 0.17 * s, true)
-			var end := PI * 1.5
-			var tip_at := c + Vector2.from_angle(end) * r
-			var tangent := Vector2(-sin(end), cos(end))
-			var normal := Vector2.from_angle(end)
-			_pad.draw_colored_polygon(PackedVector2Array([tip_at + tangent * 0.4 * s, tip_at + normal * 0.3 * s, tip_at - normal * 0.3 * s]), PALE)
-			_pad.draw_arc(c, r * 0.5, PI * 1.12, PI * 2.5, 20, Color(PALE, 0.55), 0.1 * s, true)
-			_pad.draw_circle(c, 0.16 * s, accent)
+			# Un homme qui bondit de côté, et les traits de sa vitesse derrière lui.
+			var w := 0.15 * s
+			var o := c + Vector2(0.18, 0.0) * s
+			_pad.draw_circle(o + Vector2(0.3, -0.62) * s, 0.17 * s, PALE)
+			_pad.draw_line(o + Vector2(0.2, -0.4) * s, o + Vector2(-0.12, 0.12) * s, PALE, w * 1.25, true)
+			_pad.draw_line(o + Vector2(0.15, -0.3) * s, o + Vector2(0.52, -0.12) * s, PALE, w * 0.8, true)
+			_pad.draw_line(o + Vector2(0.15, -0.3) * s, o + Vector2(-0.22, -0.38) * s, PALE, w * 0.8, true)
+			_pad.draw_line(o + Vector2(-0.12, 0.12) * s, o + Vector2(0.28, 0.32) * s, PALE, w, true)
+			_pad.draw_line(o + Vector2(0.28, 0.32) * s, o + Vector2(0.2, 0.7) * s, PALE, w, true)
+			_pad.draw_line(o + Vector2(-0.12, 0.12) * s, o + Vector2(-0.46, 0.56) * s, PALE, w, true)
+			for k in 3:
+				var y := -0.32 + 0.36 * k
+				var length := 0.34 if k == 1 else 0.24
+				_pad.draw_line(c + Vector2(-0.95, y) * s, c + Vector2(-0.95 + length, y) * s, Color(accent, 0.95), 0.1 * s, true)
 		&"flask":
 			_pad.draw_colored_polygon(_shape([Vector2(-0.2, -0.62), Vector2(0.2, -0.62), Vector2(0.2, -0.12), Vector2(-0.2, -0.12)], c, s), Color(PALE, 0.85))
 			_pad.draw_circle(c + Vector2(0.0, 0.32) * s, 0.58 * s, Color(PALE, 0.9))

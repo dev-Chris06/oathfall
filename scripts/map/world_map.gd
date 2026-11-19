@@ -140,11 +140,6 @@ func _process(delta: float) -> void:
 		_velocity *= exp(-FRICTION * delta)
 	elif not _dragging:
 		_velocity = 0.0
-		# Revenu à la vue d'ensemble, la visée se recentre.
-		if _focus_x >= 0.0 and _zoom > 0.97:
-			_focus_x = move_toward(_focus_x, _world.default_x(_focus_y), delta * 400.0)
-			if is_equal_approx(_focus_x, _world.default_x(_focus_y)):
-				_focus_x = -1.0
 	_apply_scroll()
 	_scene.river.time = _time
 
@@ -371,8 +366,9 @@ func _focus() -> void:
 		_fade.color.a = 1.0
 		_start_glide(Vector3(from.x, from.y, 0.22), Vector3(_world.default_x(from.y), _clamp_focus(from.y), 1.0), BACK_TIME)
 	else:
-		# En ouvrant la partie : un lent travelling, du fleuve jusqu'au lieu.
-		_start_glide(Vector3(_world.default_x(FOCUS_MAX), FOCUS_MAX, 1.15), goal, OPENING_TIME)
+		# En ouvrant la partie : un lent travelling, du fleuve jusqu'au lieu,
+		# face à la ville.
+		_start_glide(Vector3(MapWorld.CENTER.x, MapScene.RIVER_TOP + 60.0, 1.15), goal, OPENING_TIME)
 
 
 func _clamp_focus(value: float) -> float:
@@ -437,9 +433,8 @@ func _on_view_input(event: InputEvent) -> void:
 		_moved += absf(motion.relative.x) + absf(motion.relative.y)
 		_focus_y = _clamp_focus(_focus_y - motion.relative.y * DRAG_RATIO * _zoom)
 		_velocity = lerpf(_velocity, motion.relative.y * 60.0 * _zoom, 0.5)
-		# De près, on peut aussi longer la voie.
-		if _zoom < 0.97:
-			_focus_x = clampf(_current_x() - motion.relative.x * DRAG_RATIO * _zoom, 160.0, 1120.0)
+		# On peut aussi longer les voies, à gauche et à droite.
+		_focus_x = clampf(_current_x() - motion.relative.x * DRAG_RATIO * _zoom, 160.0, 1120.0)
 
 
 ## Deux doigts : on pince pour rapprocher ou éloigner la caméra.

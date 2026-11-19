@@ -554,8 +554,7 @@ func set_selected(index: int, refuge: bool) -> void:
 ## Place la caméra pour regarder le point du plan d'ordonnée `plane_y`.
 func focus(plane_y: float) -> void:
 	# Près du bas de la carte, la caméra se décale vers le moulin, à gauche.
-	var shift := clampf((plane_y - 2300.0) / 320.0, 0.0, 1.0) * 300.0
-	focus_point(Vector2(CENTER.x - shift, plane_y))
+	focus_point(Vector2(default_x(plane_y), plane_y))
 
 
 ## Place la caméra pour regarder le point `plane` du plan, au rapprochement
@@ -566,9 +565,11 @@ func focus_point(plane: Vector2) -> void:
 	camera.look_at(target, Vector3.UP)
 
 
-## Où la caméra regarde : x du plan quand on ne la décale pas.
+## Où la caméra regarde : x du plan quand on ne la décale pas. Au centre de
+## la ville, pour voir chaque voie d'un bout à l'autre ; elle ne glisse vers
+## le moulin, à gauche, qu'une fois passé le fleuve.
 func default_x(plane_y: float) -> float:
-	return CENTER.x - clampf((plane_y - 2300.0) / 320.0, 0.0, 1.0) * 300.0
+	return CENTER.x - clampf((plane_y - 2580.0) / 140.0, 0.0, 1.0) * 300.0
 
 
 ## Position à l'écran d'un point du plan.

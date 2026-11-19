@@ -352,7 +352,7 @@ Règles à garder :
   lointain doit être bas. Les matériaux **luisent** (`_glow`) : sans lueur, ils
   retombent au noir sous la brume sur le téléphone.
 - **Interface de jeu** : les boutons (`touch_controls.gd`) sont des disques
-  sombres au double liseré, avec une icône dessinée en code (épée, roulade,
+  sombres au double liseré, avec une icône dessinée en code (épée, bond de côté,
   fiole, pierre tombale pour le Repos, bulle, porte, ciseaux, livre, pause), un
   anneau de recharge pour l'esquive, un chiffre sur la fiole, un signal sur le
   carnet. La légende du bouton d'action est un `Label` (le texte dessiné dans la
