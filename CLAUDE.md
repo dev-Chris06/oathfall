@@ -388,9 +388,13 @@ Règles à garder :
   coupent (`WorldMap.cinematics`), sauf la plongée, vérifiée à part.
 - **Fiche du lieu** : chaque niveau de `WorldData` nomme ses morts (`dead`) ;
   la fiche montre leurs portraits, en silhouette s'ils sont inconnus.
-- **Sous la ville (carte)** : la plaque sombre, le « ? » et dix cercles ne
-  sont pas jouables. Un cercle s'allume quand les cinq niveaux de son chapitre
-  sont faits ; le « ? » s'allume quand les dix le sont. Aucun nom n'y est écrit.
+- **Sceaux et fondations (carte)** : la route compte une voie par chapitre
+  de la ville (`WorldData.ROUTE_CHAPTERS` = 10 : 3 + 3 + 3 + 1 voies, comme
+  les actes du scénario) ; les deux derniers chapitres sont sous la ville
+  (`UNDER_CHAPTERS`). Au milieu du rempart de chaque étage, un sceau
+  (`WorldData.SEALS`) luit, puis se fend quand le dernier chapitre de l'étage
+  est accompli. Sur la rive, la porte des fondations s'ouvre quand les quatre
+  sont brisés. Rien de cela n'est jouable, et aucun nom n'y est écrit.
 - **Le Repos découvert** : à la Grille, `hero.rite_enabled` est faux au début
   (pas de bouton REPOS) ; le premier mort est abattu, se relève, et c'est
   alors qu'Anselme enseigne le rite et que le bouton apparaît.

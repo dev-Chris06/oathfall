@@ -12,7 +12,7 @@ extends RefCounted
 ## `MESH_PATH`. Changer le relief, c'est changer ce fichier et `VERSION`, puis
 ## relancer l'outil (le test vérifie la version).
 
-const VERSION := 1
+const VERSION := 2
 const MESH_PATH := "res://assets/terrain/orvana_terrain.res"
 
 ## Largeur des falaises entre deux étages, et ce qu'elles descendent.

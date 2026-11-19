@@ -5,7 +5,20 @@ extends RefCounted
 ## cependant dix chapitres, les suivants restent fermés.
 
 const LEVELS_PER_CHAPTER := 5
+## Les chapitres de la ville, un par voie de la route : trois dans la ville
+## basse, trois à la citadelle, trois à la cathédrale, un au palais. Les deux
+## derniers du scénario sont sous la ville, derrière la porte des fondations.
 const ROUTE_CHAPTERS := 10
+const UNDER_CHAPTERS := 2
+
+## Les quatre sceaux qui tiennent le serment, un par étage : chacun se brise
+## avec le dernier chapitre de son étage.
+const SEALS := [
+	{"name": "Sceau des Corps", "act": 0, "chapter": 3},
+	{"name": "Sceau des Armes", "act": 1, "chapter": 6},
+	{"name": "Sceau des Noms", "act": 2, "chapter": 9},
+	{"name": "Sceau du Roi", "act": 3, "chapter": 10},
+]
 
 ## Les quatre étages de la ville, de bas en haut.
 const ACTS := [

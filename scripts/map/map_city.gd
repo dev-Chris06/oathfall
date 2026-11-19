@@ -160,7 +160,7 @@ func _reserved(district: int, p: Vector2) -> bool:
 		1:
 			return absf(p.x - 610.0) < 120.0 and absf(p.y - 1590.0) < 85.0
 		2:
-			return absf(p.x - 640.0) < 145.0 and absf(p.y - 1205.0) < 90.0
+			return absf(p.x - 640.0) < 145.0 and absf(p.y - 1095.0) < 80.0
 		3:
 			return absf(p.x - 640.0) < 190.0 and p.y < 650.0
 	return false
@@ -170,9 +170,9 @@ func _reserved(district: int, p: Vector2) -> bool:
 func _landmarks() -> void:
 	_landmark("building_castle_red", 1, Vector2(650.0, 1585.0), 0.0, 2.2, 0.8, 0.1)
 	_landmark("building_barracks_red", 1, Vector2(540.0, 1600.0), -8.0, 1.7, 0.6, 0.4)
-	_landmark("building_church_red", 2, Vector2(640.0, 1200.0), 0.0, 3.4, 1.0, 0.7)
+	_landmark("building_church_red", 2, Vector2(640.0, 1090.0), 0.0, 3.4, 1.0, 0.7)
 	for side: float in [-1.0, 1.0]:
-		_landmark("building_tower_A_red", 2, Vector2(640.0 + side * 115.0, 1235.0), 0.0, 1.7, 0.5, 0.2)
+		_landmark("building_tower_A_red", 2, Vector2(640.0 + side * 115.0, 1120.0), 0.0, 1.7, 0.5, 0.2)
 	_landmark("building_castle_red", 3, Vector2(640.0, 515.0), 0.0, 3.6, 1.0, 0.5)
 	for side: float in [-1.0, 1.0]:
 		_landmark("building_tower_B_red", 3, Vector2(640.0 + side * 160.0, 560.0), 0.0, 2.1, 0.7, 0.9)

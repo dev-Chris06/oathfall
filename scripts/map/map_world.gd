@@ -33,8 +33,9 @@ var animate_reveal := true
 
 var _nodes: Array[Dictionary] = []
 var _labels: Array[Label3D] = []
-var _circles: Array[MeshInstance3D] = []
-var _qmark: Label3D
+var _seals: Array[ShaderMaterial] = []
+var _gate_doors: Array = []
+var _gate_glow: MeshInstance3D
 var _sails: Node3D
 var _sails_basis := Basis.IDENTITY
 var _wheel: Node3D
@@ -273,32 +274,109 @@ func _build_mill() -> void:
 		_box(spoke, Vector3(0.3, 0.1, 0.5), Vector3(0.0, 1.5, 0.0), wood)
 
 
-## Sous la ville : une plaque sombre, un « ? » et dix cercles, un par chapitre.
+const SEAL_SHADER := """
+shader_type spatial;
+render_mode unshaded, cull_disabled, depth_draw_never, blend_mix;
+
+uniform float broken = 0.0;
+uniform vec3 glow = vec3(0.6, 0.68, 1.0);
+
+void fragment() {
+	vec2 p = UV * 2.0 - 1.0;
+	float r = length(p);
+	float a = atan(p.y, p.x);
+	float ring = smoothstep(0.035, 0.0, abs(r - 0.88)) + 0.8 * smoothstep(0.025, 0.0, abs(r - 0.7));
+	// Des signes entre les deux cercles.
+	float runes = step(0.73, r) * step(r, 0.85) * step(0.45, fract(a * 3.8197)) * step(0.3, fract(a * 1.1141 + 0.1));
+	float star = 0.0;
+	for (int k = 0; k < 4; k++) {
+		float angle = float(k) * 0.7854;
+		vec2 d = vec2(cos(angle), sin(angle));
+		star += smoothstep(0.03, 0.0, abs(p.x * d.y - p.y * d.x)) * step(r, 0.7);
+	}
+	float heart = smoothstep(0.17, 0.14, r) - smoothstep(0.12, 0.09, r);
+	float mark = clamp(ring + runes * 0.7 + star * 0.8 + heart, 0.0, 1.0);
+	float pulse = 0.72 + 0.28 * sin(TIME * 1.5);
+	// Brisé : une fêlure de braise le traverse, le reste s'éteint.
+	float crack = smoothstep(0.04, 0.0, abs(p.x * 0.85 + p.y * 0.35 + 0.13 * sin(p.y * 9.0))) * step(r, 0.95);
+	vec3 color = mix(glow * pulse, vec3(0.22, 0.09, 0.05), broken) + vec3(1.0, 0.45, 0.15) * crack * broken * 1.4;
+	float alpha = mark * mix(0.95, 0.5, broken) + crack * broken;
+	ALBEDO = color;
+	ALPHA = clamp(alpha, 0.0, 1.0) * step(r, 1.0);
+}
+"""
+
+
+## Au front de chaque étage, gravé dans la falaise, le sceau qui tient le
+## serment : il luit tant qu'il tient, se fend quand il est brisé. Au pied de
+## la ville, sur la rive, la porte des fondations, fermée tant que les quatre
+## sceaux tiennent. Aucun nom n'y est écrit.
 func _build_foundations() -> void:
-	var plate := to_world(Vector2(690.0, 2865.0))
-	_box(self, Vector3(520.0 * S, 0.06, 130.0 * S), Vector3(plate.x, 0.03, plate.z), _mat(Color(0.04, 0.04, 0.09), 1.0))
-	for i in WorldData.ROUTE_CHAPTERS:
-		var at := to_world(Vector2(680.0 + 54.0 * (i % 5) + (0.0 if i < 5 else 27.0), 2840.0 + 50.0 * (i / 5)))
-		var disc := MeshInstance3D.new()
-		var cylinder := CylinderMesh.new()
-		cylinder.top_radius = 0.32
-		cylinder.bottom_radius = 0.32
-		cylinder.height = 0.1
-		cylinder.radial_segments = 16
-		disc.mesh = cylinder
-		disc.material_override = _mat(Color(0.29, 0.27, 0.38), 1.0)
-		disc.position = Vector3(at.x, 0.1, at.z)
-		add_child(disc)
-		_circles.append(disc)
-	_qmark = Label3D.new()
-	_qmark.text = "?"
-	_qmark.font = GameFonts.text()
-	_qmark.font_size = 160
-	_qmark.pixel_size = 0.012
-	_qmark.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	_qmark.modulate = Color(0.6, 0.56, 0.69, 0.55)
-	_qmark.position = to_world(Vector2(540.0, 2850.0), 1.0)
-	add_child(_qmark)
+	var shader := Shader.new()
+	shader.code = SEAL_SHADER
+	for seal: Dictionary in WorldData.SEALS:
+		var terrace: Dictionary = MapScene.TERRACES[int(seal["act"])]
+		var at := to_world(Vector2(640.0, float(terrace["y0"]) - 2.0))
+		at.y = float(HEIGHTS[int(seal["act"])]) + 0.55
+		# Une grande pierre ronde dressée au milieu du rempart, et le sceau
+		# gravé dessus, tourné vers la caméra.
+		var holder := Node3D.new()
+		holder.position = at
+		holder.rotation.x = deg_to_rad(-18.0)
+		add_child(holder)
+		var stone := MeshInstance3D.new()
+		var slab := CylinderMesh.new()
+		slab.top_radius = 1.05
+		slab.bottom_radius = 1.12
+		slab.height = 0.25
+		slab.radial_segments = 20
+		slab.rings = 1
+		stone.mesh = slab
+		stone.rotation.x = PI / 2.0
+		stone.material_override = _mat(Color(0.07, 0.07, 0.11), 0.9)
+		holder.add_child(stone)
+		var sigil := MeshInstance3D.new()
+		var quad := QuadMesh.new()
+		quad.size = Vector2(1.9, 1.9)
+		sigil.mesh = quad
+		sigil.position.z = 0.14
+		var material := ShaderMaterial.new()
+		material.shader = shader
+		sigil.material_override = material
+		sigil.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		holder.add_child(sigil)
+		_seals.append(material)
+	# La porte des fondations, sur la rive, face à la ville.
+	var gate := (load("res://assets/kaykit/halloween/arch_gate.gltf") as PackedScene).instantiate() as Node3D
+	gate.position = to_world(Vector2(700.0, 2830.0))
+	gate.scale = Vector3.ONE * 0.8
+	add_child(gate)
+	for mesh: Node in gate.find_children("*", "MeshInstance3D", true, false):
+		(mesh as MeshInstance3D).material_override = city.night_material()
+	_gate_doors = [gate.find_child("arch_gate_left", true, false), gate.find_child("arch_gate_right", true, false)]
+	# Ouverte, la porte laisse voir la lueur de l'escalier qui descend.
+	_gate_glow = MeshInstance3D.new()
+	var light := QuadMesh.new()
+	light.size = Vector2(2.4, 2.8)
+	_gate_glow.mesh = light
+	_gate_glow.material_override = Fx.glow(Color(1.0, 0.42, 0.15, 0.6))
+	_gate_glow.position = gate.position + Vector3(0.0, 1.4, -0.1)
+	_gate_glow.visible = false
+	add_child(_gate_glow)
+
+
+## Le sceau `index` est-il brisé ?
+func seal_broken(index: int) -> bool:
+	var chapter := int((WorldData.SEALS[index] as Dictionary)["chapter"])
+	return chapter - 1 < data.chapters_done.size() and data.chapters_done[chapter - 1]
+
+
+## La porte des fondations s'ouvre quand les quatre sceaux sont brisés.
+func gate_open() -> bool:
+	for i in WorldData.SEALS.size():
+		if not seal_broken(i):
+			return false
+	return true
 
 
 ## Les points de la route : un cœur, un anneau, un halo. Les niveaux écrits ont
@@ -508,12 +586,15 @@ func set_states(states: PackedStringArray, flags: Array) -> void:
 		core.visible = not done
 		var ready: bool = i < flags.size() and flags[i]
 		_labels[i].modulate = PALE if ready else Color(0.6, 0.56, 0.69, 0.85)
-	for i in _circles.size():
-		var done: bool = i < data.chapters_done.size() and data.chapters_done[i]
-		_circles[i].material_override = _mat(AMBER if done else Color(0.29, 0.27, 0.38), 3.0 if done else 1.0)
+	for i in _seals.size():
+		_seals[i].set_shader_parameter("broken", 1.0 if seal_broken(i) else 0.0)
+	var open := gate_open()
+	_gate_glow.visible = open
+	for k in _gate_doors.size():
+		var door := _gate_doors[k] as Node3D
+		if door != null:
+			door.visible = not open
 	life.set_states(zone_states(states), animate_reveal)
-	var all_done := data.chapters_done.size() == WorldData.ROUTE_CHAPTERS and not data.chapters_done.has(false)
-	_qmark.modulate = Color(AMBER, 0.95) if all_done else Color(0.6, 0.56, 0.69, 0.55)
 
 
 ## L'état de chaque quartier de la ville, d'après les niveaux de son chapitre.

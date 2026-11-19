@@ -1842,15 +1842,33 @@ func _map_tests() -> bool:
 		return _fail("l'eau de la carte ne s'anime pas")
 	print("test 12 réussi : carte aérée, chapitres sur leurs voies, moulin à l'écart, eau animée")
 
-	# Sous la ville, un cercle par chapitre : allumé quand ses cinq niveaux sont faits.
+	# Un chapitre est accompli quand ses cinq niveaux sont faits.
 	for level_data: Dictionary in WorldData.CHAPTER_1["levels"]:
 		Progress.mark_completed(level_data["id"])
 	map.refresh()
 	if map._scene.chapters_done.size() != WorldData.ROUTE_CHAPTERS or not map._scene.chapters_done[0]:
-		return _fail("le cercle du chapitre I ne s'allume pas quand ses cinq niveaux sont faits")
+		return _fail("le chapitre I n'est pas accompli quand ses cinq niveaux sont faits")
 	if map._scene.chapters_done.has(true) and map._scene.chapters_done.count(true) != 1 + (1 if Progress.is_completed(&"la_porte_des_halles") and Progress.is_completed(&"les_etals") and Progress.is_completed(&"la_balance") and Progress.is_completed(&"les_caves") and Progress.is_completed(&"la_halle_du_prevot") else 0):
-		return _fail("un cercle s'allume pour un chapitre inachevé")
-	print("test 12 réussi : les cercles des fondations suivent les chapitres accomplis")
+		return _fail("un chapitre inachevé passe pour accompli")
+	# Les sceaux : chacun se brise avec le dernier chapitre de son étage ; la
+	# porte des fondations s'ouvre quand les quatre le sont.
+	if map._scene.lane_segments.size() != WorldData.ROUTE_CHAPTERS:
+		return _fail("la route compte %d voies pour %d chapitres" % [map._scene.lane_segments.size(), WorldData.ROUTE_CHAPTERS])
+	var saved_done := map._scene.chapters_done.duplicate()
+	var world: MapWorld = map._world
+	map._scene.chapters_done.fill(false)
+	map._scene.chapters_done[2] = true
+	if not world.seal_broken(0) or world.seal_broken(1) or world.gate_open():
+		return _fail("le Sceau des Corps ne suit pas le chapitre III")
+	map._scene.chapters_done.fill(true)
+	world.set_states(map._scene.states, map._scene.ready_flags)
+	if not world.gate_open() or not world._gate_glow.visible:
+		return _fail("la porte des fondations ne s'ouvre pas quand les quatre sceaux sont brisés")
+	map._scene.chapters_done = saved_done
+	map.refresh()
+	if world.gate_open() or world._gate_glow.visible:
+		return _fail("la porte des fondations reste ouverte")
+	print("test 12 réussi : chapitres accomplis, sceaux et porte des fondations")
 
 	# Le moulin se choisit comme un niveau, mais ne consomme pas le repas.
 	Progress.add_gold(100)
