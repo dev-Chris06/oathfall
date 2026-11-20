@@ -54,6 +54,8 @@ var hud: Hud
 ## Point que le héros doit rejoindre, s'il y en a un. Sert au joueur
 ## automatique et au repère affiché dans le décor et à l'écran.
 var objective = null
+## Chance qu'une fiole tombe d'un corps mis au repos (l'arène d'essai la coupe).
+var flask_drop_chance := Supplies.FLASK_DROP_CHANCE
 ## Le carnet des compétences, tant qu'il est ouvert.
 var book: SkillBook
 ## Le menu de pause, tant qu'il est ouvert.
@@ -275,6 +277,11 @@ func until_peace() -> void:
 
 
 func mark_checkpoint(index: int) -> void:
+	# Le héros reprend son souffle : il retrouve au moins une part de sa vie.
+	var floor_health := int(ceil(float(hero.max_health) * Supplies.CHECKPOINT_HEALTH))
+	if not hero.is_dead() and hero.health < floor_health:
+		hero.heal(floor_health - hero.health)
+		hud.show_message("Tu reprends ton souffle.", 2.0)
 	checkpoint_reached.emit(index)
 
 
@@ -417,6 +424,19 @@ func _on_enemy_rested(enemy: Enemy) -> void:
 	Progress.add_gold(enemy.gold_given())
 	# Chaque Repos donné allume une braise pour les rites de combat.
 	Progress.add_ember()
+	# Parfois, une fiole tombe du corps apaisé.
+	if randf() < flask_drop_chance:
+		drop_flask(enemy.body_position())
+
+
+## Pose une fiole à ramasser au sol.
+func drop_flask(where: Vector3) -> FlaskPickup:
+	var pickup := FlaskPickup.new()
+	pickup.hero = hero
+	pickup.position = Vector3(where.x, 0.0, where.z)
+	pickup.picked.connect(func() -> void: hud.show_message("Une fiole de baume.", 1.6))
+	add_child(pickup)
+	return pickup
 
 
 # --- Progression --------------------------------------------------------------

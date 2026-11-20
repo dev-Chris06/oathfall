@@ -47,6 +47,8 @@ func spawn_wave(count: int, rise_delay := -1.0) -> void:
 
 
 func _build() -> void:
+	# Les essais comptent les fioles : pas de fiole tombée au hasard.
+	flask_drop_chance = 0.0
 	var half_x := COLS * TILE / 2.0
 	var half_z := ROWS * TILE / 2.0
 

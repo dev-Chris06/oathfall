@@ -15,6 +15,13 @@ const FLASK := {
 	"model": "res://assets/kaykit/items/bottle_green.glb",
 }
 
+## Fioles portées au début d'une partie neuve.
+const START_FLASKS := 2
+## Chance qu'une fiole tombe d'un corps mis au repos (une sur douze).
+const FLASK_DROP_CHANCE := 1.0 / 12.0
+## Part de la vie au moins retrouvée à chaque point de reprise.
+const CHECKPOINT_HEALTH := 0.6
+
 const MEALS := {
 	&"pain": {
 		"name": "Petit pain", "icon": "pain", "cost": 15,

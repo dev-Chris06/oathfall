@@ -14,6 +14,10 @@ var _new_button: Button
 var _confirm: PanelContainer
 var _options: PanelContainer
 var _credits: PanelContainer
+var _update: PanelContainer
+var _update_text: Label
+var _download_button: Button
+var _update_check: UpdateCheck
 var _info: Label
 
 
@@ -46,7 +50,7 @@ func _ready() -> void:
 	_menu.offset_left = -190.0
 	_menu.offset_right = 190.0
 	_menu.offset_top = -10.0
-	_menu.offset_bottom = 250.0
+	_menu.offset_bottom = 320.0
 	add_child(_menu)
 	_continue_button = _button("Continuer", true)
 	_continue_button.pressed.connect(func() -> void: continue_pressed.emit())
@@ -57,6 +61,8 @@ func _ready() -> void:
 	_new_button.pressed.connect(press_new_game)
 	var options := _button("Options", false)
 	options.pressed.connect(func() -> void: _show_panel(_options))
+	var update := _button("Mise à jour", false)
+	update.pressed.connect(check_update)
 
 	var version := Theatre.label("Oathfall %s" % ProjectSettings.get_setting("application/config/version", "?"),
 		16, Color(Theatre.MUTED, 0.7))
@@ -77,6 +83,15 @@ func _ready() -> void:
 	_credits = _panel("Crédits",
 		"Modèles : KayKit, de Kay Lousberg (CC0).\nPolices : Standard Blackletter, de David Grigg, et MFB Oldstyle (CC0).\nSons : Kenney (CC0). Musiques et bruitages lourds : synthèse faite pour le jeu.\nMoteur : Godot Engine (licence MIT).",
 		[["Retour", func() -> void: _show_panel(_options)]])
+	_update = _panel("Mise à jour", " ", [
+		["Télécharger", UpdateCheck.open_download],
+		["Retour", func() -> void: _show_panel(null)]])
+	var update_column := _update.get_child(0) as VBoxContainer
+	_update_text = update_column.get_child(1) as Label
+	_download_button = update_column.get_child(2) as Button
+	_update_check = UpdateCheck.new()
+	_update_check.finished.connect(show_update_result)
+	add_child(_update_check)
 	refresh()
 
 
@@ -117,6 +132,31 @@ func confirm_new_game() -> void:
 	new_game_pressed.emit()
 
 
+## « Mise à jour » : cherche une version plus récente sur la page du jeu.
+func check_update() -> void:
+	_update_text.text = "Recherche d'une nouvelle version…"
+	_download_button.visible = false
+	_show_panel(_update)
+	_update_check.start()
+
+
+## Affiche le résultat de la recherche : `state` vaut "ok", "new" ou "error".
+func show_update_result(state: String, remote: String) -> void:
+	var local := UpdateCheck.local_version()
+	match state:
+		"new":
+			_update_text.text = "La version %s est disponible (tu as la %s).\nTélécharge-la, puis installe-la par-dessus : ta partie est gardée." % [remote, local]
+		"ok":
+			_update_text.text = "Ton jeu est à jour (version %s)." % local
+		_:
+			_update_text.text = "Impossible de joindre la page du jeu. Vérifie ta connexion, puis réessaie."
+	_download_button.visible = state == "new"
+
+
+func update_text() -> String:
+	return _update_text.text
+
+
 ## Efface la partie en cours, sans en commencer une autre.
 func erase_save() -> void:
 	Progress.delete_save()
@@ -126,7 +166,7 @@ func erase_save() -> void:
 
 
 func _show_panel(panel: Control) -> void:
-	for candidate: Control in [_confirm, _options, _credits]:
+	for candidate: Control in [_confirm, _options, _credits, _update]:
 		candidate.visible = candidate == panel
 	_menu.visible = panel == null
 

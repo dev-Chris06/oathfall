@@ -1084,6 +1084,66 @@ func _supplies_tests() -> bool:
 		return _fail("le héros boit alors qu'il est en pleine forme")
 	print("test réussi : un coup ou une esquive annule la fiole, pas de fiole à pleine vie")
 
+	# Armure d'élan : hors Repos, corde et fiole, un coup blesse sans arrêter.
+	hero.heal(1000)
+	hero.state = Hero.State.MOVE
+	arena.controls.attack_pressed.emit()
+	if hero.state != Hero.State.ATTACK:
+		return _fail("le héros ne frappe pas pour l'essai de l'élan")
+	var life_before := hero.health
+	hero.take_damage(5, hero.global_position + Vector3.FORWARD)
+	if hero.state != Hero.State.ATTACK or hero.health != life_before - 5:
+		return _fail("un coup reçu a interrompu le coup du héros (état %d)" % hero.state)
+	await _frames(60)
+	hero.state = Hero.State.MOVE
+	hero.take_damage(5, hero.global_position + Vector3.FORWARD)
+	if hero.state != Hero.State.MOVE:
+		return _fail("un coup reçu arrête le héros qui court")
+	print("test réussi : le héros garde son élan sous les coups")
+
+	# Point de reprise : au moins 60 % de la vie revient, jamais moins.
+	hero.health = 10
+	arena.mark_checkpoint(0)
+	var floor_health := int(ceil(float(hero.max_health) * Supplies.CHECKPOINT_HEALTH))
+	if hero.health != floor_health:
+		return _fail("le point de reprise rend %d de vie au lieu de remonter à %d" % [hero.health, floor_health])
+	hero.health = hero.max_health - 1
+	arena.mark_checkpoint(0)
+	if hero.health != hero.max_health - 1:
+		return _fail("le point de reprise a soigné un héros déjà vaillant")
+	print("test réussi : le point de reprise rend au moins 60 % de la vie")
+
+	# Fiole tombée d'un corps : ramassée en passant, laissée si on est plein.
+	Progress.flasks = 1
+	var pickup := arena.drop_flask(hero.global_position + Vector3(4.0, 0.0, 0.0))
+	await _frames(3)
+	if Progress.flasks != 1:
+		return _fail("une fiole lointaine a été ramassée")
+	hero.global_position = pickup.global_position
+	await _frames(3)
+	if Progress.flasks != 2 or is_instance_valid(pickup):
+		return _fail("la fiole tombée n'a pas été ramassée (fioles %d)" % Progress.flasks)
+	Progress.flasks = 3
+	var spare := arena.drop_flask(hero.global_position)
+	await _frames(3)
+	if Progress.flasks != 3 or not is_instance_valid(spare):
+		return _fail("une fiole a été ramassée au-delà de 3")
+	spare.queue_free()
+	Progress.flasks = 2
+	print("test réussi : une fiole tombée se ramasse, jamais au-delà de 3")
+
+	# Une partie neuve commence avec deux fioles.
+	Progress.save()
+	var kept_save := FileAccess.get_file_as_string(Progress.save_path)
+	Progress.new_game()
+	if Progress.flasks != Supplies.START_FLASKS or not Progress.has_progress():
+		return _fail("une partie neuve commence avec %d fioles" % Progress.flasks)
+	var restore := FileAccess.open(Progress.save_path, FileAccess.WRITE)
+	restore.store_string(kept_save)
+	restore.close()
+	Progress.load_save()
+	print("test réussi : une partie neuve commence avec %d fioles" % Supplies.START_FLASKS)
+
 	# Les repas : un seul à la fois, valables pour le niveau.
 	Progress.gold = 200
 	Progress.packed_meal = &""
@@ -2612,6 +2672,21 @@ func _menu_tests() -> bool:
 		return _fail("l'écran-titre ne s'affiche pas")
 	if title.has_continue():
 		return _fail("« Continuer » est proposé sans partie")
+	# « Mise à jour » : versions comparées, résultat affiché (sans réseau).
+	if not UpdateCheck.is_newer("0.26.1", "0.26.0") or UpdateCheck.is_newer("0.26.0", "0.26.0") \
+			or UpdateCheck.is_newer("0.9.0", "0.10.0") or not UpdateCheck.is_newer("1.0", "0.99.9"):
+		return _fail("la comparaison des versions se trompe")
+	if UpdateCheck.version_from_notes("Version 0.27.0. Build de test automatique") != "0.27.0" \
+			or UpdateCheck.version_from_notes("Build de test") != "":
+		return _fail("la version n'est pas lue dans les notes de la page")
+	title.show_update_result("new", "9.0.0")
+	if not title._download_button.visible or not title.update_text().contains("9.0.0"):
+		return _fail("une nouvelle version n'est pas proposée au téléchargement")
+	title.show_update_result("ok", UpdateCheck.local_version())
+	if title._download_button.visible or not title.update_text().contains("à jour"):
+		return _fail("un jeu à jour propose quand même un téléchargement")
+	title._show_panel(null)
+	print("test réussi : le bouton Mise à jour compare les versions")
 	Progress.add_gold(10)
 	title.refresh()
 	if not title.has_continue():
@@ -2621,8 +2696,8 @@ func _menu_tests() -> bool:
 		return _fail("« Nouvelle partie » n'a pas demandé confirmation, ou a effacé avant")
 	title.confirm_new_game()
 	await get_tree().process_frame
-	if Progress.has_progress():
-		return _fail("la nouvelle partie n'a pas remis la progression à zéro")
+	if Progress.gold != 0 or Progress.memories != 0 or Progress.flasks != Supplies.START_FLASKS:
+		return _fail("la nouvelle partie n'a pas remis la progression à zéro (or %d, fioles %d)" % [Progress.gold, Progress.flasks])
 	if main.opening == null or main.title_screen != null:
 		return _fail("le texte d'ouverture ne se lance pas après « Nouvelle partie »")
 	main.opening.skip_all()

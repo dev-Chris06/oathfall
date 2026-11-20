@@ -244,11 +244,14 @@ func take_damage(amount: int, from: Vector3, attacker: Node = null) -> void:
 	health_changed.emit(health, max_health)
 	hurt.emit()
 	Audio.play(&"hurt")
+	# Agenouillé (Repos, corde) ou en train de boire, on est sans défense :
+	# le coup interrompt. Sinon le héros garde son élan : il est blessé, mais
+	# continue de frapper, de courir ou d'esquiver, malgré la foule.
+	var exposed := state == State.RITE or state == State.DRINK
 	_rite_target = null
 	_cut_target = null
 	_rite_progress = 0.0
-	# Pendant un rite, le coup blesse sans interrompre le geste.
-	if state == State.CAST and health > 0:
+	if not exposed and health > 0:
 		return
 	if health == 0:
 		_rites.finish()

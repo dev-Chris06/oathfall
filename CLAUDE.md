@@ -90,7 +90,9 @@ apprendre les compétences et quelques personnages à qui parler.
 
 Le jeu s'ouvre sur **l'écran-titre** (`TitleScreen` : Continuer s'il y a une
 partie, Nouvelle partie avec confirmation, Options avec crédits et effacement
-de la sauvegarde). Une partie neuve passe par le texte d'ouverture
+de la sauvegarde, **Mise à jour** : `UpdateCheck` lit la version au début des
+notes de la page `releases/tag/dev`, « Version x.y.z. », écrite par le build,
+et propose de télécharger l'APK ; permission Internet activée). Une partie neuve passe par le texte d'ouverture
 (`OpeningScreen`), puis **la carte d'Orvana** (`scripts/map/`) : la capitale
 vue de face, en quatre étages, que la route en lacets gravit du fleuve au
 palais. On y choisit un niveau (toucher un point, puis « Entrer ») ou le
@@ -136,6 +138,15 @@ frappe, on n'enchaîne pas.
   dernier tiers un faux cercle terne l'accompagne. À chaque tiers il décrète
   (intouchable 1,6 s) et convoque ses percepteurs.
 
+**Difficulté** (choix de l'auteur, après les retours des testeurs) : le héros
+a l'**armure d'élan** : un coup le blesse sans l'arrêter (il continue de
+frapper, courir, esquiver), sauf agenouillé (Repos, corde) ou en buvant, où il
+reste interrompu. On garde la foule : **pas de limite** au nombre de morts qui
+frappent à la fois, ni d'invulnérabilité après un coup. Chaque point de reprise
+remonte la vie à 60 % au moins (`Supplies.CHECKPOINT_HEALTH`,
+`Level.mark_checkpoint`). La difficulté monte par chapitre ; des modes plus
+durs (rejouer un chapitre fini, mêmes niveaux) viendront plus tard.
+
 Le joueur automatique joue comme un joueur attentif : il esquive, recule devant
 un coup à armure et frappe quand le mort est ouvert, vise les Crieurs d'abord,
 rejoint le cercle d'or, boit ses fioles (il en a trois) et, au chapitre II,
@@ -175,7 +186,10 @@ bottes séparées : ne pas en vendre sans modèle fidèle.
 **Fioles et vivres** (`scripts/data/supplies.gd`, boutique de Maud, onglets
 Fioles et Vivres) : une fiole (au plus 3, visibles à la ceinture du héros) se
 boit avec le bouton FIOLE (touche F) : 0,85 s **sans défense**, un coup ou une
-esquive l'annule et la garde ; elle rend 45 de vie. Un repas emballé (pain,
+esquive l'annule et la garde ; elle rend 45 de vie. Une partie neuve commence avec
+**2 fioles** (`Supplies.START_FLASKS`) ; chaque Repos a une chance sur douze
+de faire tomber une fiole (`FlaskPickup`, ramassée en passant dessus, laissée
+au sol si on en porte déjà 3 ; l'arène d'essai la coupe). Un repas emballé (pain,
 fromage, jambon, ragoût ; un seul à la fois) donne son bonus pour le **prochain
 niveau seulement** : `Main` le mange en partant pour un niveau (pas pour le
 moulin) et il disparaît au retour à la carte. Le héros émet `flask_drunk` ;

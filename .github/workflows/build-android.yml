@@ -149,7 +149,10 @@ jobs:
         run: |
           set -euo pipefail
           SHORT_SHA="${GITHUB_SHA::7}"
-          NOTES="Build de test automatique, non destiné à la diffusion. Commit ${SHORT_SHA}, construit le $(date -u '+%Y-%m-%d à %H:%M UTC')."
+          # La version est lue par le bouton « Mise à jour » du jeu : garder la
+          # forme « Version x.y.z. » au début des notes.
+          VERSION="$(sed -n 's/^config\/version="\(.*\)"/\1/p' project.godot)"
+          NOTES="Version ${VERSION}. Build de test automatique, non destiné à la diffusion. Commit ${SHORT_SHA}, construit le $(date -u '+%Y-%m-%d à %H:%M UTC')."
           if gh release view dev --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
             gh release edit dev --repo "${GITHUB_REPOSITORY}" --notes "${NOTES}"
           else

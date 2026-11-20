@@ -82,6 +82,7 @@ func reset() -> void:
 ## Une partie neuve : tout est remis à zéro, et la sauvegarde écrasée.
 func new_game() -> void:
 	reset()
+	flasks = Supplies.START_FLASKS
 	save()
 
 
@@ -324,6 +325,16 @@ func buy_flask() -> bool:
 	if flask_blocker() != "":
 		return false
 	gold -= int(Supplies.FLASK["cost"])
+	flasks += 1
+	changed.emit()
+	save()
+	return true
+
+
+## Une fiole trouvée en combat. Renvoie faux si on en porte déjà le maximum.
+func gain_flask() -> bool:
+	if flasks >= int(Supplies.FLASK["max"]):
+		return false
 	flasks += 1
 	changed.emit()
 	save()
