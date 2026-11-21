@@ -22,6 +22,10 @@ jobs:
     steps:
       - name: Récupérer le projet
         uses: actions/checkout@v4
+        with:
+          # Tout l'historique et les étiquettes : les notes d'une version
+          # listent les commits depuis la précédente.
+          fetch-depth: 0
 
       - name: Installer Java 17
         uses: actions/setup-java@v5
@@ -160,3 +164,32 @@ jobs:
               --title "Dernier build de test" --notes "${NOTES}" --target "${GITHUB_SHA}"
           fi
           gh release upload dev build/oathfall-debug.apk --repo "${GITHUB_REPOSITORY}" --clobber
+
+      # Une page par version (vX.Y.Z), gardée pour toujours : l'auteur
+      # retrouve chaque APK sur GitHub. Si la version existe déjà (envoi sans
+      # changement de numéro), son APK et ses notes sont remplacés.
+      - name: Publier la version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          VERSION="$(sed -n 's/^config\/version="\(.*\)"/\1/p' project.godot)"
+          TAG="v${VERSION}"
+          PREVIOUS="$(git tag --list 'v*' --sort=-v:refname | grep -vx "${TAG}" | head -1 || true)"
+          if [ -n "${PREVIOUS}" ]; then
+            CHANGES="$(git log --format='- %s' "${PREVIOUS}..${GITHUB_SHA}")"
+            SINCE="Changements depuis ${PREVIOUS} :"
+          else
+            CHANGES="$(git log --format='- %s' -n 10 "${GITHUB_SHA}")"
+            SINCE="Derniers changements :"
+          fi
+          NOTES="$(printf 'Oathfall %s, commit %s, construit le %s.\n\n%s\n\n%s\n' \
+            "${VERSION}" "${GITHUB_SHA::7}" "$(date -u '+%Y-%m-%d à %H:%M UTC')" "${SINCE}" "${CHANGES}")"
+          cp build/oathfall-debug.apk "build/oathfall-${VERSION}.apk"
+          if gh release view "${TAG}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+            gh release edit "${TAG}" --repo "${GITHUB_REPOSITORY}" --notes "${NOTES}"
+          else
+            gh release create "${TAG}" --repo "${GITHUB_REPOSITORY}" \
+              --title "Oathfall ${VERSION}" --notes "${NOTES}" --target "${GITHUB_SHA}"
+          fi
+          gh release upload "${TAG}" "build/oathfall-${VERSION}.apk" --repo "${GITHUB_REPOSITORY}" --clobber
