@@ -43,6 +43,8 @@ var rite_slots: Array[StringName] = [&"", &"", &""]
 var embers := 0
 ## Entrées imposées par un script (tests, démonstrations).
 var simulated_move := Vector2.ZERO
+## Biais de la caméra (radians) : « haut » sur le joystick va vers le haut de l'écran.
+var view_yaw := deg_to_rad(GameCamera.YAW)
 var simulated_rite := false
 
 var _stick_index := -1
@@ -85,7 +87,9 @@ func _process(delta: float) -> void:
 	var keys := Vector2(
 		float(_key(KEY_D) or _key(KEY_RIGHT)) - float(_key(KEY_A) or _key(KEY_LEFT)),
 		float(_key(KEY_S) or _key(KEY_DOWN)) - float(_key(KEY_W) or _key(KEY_UP)))
-	move = (_stick_vector + keys + simulated_move).limit_length(1.0)
+	# Le joystick et le clavier suivent la caméra ; le joueur automatique donne
+	# directement une direction dans le monde.
+	move = ((_stick_vector + keys).rotated(-view_yaw) + simulated_move).limit_length(1.0)
 	rite_held = _rite_index != -1 or _key(KEY_E) or simulated_rite
 
 	_caption.visible = rite_available and rite_label != ""

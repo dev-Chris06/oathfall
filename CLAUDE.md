@@ -276,7 +276,7 @@ Retour de l'auteur encore attendu : les sensations de combat sur téléphone
 | `scripts/ui/rite_icons.gd`, `rite_preview.gd` | Icônes des rites, dessinées en code ; courte animation de chaque rite (carnet, découverte) |
 | `scripts/enemy.gd` | Un mort : CHASE, WINDUP, STAGGER, DOWN, RISING, RESTED |
 | `scripts/touch_controls.gd` | Joystick, boutons tactiles, clavier |
-| `scripts/game_camera.gd` | Caméra qui suit le héros et tremble à l'impact |
+| `scripts/game_camera.gd` | Caméra qui suit le héros, de biais et plongeante (angles de Dark Avenger), et tremble à l'impact |
 | `scripts/hud.gd` | Barre de vie, compteurs, messages |
 | `scripts/data/hero_classes.gd` | Valeurs et animations des classes |
 | `scripts/data/enemy_types.gd` | Valeurs et animations des types de morts |
@@ -363,8 +363,8 @@ Règles à garder :
   `scenery` : `PIT` (la Fosse : terre et collines), `RIVER` (le moulin : fleuve
   animé et rive d'en face) ; le cimetière est le défaut (toits d'un faubourg en
   contrebas) ; sous terre ce sont les blocs sur les murs. **La caméra regarde à
-  36° sous l'horizontale : elle ne voit jamais le ciel, seulement le sol jusqu'à
-  45 m**, donc les abords sont du sol plus bas vu d'en haut, et tout objet
+  52° sous l'horizontale : elle ne voit jamais le ciel, seulement le sol
+  alentour**, donc les abords sont du sol plus bas vu d'en haut, et tout objet
   lointain doit être bas. Les matériaux **luisent** (`_glow`) : sans lueur, ils
   retombent au noir sous la brume sur le téléphone.
 - **Interface de jeu** : les boutons (`touch_controls.gd`) sont des disques
@@ -419,9 +419,15 @@ Règles à garder :
 - **Corps et obstacles** : la chute projette le corps ; il peut finir derrière
   une grille. Le rite se mesure donc avec `Enemy.distance_to_body()`, qui
   accepte aussi le point de chute.
-- **Caméra et décor** : la caméra est à 6,6 de haut et 7,4 en arrière. Le
-  héros ne doit jamais pouvoir passer derrière un décor plus haut qu'elle
-  (les mausolées) : fermer ces recoins.
+- **Caméra et décor** : angles repris de Dark Avenger (`GameCamera`) : plongée
+  de 52°, de biais (40° autour de la verticale), à 11 du buste du héros,
+  soit près de 9,8 de haut ; elle se tient du côté +X et +Z du héros, et le
+  chemin (-Z) monte en diagonale vers le haut à droite de l'écran. Le
+  joystick et le clavier suivent ce biais (`TouchControls.view_yaw`), le
+  joueur automatique donne des directions du monde. Un décor haut du côté
+  de la caméra (mur droit, mur du bas) peut cacher le héros : le garder
+  bas. Le héros ne doit jamais pouvoir passer derrière un décor plus haut
+  qu'elle (les mausolées) : fermer ces recoins.
 - **Nouveau niveau** : l'ajouter à `Main.LEVELS` ; il est déjà nommé dans
   `WorldData` (chapitre 1). Un autre chapitre demande d'abord d'écrire ses
   niveaux dans `WorldData`.
@@ -515,6 +521,12 @@ Chaque envoi sur `main` lance `.github/workflows/build-android.yml` : test
 automatique, export de l'APK, puis publication sur la page fixe
 `releases/tag/dev`. L'auteur installe l'APK depuis cette page sur son
 téléphone.
+
+Le build publie aussi **une release par version** (`releases/tag/vX.Y.Z`,
+titre « Oathfall X.Y.Z », APK `oathfall-X.Y.Z.apk`, commits depuis la version
+précédente), gardée pour que l'auteur retrouve chaque version. Un envoi sans
+changement de numéro remplace l'APK de la release existante : **tout envoi qui
+change le jeu augmente la version.**
 
 À chaque version, augmenter ensemble :
 

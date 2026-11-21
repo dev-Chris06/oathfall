@@ -1,10 +1,19 @@
 class_name GameCamera
 extends Camera3D
-## Caméra de jeu : suit le héros à angle fixe, d'assez près et d'assez bas
-## pour que les combats aient du poids, et tremble quand un coup porte.
+## Caméra de jeu : suit le héros à angle fixe, haute et plongeante, de biais
+## (le chemin du niveau, vers -Z, monte en diagonale vers le haut à droite de
+## l'écran), et tremble quand un coup porte. Le joystick suit ce biais
+## (`TouchControls.view_yaw`).
 
-const OFFSET := Vector3(0.0, 6.6, 7.4)
+## Biais de la caméra autour de la verticale, en degrés.
+const YAW := 40.0
+## Inclinaison sous l'horizontale, en degrés.
+const PITCH := 52.0
+## Distance au point visé (le buste du héros).
+const DISTANCE := 11.0
+const LOOK_HEIGHT := 1.1
 const FOLLOW_SPEED := 7.0
+static var OFFSET := offset()
 
 var target: Node3D
 var _shake := 0.0
@@ -18,7 +27,15 @@ func _ready() -> void:
 func follow(node: Node3D) -> void:
 	target = node
 	global_position = node.global_position + OFFSET
-	look_at(node.global_position + Vector3(0.0, 1.1, 0.0), Vector3.UP)
+	look_at(node.global_position + Vector3(0.0, LOOK_HEIGHT, 0.0), Vector3.UP)
+
+
+## Position de la caméra par rapport aux pieds du héros.
+static func offset() -> Vector3:
+	var yaw := deg_to_rad(YAW)
+	var pitch := deg_to_rad(PITCH)
+	var flat := DISTANCE * cos(pitch)
+	return Vector3(sin(yaw) * flat, LOOK_HEIGHT + DISTANCE * sin(pitch), cos(yaw) * flat)
 
 
 func shake(amount: float) -> void:
