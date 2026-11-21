@@ -195,7 +195,9 @@ func set_sfx_volume(value: float) -> void:
 func save_settings() -> void:
 	var file := FileAccess.open(_settings_path, FileAccess.WRITE)
 	if file != null:
-		file.store_string(JSON.stringify({"music": music_volume, "sfx": sfx_volume}))
+		# La vue de la caméra est gardée avec les volumes, dans le même fichier.
+		file.store_string(JSON.stringify({"music": music_volume, "sfx": sfx_volume,
+			"camera": int(GameCamera.mode)}))
 
 
 func load_settings() -> void:
@@ -204,6 +206,8 @@ func load_settings() -> void:
 		if parsed is Dictionary:
 			music_volume = clampf(float(parsed.get("music", music_volume)), 0.0, 1.0)
 			sfx_volume = clampf(float(parsed.get("sfx", sfx_volume)), 0.0, 1.0)
+			GameCamera.mode = clampi(int(parsed.get("camera", GameCamera.mode)), 0,
+				GameCamera.Mode.size() - 1) as GameCamera.Mode
 	_apply_volume("Musique", music_volume)
 	_apply_volume("Sons", sfx_volume)
 

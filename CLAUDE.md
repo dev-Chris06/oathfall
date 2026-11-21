@@ -419,7 +419,22 @@ Règles à garder :
 - **Corps et obstacles** : la chute projette le corps ; il peut finir derrière
   une grille. Le rite se mesure donc avec `Enemy.distance_to_body()`, qui
   accepte aussi le point de chute.
-- **Caméra et décor** : angles repris de Dark Avenger (`GameCamera`) : plongée
+- **Trois vues** (`GameCamera.Mode`, choisies dans Options et dans le menu
+  pause, `CameraChoice`, gardées dans `user://reglages.json` avec les
+  volumes) : **Classique** (ci-dessous, par défaut), **Épaule** (derrière
+  l'épaule droite, à 5 ; on la tourne en glissant le doigt sur la moitié
+  droite de l'écran hors des boutons, ou bouton droit de la souris ; elle se
+  rapproche quand un mur s'interpose) et **Première personne** (aux yeux ; le
+  modèle du héros ne garde que son ombre, `Hero.show_model`). En vue libre,
+  la brume s'épaissit (`Level._apply_view_environment`) et, sans direction
+  au joystick, le héros frappe là où l'on regarde (`Hero.view_forward`). Les
+  tests et captures sont en vue classique, sauf `--camera=1` ou `2`.
+- **Verrouillage** (bouton CIBLE, viseur au bord droit, au-dessus du troisième rite ; L au
+  clavier) : `Level.toggle_lock` prend le mort debout le plus en vue (14 au
+  plus), marqué d'une pointe d'or. Coups et rites partent vers lui
+  (`Hero.lock_target`) ; en vue libre la caméra se tourne vers lui. S'il
+  tombe, la cible passe au plus proche ; au-delà de 18, elle est relâchée.
+- **Caméra classique et décor** : angles repris de Dark Avenger (`GameCamera`) : plongée
   de 52°, de biais (40° autour de la verticale), à 11 du buste du héros,
   soit près de 9,8 de haut ; elle se tient du côté +X et +Z du héros, et le
   chemin (-Z) monte en diagonale vers le haut à droite de l'écran. Le
@@ -435,9 +450,10 @@ Règles à garder :
   d'accents : la réserver aux titres, avec la police de texte en secours.
 - **Sol** : `pave()` dessine tous les carreaux en un seul appel. Ne pas
   poser les carreaux un par un.
-- **Entrées** : le jeu ne lit que `TouchControls.move`, `rite_held` et les
-  signaux `attack_pressed`, `dodge_pressed`, `flask_pressed`, `book_pressed`
-  et `rite_slot_pressed`.
+- **Entrées** : le jeu ne lit que `TouchControls.move`, `rite_held`,
+  `take_look()` (glissés de la vue) et les signaux `attack_pressed`,
+  `dodge_pressed`, `flask_pressed`, `book_pressed`, `lock_pressed` et
+  `rite_slot_pressed`.
 - **Hasard du joueur automatique** : jamais l'identifiant interne d'un objet
   (`get_instance_id`) pour décider : il change dès qu'un objet de plus est
   créé (un élément d'interface suffit). Utiliser `Enemy.spawn_index`.

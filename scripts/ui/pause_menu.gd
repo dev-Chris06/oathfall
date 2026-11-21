@@ -1,8 +1,8 @@
 class_name PauseMenu
 extends CanvasLayer
 ## Le menu de pause, ouvert par le bouton à côté du carnet (ou Échap, P). Le
-## jeu s'arrête tant qu'il est ouvert : Reprendre, régler la musique et les
-## sons, ou quitter le niveau (après confirmation).
+## jeu s'arrête tant qu'il est ouvert : Reprendre, régler la musique, les
+## sons et la vue de la caméra, ou quitter le niveau (après confirmation).
 
 signal resumed
 signal leave_requested
@@ -50,6 +50,7 @@ func _ready() -> void:
 
 	_add_volume_row(column, "Musique", Audio.music_volume, Audio.set_music_volume)
 	_add_volume_row(column, "Sons", Audio.sfx_volume, Audio.set_sfx_volume)
+	column.add_child(CameraChoice.row())
 
 	_leave_button = Button.new()
 	_leave_button.text = "Quitter le niveau"

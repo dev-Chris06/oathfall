@@ -369,6 +369,8 @@ func _run() -> void:
 		return
 	if not await _pause_tests():
 		return
+	if not await _camera_tests():
+		return
 	if not await _stone_tests():
 		return
 	for type_id: StringName in EnemyTypes.TYPES:
@@ -1400,6 +1402,103 @@ func _pause_tests() -> bool:
 	if not ok:
 		return _fail("confirmer ne quitte pas le niveau")
 	print("test réussi : le menu de pause ouvre, reprend et quitte après confirmation")
+	return true
+
+
+## Les trois vues de la caméra et le verrouillage : la vue choisie est gardée
+## dans les réglages ; dans chaque vue, « haut » au joystick va droit devant la
+## caméra ; la vue épaule tourne au doigt sans jamais passer derrière un mur ;
+## à la première personne le modèle du héros est caché ; CIBLE verrouille le
+## mort le plus en vue, les coups partent vers lui, et il est relâché quand il
+## tombe.
+func _camera_tests() -> bool:
+	var saved_mode := GameCamera.mode
+	GameCamera.mode = GameCamera.Mode.SHOULDER
+	Audio.save_settings()
+	GameCamera.mode = GameCamera.Mode.CLASSIC
+	Audio.load_settings()
+	if GameCamera.mode != GameCamera.Mode.SHOULDER:
+		GameCamera.mode = saved_mode
+		return _fail("la vue de la caméra n'est pas gardée dans les réglages")
+
+	var level := main.LEVELS[&"la_grille"].new() as Level
+	main.add_child(level)
+	await _frames(4)
+	var problem := ""
+	var camera := level._camera
+	var hero := level.hero
+	for mode: int in [GameCamera.Mode.CLASSIC, GameCamera.Mode.SHOULDER, GameCamera.Mode.FIRST]:
+		GameCamera.mode = mode as GameCamera.Mode
+		for turn in 4:
+			level.controls.simulate_look(Vector2(410.0, 0.0))
+			await _frames(3)
+			level.controls._stick_vector = Vector2(0.0, -1.0)
+			await _frames(2)
+			var forward := -camera.global_transform.basis.z
+			forward = Vector3(forward.x, 0.0, forward.z).normalized()
+			var wish := Vector3(level.controls.move.x, 0.0, level.controls.move.y)
+			level.controls._stick_vector = Vector2.ZERO
+			if wish.normalized().dot(forward) < 0.97:
+				problem = "en vue %s, « haut » au joystick ne va pas devant la caméra" % GameCamera.mode_name(mode)
+			if mode == GameCamera.Mode.SHOULDER:
+				# Rien de solide entre la tête du héros et la caméra.
+				var query := PhysicsRayQueryParameters3D.create(
+					hero.global_position + Vector3(0.0, GameCamera.SHOULDER_HEIGHT, 0.0), camera.global_position)
+				query.exclude = [hero.get_rid()]
+				var hit := level.get_world_3d().direct_space_state.intersect_ray(query)
+				if not hit.is_empty() and not (hit["collider"] is CharacterBody3D):
+					problem = "la vue épaule passe derrière un mur"
+		var shadow_only := 0
+		for node in hero._model.find_children("*", "GeometryInstance3D", true, false):
+			if (node as GeometryInstance3D).cast_shadow == GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY:
+				shadow_only += 1
+		if (mode == GameCamera.Mode.FIRST) != (shadow_only > 0):
+			problem = "le modèle du héros est mal caché ou montré en vue %s" % GameCamera.mode_name(mode)
+		if problem != "":
+			break
+	# Retour à la vue classique : la caméra reprend ses angles fixes.
+	GameCamera.mode = GameCamera.Mode.CLASSIC
+	await _frames(40)
+	var offset := camera.global_position - hero.global_position
+	if problem == "" and offset.distance_to(GameCamera.OFFSET) > 0.6:
+		problem = "la vue classique ne revient pas à sa place (%s)" % offset
+
+	# Verrouillage : le mort devant le héros plutôt que celui derrière.
+	if problem == "":
+		var ahead := level.spawn(&"depouille", hero.global_position + Vector3(-1.5, 0.0, -5.0), false)
+		var behind := level.spawn(&"depouille", hero.global_position + Vector3(1.0, 0.0, 4.0), false)
+		# Immobiles : ils ne doivent ni bouger ni frapper pendant l'essai.
+		ahead.process_mode = Node.PROCESS_MODE_DISABLED
+		behind.process_mode = Node.PROCESS_MODE_DISABLED
+		hero.face(Vector3(0.0, 0.0, -1.0))
+		level.controls.press_lock()
+		await _frames(2)
+		if hero.lock_target != ahead or not level.controls.lock_active:
+			problem = "CIBLE ne verrouille pas le mort devant le héros"
+		else:
+			hero.face(Vector3(1.0, 0.0, 0.0))
+			level.controls.press_attack()
+			await _frames(2)
+			var to := ahead.global_position - hero.global_position
+			if hero.facing().dot(Vector3(to.x, 0.0, to.z).normalized()) < 0.95:
+				problem = "le coup ne part pas vers le mort verrouillé"
+			ahead.take_hit(hero.global_position, 999)
+			await _frames(3)
+			if hero.lock_target == ahead:
+				problem = "le mort abattu reste verrouillé"
+			elif hero.lock_target != behind:
+				problem = "la cible ne passe pas au mort suivant quand la première tombe"
+			level.controls.press_lock()
+			await _frames(2)
+			if problem == "" and (hero.lock_target != null or level.controls.lock_active):
+				problem = "CIBLE ne relâche pas la cible"
+	GameCamera.mode = saved_mode
+	Audio.save_settings()
+	level.queue_free()
+	await _frames(2)
+	if problem != "":
+		return _fail(problem)
+	print("test réussi : trois vues de caméra (joystick, murs, héros caché), réglage gardé, verrouillage")
 	return true
 
 

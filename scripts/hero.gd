@@ -54,6 +54,12 @@ var _data: Dictionary
 var _model: Node3D
 var _anim: AnimationPlayer
 var _facing := Vector3(0.0, 0.0, 1.0)
+## Le mort verrouillé par le joueur (bouton CIBLE), donné par le niveau.
+var lock_target: Enemy
+## Direction du regard en vue libre (à plat), donnée par le niveau : sans
+## direction au joystick, le héros frappe là où l'on regarde. Nulle en vue
+## classique.
+var view_forward := Vector3.ZERO
 var _state_time := 0.0
 var _combo := 0
 var _queued := false
@@ -173,6 +179,7 @@ func _physics_process(delta: float) -> void:
 				if _queued and _combo < attacks.size() - 1:
 					if wish.length() > 0.1:
 						_facing = wish.normalized()
+					_aim_at_lock()
 					_start_attack(_combo + 1)
 				else:
 					state = State.MOVE
@@ -314,9 +321,36 @@ func _on_attack_pressed() -> void:
 			var wish := _wish_direction()
 			if wish.length() > 0.1:
 				_facing = wish.normalized()
+			elif view_forward != Vector3.ZERO:
+				_facing = view_forward
+			_aim_at_lock()
 			_start_attack(0)
 		State.ATTACK:
 			_queued = true
+
+
+## Vrai si un mort verrouillé est encore là, debout.
+func has_lock() -> bool:
+	return lock_target != null and is_instance_valid(lock_target) and lock_target.is_standing()
+
+
+## Un mort verrouillé attire les coups et les rites : le héros se tourne vers lui.
+func _aim_at_lock() -> void:
+	if not has_lock():
+		return
+	var to := lock_target.global_position - global_position
+	to.y = 0.0
+	if to.length() > 0.2:
+		_facing = to.normalized()
+
+
+## Montre ou cache le modèle (vue à la première personne). L'ombre reste.
+func show_model(shown: bool) -> void:
+	if _model == null:
+		return
+	for node in _model.find_children("*", "GeometryInstance3D", true, false):
+		(node as GeometryInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON \
+			if shown else GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY
 
 
 ## Boire une fiole : un instant sans défense ; un coup ou une esquive l'annule.

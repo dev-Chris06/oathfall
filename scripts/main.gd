@@ -51,12 +51,16 @@ func _ready() -> void:
 	var only_level: StringName = &""
 	var direct := false
 	var forced_checkpoint := -1
+	var camera_mode := GameCamera.Mode.CLASSIC
 	for arg in OS.get_cmdline_user_args():
 		if arg == "--selftest":
 			scripted = true
 		elif arg.begins_with("--capture="):
 			scripted = true
 			capture_dir = arg.trim_prefix("--capture=")
+		elif arg.begins_with("--camera="):
+			# Vue des captures : 0 classique, 1 épaule, 2 première personne.
+			camera_mode = clampi(int(arg.trim_prefix("--camera=")), 0, GameCamera.Mode.size() - 1) as GameCamera.Mode
 		elif arg == "--map":
 			capture_map = true
 		elif arg.begins_with("--only="):
@@ -92,6 +96,8 @@ func _ready() -> void:
 		Progress.delete_save()
 		Progress.reset()
 		Audio.use_test_settings()
+		# Les tests et captures ne dépendent pas de la vue choisie par le joueur.
+		GameCamera.mode = camera_mode
 		# Le joueur automatique choisit lui-même les niveaux.
 		var bot := SelftestBot.new()
 		bot.main = self

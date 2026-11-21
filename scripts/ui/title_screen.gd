@@ -240,6 +240,9 @@ func _add_volume_sliders(panel: PanelContainer) -> void:
 		column.add_child(row)
 		column.move_child(row, at)
 		at += 1
+	var camera := CameraChoice.row()
+	column.add_child(camera)
+	column.move_child(camera, at)
 
 
 ## La ville à l'horizon et le moulin, en silhouettes.

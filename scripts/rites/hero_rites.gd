@@ -52,6 +52,14 @@ func start(rite_id: StringName) -> void:
 	_start = hero.global_position
 	var wish := hero.wish()
 	_direction = wish.normalized() if wish.length() > 0.1 else hero.facing()
+	# Un mort verrouillé attire le rite ; sinon, en vue libre, le regard.
+	if hero.has_lock():
+		var to := hero.lock_target.global_position - hero.global_position
+		to.y = 0.0
+		if to.length() > 0.2:
+			_direction = to.normalized()
+	elif wish.length() <= 0.1 and hero.view_forward != Vector3.ZERO:
+		_direction = hero.view_forward
 	var speed := float(_anim.get("speed", 1.0))
 	var length := hero.play_once(String(_anim.get("animation", "")), speed)
 	_length = length / speed if length > 0.0 else 0.8

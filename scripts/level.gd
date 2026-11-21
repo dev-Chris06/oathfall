@@ -62,6 +62,11 @@ var book: SkillBook
 var pause_menu: PauseMenu
 
 var _camera: GameCamera
+var _env: Environment
+## Vue pour laquelle la brume est réglée (elle s'épaissit en vue libre).
+var _env_mode := -1
+## Repère d'or au-dessus du mort verrouillé.
+var _lock_marker: Node3D
 var _guide: Node3D
 var _enemies: Array[Enemy] = []
 ## Morts apparus depuis le début du niveau (numéro d'apparition).
@@ -104,6 +109,8 @@ func _ready() -> void:
 	_camera = GameCamera.new()
 	add_child(_camera)
 	_camera.follow(hero)
+	controls.lock_pressed.connect(toggle_lock)
+	_build_lock_marker()
 
 	hud = Hud.new()
 	add_child(hud)
@@ -137,6 +144,7 @@ func _process(delta: float) -> void:
 		var flicker := sin(_time * 9.0 + i * 1.7) * 0.25 + sin(_time * 23.0 + i * 4.1) * 0.12
 		_lights[i].light_energy = _light_base[i] + flicker
 
+	_update_view()
 	_update_guide()
 
 	_hud_timer -= delta
@@ -146,6 +154,105 @@ func _process(delta: float) -> void:
 		hud.set_debug("Oathfall %s — %s — %d images/s" % [
 			ProjectSettings.get_setting("application/config/version", "?"),
 			title, Engine.get_frames_per_second()])
+
+
+# --- Vue et cible ----------------------------------------------------------------
+
+## Distance à laquelle on peut verrouiller un mort, et au-delà de laquelle il
+## est relâché.
+const LOCK_RANGE := 14.0
+const LOCK_KEEP := 18.0
+
+
+## Chaque image : la vue suit le doigt, le joystick suit la vue, la cible est
+## tenue ou relâchée, la brume suit la vue choisie.
+func _update_view() -> void:
+	_camera.look(controls.take_look())
+	controls.look_enabled = GameCamera.is_free()
+	controls.view_yaw = _camera.view_yaw()
+	hero.view_forward = _camera.view_forward() if GameCamera.is_free() else Vector3.ZERO
+	if _env_mode != GameCamera.mode:
+		_apply_view_environment()
+
+	var target := hero.lock_target
+	if target != null and (not is_instance_valid(target) or not target.is_standing()
+			or target.global_position.distance_to(hero.global_position) > LOCK_KEEP):
+		# La cible tombe ou s'éloigne : on passe au mort le plus proche, s'il y en a.
+		var was_valid := target != null and is_instance_valid(target)
+		set_lock(pick_lock_target(10.0) if was_valid and not target.is_standing() else null)
+	target = hero.lock_target
+	_lock_marker.visible = target != null
+	if target != null:
+		_lock_marker.global_position = target.global_position + Vector3(0.0, 4.6 if target.is_boss() else 2.5, 0.0)
+		_lock_marker.rotation.y += get_process_delta_time() * 2.5
+
+
+## Bouton CIBLE : verrouille le mort le plus en vue, ou relâche la cible.
+func toggle_lock() -> void:
+	if hero.lock_target != null:
+		set_lock(null)
+	else:
+		set_lock(pick_lock_target(LOCK_RANGE))
+		if hero.lock_target == null:
+			hud.show_message("Aucun mort debout à portée.", 1.2)
+
+
+func set_lock(target: Enemy) -> void:
+	hero.lock_target = target
+	_camera.lock_target = target
+	controls.lock_active = target != null
+
+
+## Le mort debout le plus en vue : proche, et devant le regard (ou devant le
+## héros en vue classique).
+func pick_lock_target(reach: float) -> Enemy:
+	var forward := _camera.view_forward() if GameCamera.is_free() else hero.facing()
+	var best: Enemy = null
+	var best_score := INF
+	for node in get_tree().get_nodes_in_group(&"hittable"):
+		var enemy := node as Enemy
+		if enemy == null or not enemy.is_standing():
+			continue
+		var to := enemy.global_position - hero.global_position
+		to.y = 0.0
+		var distance := to.length()
+		if distance > reach:
+			continue
+		var angle := forward.angle_to(to) if distance > 0.1 else 0.0
+		var score := distance * (1.0 + angle / PI * 1.5)
+		if score < best_score:
+			best_score = score
+			best = enemy
+	return best
+
+
+func _build_lock_marker() -> void:
+	_lock_marker = MeshInstance3D.new()
+	var cone := CylinderMesh.new()
+	cone.top_radius = 0.28
+	cone.bottom_radius = 0.0
+	cone.height = 0.5
+	cone.radial_segments = 4
+	cone.rings = 1
+	(_lock_marker as MeshInstance3D).mesh = cone
+	(_lock_marker as MeshInstance3D).material_override = Fx.glow(Color(0.95, 0.72, 0.32, 0.9))
+	(_lock_marker as MeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_lock_marker.visible = false
+	add_child(_lock_marker)
+
+
+## En vue libre, la caméra voit au loin : une brume plus épaisse, de la couleur
+## du fond, efface les bords du terrain et ce qui est trop loin pour le téléphone.
+func _apply_view_environment() -> void:
+	_env_mode = GameCamera.mode
+	if _env == null:
+		return
+	if GameCamera.is_free():
+		_env.background_color = _env.fog_light_color
+		_env.fog_density = 0.06
+	else:
+		_env.background_color = Color(0.015, 0.015, 0.03)
+		_env.fog_density = 0.025
 
 
 # --- Repère de l'objectif -----------------------------------------------------
@@ -547,6 +654,7 @@ func _build_environment() -> void:
 	env.fog_density = 0.025
 	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
 
+	_env = env
 	var world_env := WorldEnvironment.new()
 	world_env.environment = env
 	add_child(world_env)

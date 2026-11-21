@@ -12,6 +12,8 @@ signal pause_pressed
 signal flask_pressed
 ## Un bouton de rite de combat (0, 1 ou 2).
 signal rite_slot_pressed(slot: int)
+## Le bouton CIBLE : verrouiller le mort le plus proche, ou le relâcher.
+signal lock_pressed
 
 const STICK_RADIUS := 95.0
 const ATTACK_RADIUS := 88.0
@@ -21,6 +23,7 @@ const BOOK_RADIUS := 44.0
 const FLASK_RADIUS := 50.0
 const PAUSE_RADIUS := 38.0
 const SLOT_RADIUS := 46.0
+const LOCK_RADIUS := 40.0
 
 ## Direction voulue, de longueur 0 à 1. x vers la droite, y vers le bas de l'écran.
 var move := Vector2.ZERO
@@ -46,11 +49,20 @@ var simulated_move := Vector2.ZERO
 ## Biais de la caméra (radians) : « haut » sur le joystick va vers le haut de l'écran.
 var view_yaw := deg_to_rad(GameCamera.YAW)
 var simulated_rite := false
+## Vrai en vue libre : glisser le doigt sur la moitié droite de l'écran (hors
+## des boutons) tourne la caméra.
+var look_enabled := false
+## Vrai tant qu'un mort est verrouillé : le bouton CIBLE luit.
+var lock_active := false
 
 var _stick_index := -1
 var _stick_origin := Vector2.ZERO
 var _stick_vector := Vector2.ZERO
 var _rite_index := -1
+var _look_index := -1
+## Glissés accumulés depuis la dernière lecture (`take_look`), en pixels.
+var _look_delta := Vector2.ZERO
+var _lock_flash := 0.0
 var _attack_flash := 0.0
 var _dodge_flash := 0.0
 var _pad: Control
@@ -110,6 +122,7 @@ func _process(delta: float) -> void:
 		_slot_flash[i] = maxf(0.0, _slot_flash[i] - delta * 4.0)
 		_slot_denied[i] = maxf(0.0, _slot_denied[i] - delta * 3.0)
 	_attack_flash = maxf(0.0, _attack_flash - delta * 5.0)
+	_lock_flash = maxf(0.0, _lock_flash - delta * 5.0)
 	_dodge_flash = maxf(0.0, _dodge_flash - delta * 5.0)
 	_pad.queue_redraw()
 
@@ -129,6 +142,8 @@ func _input(event: InputEvent) -> void:
 			elif touch.position.distance_to(_book_center()) <= BOOK_RADIUS * 1.3:
 				_release_all()
 				book_pressed.emit()
+			elif touch.position.distance_to(_lock_center()) <= LOCK_RADIUS * 1.25:
+				press_lock()
 			elif touch.position.distance_to(_attack_center()) <= ATTACK_RADIUS * 1.25:
 				press_attack()
 			elif _slot_at(touch.position) >= 0:
@@ -143,7 +158,11 @@ func _input(event: InputEvent) -> void:
 				_stick_index = touch.index
 				_stick_origin = touch.position
 				_stick_vector = Vector2.ZERO
+			elif look_enabled and touch.position.x >= _pad.size.x * 0.5 and _look_index == -1:
+				_look_index = touch.index
 		else:
+			if touch.index == _look_index:
+				_look_index = -1
 			if touch.index == _stick_index:
 				_stick_index = -1
 				_stick_vector = Vector2.ZERO
@@ -153,6 +172,13 @@ func _input(event: InputEvent) -> void:
 		var drag := event as InputEventScreenDrag
 		if drag.index == _stick_index:
 			_stick_vector = ((drag.position - _stick_origin) / STICK_RADIUS).limit_length(1.0)
+		elif drag.index == _look_index:
+			_look_delta += drag.relative
+	elif event is InputEventMouseMotion:
+		# Sur PC : bouton droit maintenu pour tourner la vue.
+		var motion := event as InputEventMouseMotion
+		if look_enabled and motion.button_mask & MOUSE_BUTTON_MASK_RIGHT:
+			_look_delta += motion.relative
 	elif event is InputEventKey:
 		var key := event as InputEventKey
 		if key.pressed and not key.echo:
@@ -163,6 +189,8 @@ func _input(event: InputEvent) -> void:
 					press_dodge()
 				KEY_F:
 					flask_pressed.emit()
+				KEY_L, KEY_R:
+					press_lock()
 				KEY_1, KEY_U:
 					press_slot(0)
 				KEY_2, KEY_I:
@@ -175,6 +203,23 @@ func _input(event: InputEvent) -> void:
 				KEY_ESCAPE, KEY_P:
 					_release_all()
 					pause_pressed.emit()
+
+
+func press_lock() -> void:
+	_lock_flash = 1.0
+	lock_pressed.emit()
+
+
+## Les glissés de la vue depuis le dernier appel (puis remis à zéro).
+func take_look() -> Vector2:
+	var taken := _look_delta
+	_look_delta = Vector2.ZERO
+	return taken
+
+
+## Glissé imposé par un script (tests).
+func simulate_look(pixels: Vector2) -> void:
+	_look_delta += pixels
 
 
 func press_attack() -> void:
@@ -192,6 +237,7 @@ func layout_problems(screen: Vector2) -> Array[String]:
 		"FRAPPER": [_attack_center(), ATTACK_RADIUS], "ESQUIVE": [_dodge_center(), DODGE_RADIUS],
 		"FIOLE": [_flask_center(), FLASK_RADIUS], "REPOS": [_rite_center(), RITE_RADIUS],
 		"CARNET": [_book_center(), BOOK_RADIUS], "PAUSE": [_pause_center(), PAUSE_RADIUS],
+		"CIBLE": [_lock_center(), LOCK_RADIUS],
 	}
 	for i in 3:
 		circles["rite %d" % (i + 1)] = [slot_center(i), SLOT_RADIUS]
@@ -264,6 +310,13 @@ func _release_all() -> void:
 	_stick_index = -1
 	_stick_vector = Vector2.ZERO
 	_rite_index = -1
+	_look_index = -1
+	_look_delta = Vector2.ZERO
+
+
+## CIBLE : au bord droit de l'écran, au-dessus du troisième rite.
+func _lock_center() -> Vector2:
+	return Vector2(_pad.size.x - 58.0, _pad.size.y - 445.0)
 
 
 func _pause_center() -> Vector2:
@@ -300,6 +353,7 @@ const ACCENT_FLASK := Color(0.42, 0.88, 0.66)
 const ACCENT_REST := Color(0.62, 0.82, 1.0)
 const ACCENT_BOOK := Color(0.95, 0.78, 0.42)
 const ACCENT_PAUSE := Color(0.7, 0.68, 0.82)
+const ACCENT_LOCK := Color(0.95, 0.72, 0.32)
 
 
 func _draw_pad() -> void:
@@ -330,6 +384,7 @@ func _draw_pad() -> void:
 	var glow := 0.5 + 0.5 * sin(Time.get_ticks_msec() / 220.0) if book_alert else 0.0
 	_draw_button(_book_center(), BOOK_RADIUS, ACCENT_BOOK, glow * 0.5, &"book", -1.0, 0.0, "", "", glow if book_alert else -1.0)
 	_draw_button(_pause_center(), PAUSE_RADIUS, ACCENT_PAUSE, 0.0, &"pause")
+	_draw_button(_lock_center(), LOCK_RADIUS, ACCENT_LOCK, maxf(_lock_flash, 0.6 if lock_active else 0.0), &"lock")
 
 	if rite_available:
 		var held := 1.0 if rite_held else 0.0
@@ -470,6 +525,13 @@ func _draw_icon(kind: StringName, c: Vector2, s: float, accent: Color) -> void:
 			for k in 3:
 				_pad.draw_line(c + Vector2(-0.72, -0.2 + 0.25 * k) * s, c + Vector2(-0.22, -0.12 + 0.25 * k) * s, Color(dark, 0.6), 0.06 * s)
 				_pad.draw_line(c + Vector2(0.72, -0.2 + 0.25 * k) * s, c + Vector2(0.22, -0.12 + 0.25 * k) * s, Color(dark, 0.6), 0.06 * s)
+		&"lock":
+			# Un viseur : un anneau, quatre traits, un point.
+			_pad.draw_arc(c, 0.55 * s, 0.0, TAU, 28, PALE, 0.1 * s, true)
+			for k in 4:
+				var d := Vector2.from_angle(k * PI / 2.0)
+				_pad.draw_line(c + d * 0.38 * s, c + d * 0.9 * s, PALE, 0.11 * s)
+			_pad.draw_circle(c, 0.13 * s, accent)
 		&"pause":
 			_pad.draw_colored_polygon(_shape([Vector2(-0.48, -0.62), Vector2(-0.14, -0.62), Vector2(-0.14, 0.62), Vector2(-0.48, 0.62)], c, s), PALE)
 			_pad.draw_colored_polygon(_shape([Vector2(0.14, -0.62), Vector2(0.48, -0.62), Vector2(0.48, 0.62), Vector2(0.14, 0.62)], c, s), PALE)
