@@ -9,6 +9,8 @@ extends Control
 signal level_chosen(id: StringName)
 ## Le joueur veut revenir à l'écran-titre.
 signal menu_requested
+## La cour d'armes : l'entraînement.
+signal training_requested
 
 const TAP_SLOP := 14.0
 const PICK_RADIUS := 52.0
@@ -544,6 +546,11 @@ func _build_ui() -> void:
 	Theatre.pill(mill_button, 21)
 	mill_button.pressed.connect(go_to_refuge)
 	top.add_child(mill_button)
+	var training_button := Button.new()
+	training_button.text = "Entraînement"
+	Theatre.pill(training_button, 21, Theatre.MUTED)
+	training_button.pressed.connect(func() -> void: training_requested.emit())
+	top.add_child(training_button)
 	var menu_button := Button.new()
 	menu_button.text = "Menu"
 	Theatre.pill(menu_button, 21, Theatre.MUTED)

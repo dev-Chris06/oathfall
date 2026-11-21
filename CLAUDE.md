@@ -175,6 +175,18 @@ retournement du scénario.** Le mécanisme de textes secrets (fichier hors du
 dépôt injecté au build par un secret GitHub) n'existe pas encore ; le
 joueur a choisi de laisser la réplique de fin de la Fossoyeuse de côté.
 
+**La cour d'armes** (`cour_d_armes.gd`, bouton « Entraînement » de
+l'écran-titre et de la carte) : l'entraînement, **facultatif** (choix de
+l'auteur). Le vieux Hugues, soldat de la légion, propose **le parcours** (se
+déplacer, frapper, Repos, esquive, fiole, CIBLE, un rite si on en porte, le
+Boucher s'il a été rencontré ; `course_steps`) et **l'entraînement libre**
+(faire venir un mort **déjà rencontré**, jamais un boss ni un inconnu ;
+reprendre braises et fioles). `Level.practice` : rien ne se gagne ni ne se
+dépense (souvenirs, or, braises et fioles de la partie), les braises et
+fioles du héros sont prêtées, et Hugues relève le héros sous 30 % de vie.
+Ce n'est pas un niveau de la route (`Main.CALM_PLACES` : ni repas, ni
+reprise, ni fin enregistrée). Ses textes sont publics.
+
 **L'équipement** (`scripts/data/gear.gd`) : deux emplacements, bouclier et arme,
 chacun avec des objets qui sont de **vraies pièces du modèle du chevalier**
 (quatre écus, une épée, une lame longue) ou un modèle posé à sa main (la
@@ -264,6 +276,7 @@ Retour de l'auteur encore attendu : les sensations de combat sur téléphone
 | `scripts/levels/les_caves.gd` | Niveau 9 : les caves du marché, souterraines (couloirs et trois salles de tonneaux), tous les morts du chapitre |
 | `scripts/levels/la_halle_du_prevot.gd` | Niveau 10, boss : la halle voûtée, antichambre puis le Prévôt ; fin du chapitre II |
 | `scripts/levels/refuge.gd`, `npc.gd` | Le moulin et ses personnages |
+| `scripts/levels/cour_d_armes.gd` | L'entraînement, facultatif : le vieux Hugues, le parcours guidé, l'entraînement libre |
 | `scripts/data/refuge_texts.gd`, `gear.gd` | Conversations du refuge ; équipement (objets, effets, `Gear.apply`) |
 | `scripts/dev/portrait_tool.gd` | Fabrique les portraits du bestiaire (`-- --portraits`), rendus des vrais modèles |
 | `scripts/enemies/` | Comportements propres : archer (et son carreau), Porte-cloche, Fouisseur, Veuve, Sonneur, la grosse cloche avec ses cordes (`great_bell.gd`, `bell_rope.gd`), Fossoyeuse et ses pierres (`fossoyeuse.gd`, `grave_stone.gd`) |

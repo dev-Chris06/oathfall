@@ -33,7 +33,12 @@ const LEVELS := {
 	&"les_caves": preload("res://scripts/levels/les_caves.gd"),
 	&"la_halle_du_prevot": preload("res://scripts/levels/la_halle_du_prevot.gd"),
 	&"refuge": preload("res://scripts/levels/refuge.gd"),
+	&"cour_d_armes": preload("res://scripts/levels/cour_d_armes.gd"),
 }
+
+## Lieux qui ne sont pas des niveaux de la route : ni repas, ni point de
+## reprise, ni fin enregistrée.
+const CALM_PLACES := [&"refuge", &"cour_d_armes"]
 
 var level: Level
 var world_map: WorldMap
@@ -119,7 +124,7 @@ func _ready() -> void:
 func ready_levels() -> Array:
 	var ids: Array = []
 	for id: StringName in LEVELS:
-		if id != &"arena":
+		if id != &"arena" and id != &"cour_d_armes":
 			ids.append(id)
 	return ids
 
@@ -135,6 +140,7 @@ func show_title() -> void:
 	title_screen = TitleScreen.new()
 	title_screen.continue_pressed.connect(show_map)
 	title_screen.new_game_pressed.connect(start_new_game)
+	title_screen.training_pressed.connect(func() -> void: load_level(&"cour_d_armes"))
 	add_child(title_screen)
 
 
@@ -166,6 +172,7 @@ func show_map() -> void:
 	world_map.arrived_from = came_from
 	world_map.level_chosen.connect(_on_level_chosen)
 	world_map.menu_requested.connect(show_title)
+	world_map.training_requested.connect(func() -> void: load_level(&"cour_d_armes"))
 	add_child(world_map)
 
 
@@ -216,14 +223,14 @@ func _drop_map() -> void:
 
 func _on_level_chosen(id: StringName) -> void:
 	# Un repas emballé se mange en partant pour un niveau (pas pour le moulin).
-	if id != &"refuge":
+	if not id in CALM_PLACES:
 		Progress.start_level_meal()
 	load_level(id, 0)
 
 
 func _on_checkpoint(index: int) -> void:
 	_checkpoint = index
-	if level_id != &"arena":
+	if level_id != &"arena" and not level_id in CALM_PLACES:
 		Progress.set_resume_point(level_id, index)
 
 
@@ -238,11 +245,14 @@ func _on_completed() -> void:
 	var done := level
 	Progress.mark_completed(level_id)
 	Progress.set_resume_point(level_id, 0)
-	done.hud.show_message("%s\nLes morts reposent.\nNiveau %d — Or : %d" % [
-		done.title.to_upper(), Progress.hero_level, Progress.gold], 5.0)
+	# Le bandeau de victoire a déjà été montré : le niveau se ferme aussitôt.
+	var celebrated := done.hud.victory_shown()
+	if not celebrated:
+		done.hud.show_message("%s\nLes morts reposent.\nNiveau %d — Or : %d" % [
+			done.title.to_upper(), Progress.hero_level, Progress.gold], 5.0)
 	if scripted:
 		return
-	await _pause(5.5)
+	await _pause(0.4 if celebrated else 5.5)
 	if level == done:
 		show_map()
 

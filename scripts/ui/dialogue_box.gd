@@ -10,7 +10,8 @@ signal finished(action: StringName)
 var _root: Control
 var _speaker: Label
 var _text: Label
-var _buttons: HBoxContainer
+## Les choix, à la ligne quand ils sont nombreux (l'entraînement en a dix).
+var _buttons: HFlowContainer
 var _lines: Array = []
 var _actions: Array = []
 var _index := 0
@@ -48,9 +49,10 @@ func _ready() -> void:
 	_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_text.custom_minimum_size = Vector2(900.0, 84.0)
 	column.add_child(_text)
-	_buttons = HBoxContainer.new()
-	_buttons.alignment = BoxContainer.ALIGNMENT_END
-	_buttons.add_theme_constant_override("separation", 14)
+	_buttons = HFlowContainer.new()
+	_buttons.alignment = FlowContainer.ALIGNMENT_END
+	_buttons.add_theme_constant_override("h_separation", 14)
+	_buttons.add_theme_constant_override("v_separation", 10)
 	column.add_child(_buttons)
 	_show_line()
 

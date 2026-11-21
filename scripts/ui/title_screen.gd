@@ -7,6 +7,8 @@ signal continue_pressed
 ## Le joueur a choisi de commencer une partie neuve (confirmée s'il y avait
 ## une partie en cours).
 signal new_game_pressed
+## La cour d'armes : l'entraînement, facultatif.
+signal training_pressed
 
 var _menu: VBoxContainer
 var _continue_button: Button
@@ -45,12 +47,12 @@ func _ready() -> void:
 	add_child(subtitle)
 
 	_menu = VBoxContainer.new()
-	_menu.add_theme_constant_override("separation", 14)
+	_menu.add_theme_constant_override("separation", 12)
 	_menu.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	_menu.offset_left = -190.0
 	_menu.offset_right = 190.0
-	_menu.offset_top = -10.0
-	_menu.offset_bottom = 320.0
+	_menu.offset_top = -40.0
+	_menu.offset_bottom = 330.0
 	add_child(_menu)
 	_continue_button = _button("Continuer", true)
 	_continue_button.pressed.connect(func() -> void: continue_pressed.emit())
@@ -59,6 +61,8 @@ func _ready() -> void:
 	_menu.add_child(_info)
 	_new_button = _button("Nouvelle partie", false)
 	_new_button.pressed.connect(press_new_game)
+	var training := _button("Entraînement", false)
+	training.pressed.connect(func() -> void: training_pressed.emit())
 	var options := _button("Options", false)
 	options.pressed.connect(func() -> void: _show_panel(_options))
 	var update := _button("Mise à jour", false)

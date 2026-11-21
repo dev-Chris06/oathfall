@@ -54,6 +54,10 @@ var hud: Hud
 ## Point que le héros doit rejoindre, s'il y en a un. Sert au joueur
 ## automatique et au repère affiché dans le décor et à l'écran.
 var objective = null
+## Entraînement (la cour d'armes) : rien ne se gagne ni ne se dépense pour de
+## vrai. Le Repos ne rapporte ni souvenirs, ni or, ni braise de la partie ; les
+## braises et les fioles du héros sont prêtées et ne touchent pas à la partie.
+var practice := false
 ## Chance qu'une fiole tombe d'un corps mis au repos (l'arène d'essai la coupe).
 var flask_drop_chance := Supplies.FLASK_DROP_CHANCE
 ## Le carnet des compétences, tant qu'il est ouvert.
@@ -590,6 +594,11 @@ func _on_enemy_rose(_enemy: Enemy) -> void:
 
 func _on_enemy_rested(enemy: Enemy) -> void:
 	_enemies.erase(enemy)
+	if practice:
+		# Une braise prêtée, pour essayer les rites.
+		hero.embers = mini(hero.embers + 1, RiteData.MAX_EMBERS)
+		hud.set_embers(hero.embers)
+		return
 	_gained_memories += enemy.memories_given()
 	_gained_gold += enemy.gold_given()
 	Progress.note_rest(enemy.type_id_name)
@@ -642,16 +651,21 @@ func _on_leave() -> void:
 func _refresh_progress() -> void:
 	# Un achat ou un rite appris change les caractéristiques tout de suite.
 	hero.apply_stats(Progress.hero_stats())
-	hero.flasks = Progress.flasks
-	hero.embers = Progress.embers
+	# À l'entraînement, braises et fioles sont prêtées : la partie ne les écrase pas.
+	if not practice:
+		hero.flasks = Progress.flasks
+		hero.embers = Progress.embers
 	hero.rite_slots = Progress.rite_slots.duplicate()
-	hud.set_embers(Progress.embers)
+	hud.set_embers(hero.embers)
 	hero.apply_gear(Progress.equipped_map())
 	hud.set_progress(Progress.hero_level, Progress.level_progress(), Progress.gold)
 	controls.book_alert = Progress.skill_points > 0
 
 
 func _on_rite_cast(_rite_id: StringName, cost: int) -> void:
+	if practice:
+		hud.set_embers(hero.embers)
+		return
 	Progress.spend_embers(cost)
 
 
@@ -661,6 +675,10 @@ func _on_rite_denied(slot: int, reason: String) -> void:
 
 
 func _on_flask_drunk() -> void:
+	if practice:
+		hero.flasks = maxi(hero.flasks - 1, 0)
+		hero.heal(int(Supplies.FLASK["heal"]))
+		return
 	if Progress.use_flask():
 		hero.heal(int(Supplies.FLASK["heal"]))
 

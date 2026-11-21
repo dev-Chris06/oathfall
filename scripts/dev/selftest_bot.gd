@@ -415,6 +415,8 @@ func _run() -> void:
 		return
 	if not await _refuge_tests():
 		return
+	if not await _training_tests():
+		return
 	if not await _menu_tests():
 		return
 	if not _audio_tests():
@@ -1303,11 +1305,12 @@ func _reach_tests() -> bool:
 	main._drop_level()
 	await _frames(4)
 	for id: StringName in [&"la_grille", &"les_allees", &"la_chapelle", &"l_ossuaire",
-			&"la_fosse", &"la_porte_des_halles", &"les_etals", &"la_balance", &"les_caves", &"la_halle_du_prevot", &"refuge"]:
+			&"la_fosse", &"la_porte_des_halles", &"les_etals", &"la_balance", &"les_caves", &"la_halle_du_prevot", &"refuge",
+			&"cour_d_armes"]:
 		var level := main.LEVELS[id].new() as Level
 		main.add_child(level)
 		await _frames(4)
-		if id != &"refuge":
+		if not id in main.CALM_PLACES:
 			level.open_gates_before(99)
 		await _frames(3)
 		var zone := _reachable_zone(level)
@@ -1328,7 +1331,8 @@ func _visible_walls_tests() -> bool:
 	main._drop_level()
 	await _frames(3)
 	for id: StringName in [&"la_grille", &"les_allees", &"la_chapelle", &"l_ossuaire",
-			&"la_fosse", &"la_porte_des_halles", &"les_etals", &"la_balance", &"les_caves", &"la_halle_du_prevot", &"refuge"]:
+			&"la_fosse", &"la_porte_des_halles", &"les_etals", &"la_balance", &"les_caves", &"la_halle_du_prevot", &"refuge",
+			&"cour_d_armes"]:
 		var level := main.LEVELS[id].new() as Level
 		main.add_child(level)
 		await _frames(3)
@@ -2509,6 +2513,60 @@ func _frames(count: int) -> void:
 
 
 ## Le moulin : la boutique, les conversations, les rites, l'entrée et la sortie.
+## La cour d'armes : le parcours guidé va jusqu'au bout (le joueur automatique
+## se bat, le test fait les gestes demandés), rien de la partie ne change
+## (souvenirs, or, braises, fioles), le héros n'y tombe pas, l'entraînement
+## libre ne fait venir que des morts déjà rencontrés, hors boss.
+func _training_tests() -> bool:
+	var before := [Progress.memories, Progress.gold, Progress.embers, Progress.flasks, Progress.hero_level]
+	main.load_level(&"cour_d_armes")
+	var yard := _level() as CourDArmes
+	await get_tree().create_timer(0.5).timeout
+	var hero := yard.hero
+	hero.rite_slots = [&"glas", &"", &""]
+	yard.run_course()
+	var finished := await _until(func() -> bool:
+		var steps := yard.course_steps
+		if &"rest" in steps and not &"dodge" in steps:
+			yard.controls.press_dodge()
+		elif &"dodge" in steps and not &"flask" in steps and hero.state == Hero.State.MOVE:
+			yard.controls.flask_pressed.emit()
+		elif &"flask" in steps and not &"lock" in steps and hero.lock_target == null and yard.standing_count() > 0:
+			yard.controls.press_lock()
+		elif &"lock" in steps and not &"rite" in steps and yard.standing_count() > 0:
+			hero.cast_slot(0)
+		return &"done" in steps, 400.0)
+	if not finished:
+		return _fail("le parcours de la cour d'armes ne va pas au bout (étapes : %s)" % [yard.course_steps])
+	for step: StringName in [&"move", &"strike", &"rest", &"dodge", &"flask", &"lock", &"rite"]:
+		if not step in yard.course_steps:
+			return _fail("le parcours saute l'étape %s" % step)
+	if Progress.has_met(&"boucher") and not &"armor" in yard.course_steps:
+		return _fail("le parcours oublie le mort à armure déjà rencontré")
+	var after := [Progress.memories, Progress.gold, Progress.embers, Progress.flasks, Progress.hero_level]
+	if after != before:
+		return _fail("l'entraînement change la partie : %s devient %s" % [before, after])
+	if Progress.is_completed(&"cour_d_armes"):
+		return _fail("la cour d'armes est enregistrée comme un niveau")
+
+	# L'entraînement libre : un mort rencontré vient, un boss ou un inconnu non.
+	var count := yard.enemies_left()
+	yard.choose(&"spawn_depouille")
+	yard.choose(&"spawn_le_sonneur")
+	yard.choose(&"spawn_sonneur")
+	if yard.enemies_left() != count + 1:
+		return _fail("l'entraînement libre fait venir un boss, ou pas la Dépouille")
+	for id: StringName in yard.sparring_types():
+		if id != &"depouille" and not Progress.has_met(id):
+			return _fail("l'entraînement libre propose %s, jamais rencontré" % id)
+	yard.choose(&"clear")
+	await _frames(2)
+	if yard.enemies_left() != 0:
+		return _fail("Renvoyer les morts ne vide pas la cour")
+	print("test réussi : la cour d'armes (parcours de %d étapes, aucun gain, entraînement libre)" % yard.course_steps.size())
+	return true
+
+
 func _refuge_tests() -> bool:
 	# --- L'équipement, sans l'écran.
 	Progress.reset()
