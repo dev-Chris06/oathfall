@@ -89,10 +89,7 @@ func _last_stretch() -> void:
 
 
 func _leave() -> void:
-	await say("La place est silencieuse.", 2.5)
-	hud.show_message("Plus loin, les étals de la rue des bouchers.", 4.0)
-	await reach(EXIT, 2.5)
-	finish()
+	await victory("La place est silencieuse.")
 
 
 # --- Décor --------------------------------------------------------------------

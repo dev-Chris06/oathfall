@@ -91,10 +91,7 @@ func _last_stretch() -> void:
 
 
 func _leave() -> void:
-	await say("La rue est vide.", 2.5)
-	hud.show_message("Au bout, la salle de la balance.", 4.0)
-	await reach(EXIT, 2.5)
-	finish()
+	await victory("La rue est vide.")
 
 
 # --- Décor --------------------------------------------------------------------

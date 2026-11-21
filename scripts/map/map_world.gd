@@ -183,7 +183,9 @@ func _build_ground() -> void:
 	add_child(ground)
 
 
-## La route : un ruban sombre et des braises qui la jalonnent.
+## La route : un ruban sombre et des braises qui la jalonnent. Elle commence
+## au pied du pont : le premier tronçon, du moulin au pont, n'est qu'un sentier
+## de terre sans braises (le moulin est un refuge, pas une étape du chemin).
 func _build_road() -> void:
 	var route := data.route
 	var surface := SurfaceTool.new()
@@ -205,6 +207,8 @@ func _build_road() -> void:
 		for v: Vector3 in [a_high - side, a_high + side, b_high + side, a_high - side, b_high + side, b_high - side]:
 			surface.set_normal(Vector3.UP)
 			surface.add_vertex(v)
+		if i == 1:
+			continue
 		var at := 0.0 - carry
 		while at < length:
 			if at >= 0.0:
@@ -549,7 +553,7 @@ func _build_labels() -> void:
 		var terrace: Dictionary = MapScene.TERRACES[a]
 		var at := to_world(Vector2(1010.0, float(terrace["y1"]) + 30.0), 1.3)
 		_label(String(act["name"]).to_upper(), 70, Color(0.6, 0.56, 0.69, 0.85), at, 0.0075)
-	_label("le moulin, refuge", 52, Color(0.7, 0.66, 0.8, 0.95), to_world(Vector2(MapScene.MILL_X, 2745.0), 0.8))
+	_label("Refuge — le moulin", 64, Color(0.62, 0.9, 0.7, 1.0), to_world(Vector2(MapScene.MILL_X, 2745.0), 0.8))
 
 
 # --- États --------------------------------------------------------------------

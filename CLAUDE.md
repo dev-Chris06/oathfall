@@ -96,12 +96,18 @@ et propose de télécharger l'APK ; permission Internet activée). Une partie ne
 (`OpeningScreen`), puis **la carte d'Orvana** (`scripts/map/`) : la capitale
 vue de face, en quatre étages, que la route en lacets gravit du fleuve au
 palais. On y choisit un niveau (toucher un point, puis « Entrer ») ou le
-**moulin** (le refuge, en bas à gauche) ; le bouton Menu ramène au titre.
+**moulin** (le refuge, en bas à gauche, ou le bouton « Moulin » en haut) ; le
+bouton Menu ramène au titre. Les testeurs prenaient le moulin pour le niveau 1 :
+la route d'or commence donc au pied du pont, le moulin n'y est relié que par
+un sentier sans braises, et son étiquette (« Refuge — le moulin ») est verte.
 Les cinq niveaux du chapitre 1 sont construits : la Grille, les Allées, la
 Chapelle des cendres, l'Ossuaire, la Fosse. Chacun compte trois parties
 séparées par des grilles qui s'ouvrent quand les morts reposent (la Fosse :
-un chemin, puis la fosse ronde du boss). La fin d'un niveau l'enregistre (`Progress.mark_completed`) et
-ramène à la carte ; le carnet, ouvert en plein niveau, propose « Quitter le
+un chemin, puis la fosse ronde du boss). **Un niveau finit dès que son dernier mort repose** :
+`Level.victory(phrase)` montre le bandeau « Victoire » (nom du niveau, phrase,
+souvenirs et or gagnés, `Hud.show_victory`), puis le niveau se ferme seul ; plus
+de marche vers une sortie (la Fosse semblait ne pas finir). La fin l'enregistre
+(`Progress.mark_completed`) et ramène à la carte ; le carnet, ouvert en plein niveau, propose « Quitter le
 niveau ». Tout niveau construit reste jouable à tout moment (essais) ;
 « ici » désigne le premier non terminé. Le héros qui tombe se relève au
 dernier point de reprise. L'arène d'essai reste disponible (`-- --arena`).
@@ -296,7 +302,11 @@ Règles à garder :
   `_run(point_de_reprise)` (scénario) et `_checkpoint_position()`. Il signale
   `completed`, `failed` et `checkpoint_reached` ; `Main` fait le reste. Le
   niveau avance vers -Z, dos à la caméra. Il fixe `objective` quand le héros
-  doit rejoindre un point : le joueur automatique s'en sert.
+  doit rejoindre un point : le joueur automatique s'en sert. `_leave()`
+  appelle `victory()` ; le test vérifie que chaque niveau montre la victoire.
+- **Corps oubliés** : `until_peace()` montre, après 5 s sans mort debout, le
+  corps restant le plus proche (repère et flèche) et dit combien il en reste :
+  un niveau n'attend jamais un corps sans dire où il est.
 - **Zones et lignes** : `reach(point, rayon)` réussit près du point **ou dès que
   sa ligne est franchie** (les niveaux avancent vers -Z) : courir sans passer
   au point exact ne bloque jamais le scénario. Les grilles ferment chaque

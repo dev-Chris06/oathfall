@@ -103,10 +103,7 @@ func _last_room() -> void:
 
 
 func _leave() -> void:
-	await say("L'Ossuaire est en paix.", 2.5)
-	hud.show_message("Plus bas, la Fosse.", 3.5)
-	await reach(EXIT, 2.5)
-	finish()
+	await victory("L'Ossuaire est en paix.")
 
 
 # --- Décor --------------------------------------------------------------------

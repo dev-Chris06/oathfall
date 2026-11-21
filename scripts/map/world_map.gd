@@ -306,6 +306,13 @@ func _select_index(index: int) -> void:
 	_show_selection()
 
 
+## Bouton « Moulin » : la carte descend jusqu'au refuge et le choisit.
+func go_to_refuge() -> void:
+	Audio.play(&"ui_select")
+	scroll_to(MILL_POINT.y)
+	select_refuge()
+
+
 ## Choisit le moulin, le refuge.
 func select_refuge() -> void:
 	_selected = -1
@@ -321,7 +328,7 @@ func _show_selection() -> void:
 	_show_worn_rites(not _refuge_selected and not level.is_empty() and is_ready(level.get("id", &"")))
 	if _refuge_selected:
 		_bottom_title.text = "Le moulin"
-		_bottom_text.text = "Le refuge, hors des murs. Maud, frère Anselme et Tibert y vivent encore : on y achète, on y apprend."
+		_bottom_text.text = "Le refuge, hors des murs : ce n'est pas un niveau, aucun mort n'y entre. Maud, frère Anselme et Tibert y vivent encore : on y achète, on y apprend."
 		_enter_button.visible = is_ready(&"refuge")
 		return
 	if _selected < 0:
@@ -531,6 +538,12 @@ func _build_ui() -> void:
 	top.offset_top = 22.0
 	_stats_label = Theatre.label("", 21)
 	top.add_child(_stats_label)
+	# Le moulin n'est pas une étape de la route : on s'y rend d'ici.
+	var mill_button := Button.new()
+	mill_button.text = "Moulin"
+	Theatre.pill(mill_button, 21)
+	mill_button.pressed.connect(go_to_refuge)
+	top.add_child(mill_button)
 	var menu_button := Button.new()
 	menu_button.text = "Menu"
 	Theatre.pill(menu_button, 21, Theatre.MUTED)

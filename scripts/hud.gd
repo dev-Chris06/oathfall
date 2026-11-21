@@ -18,6 +18,7 @@ var _boss_label: Label
 var _guide: Polygon2D
 var _balance: BalanceMeter
 var _embers: EmberGauge
+var _victory: Control
 
 
 func _ready() -> void:
@@ -84,6 +85,49 @@ func _ready() -> void:
 	_balance = BalanceMeter.new()
 	_balance.visible = false
 	add_child(_balance)
+
+
+## Le bandeau de victoire, au centre de l'écran : « Victoire », le nom du
+## niveau, une phrase, et ce que le niveau a rapporté.
+func show_victory(level_title: String, line: String, gains: String) -> void:
+	if _victory != null:
+		_victory.queue_free()
+	hide_boss_bar_only()
+	_message.modulate.a = 0.0
+	_message_time = 0.0
+	var centre := CenterContainer.new()
+	centre.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	centre.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var panel := PanelContainer.new()
+	panel.add_theme_stylebox_override("panel", Theatre.panel_box(0.9))
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	centre.add_child(panel)
+	var column := VBoxContainer.new()
+	column.add_theme_constant_override("separation", 8)
+	column.custom_minimum_size = Vector2(520.0, 0.0)
+	panel.add_child(column)
+	for entry: Array in [["Victoire", 64, Theatre.AMBER, GameFonts.title()],
+			[level_title, 28, Theatre.CREAM, GameFonts.text()],
+			[line, 23, Theatre.CREAM, GameFonts.italic()],
+			[gains, 21, Theatre.MUTED, GameFonts.text()]]:
+		if String(entry[0]) == "":
+			continue
+		var label := Theatre.label(entry[0], entry[1], entry[2], entry[3])
+		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		column.add_child(label)
+	_victory = centre
+	centre.modulate.a = 0.0
+	add_child(centre)
+	create_tween().tween_property(centre, "modulate:a", 1.0, 0.5)
+
+
+func victory_shown() -> bool:
+	return _victory != null
+
+
+## Cache la barre du boss sans changer la musique (la victoire a la sienne).
+func hide_boss_bar_only() -> void:
+	_boss_box.visible = false
 
 
 func set_embers(count: int) -> void:

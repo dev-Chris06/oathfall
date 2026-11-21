@@ -83,13 +83,10 @@ func _boss_fight() -> void:
 
 	await until_peace()
 	hud.hide_boss()
-	await say("Le Prévôt repose. La halle se tait.\nLe chapitre s'achève.", 3.5)
 
 
 func _leave() -> void:
-	hud.show_message("Au nord, la sortie de la halle.", 3.5)
-	await reach(EXIT, 2.5)
-	finish()
+	await victory("Le Prévôt repose. La halle se tait.\nLe chapitre s'achève.")
 
 
 func _on_levy_called(_center: Vector3) -> void:

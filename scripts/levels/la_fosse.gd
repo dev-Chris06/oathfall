@@ -86,13 +86,10 @@ func _boss_fight() -> void:
 
 	await until_peace()
 	hud.hide_boss()
-	await say("La Fossoyeuse repose.\nLe chapitre s'achève.", 3.5)
 
 
 func _leave() -> void:
-	hud.show_message("Au nord, la sortie de la fosse.", 3.5)
-	await reach(EXIT, 2.5)
-	finish()
+	await victory("La Fossoyeuse repose.\nLe chapitre s'achève.")
 
 
 # --- Les trois phases ---------------------------------------------------------

@@ -91,10 +91,7 @@ func _last_stretch() -> void:
 
 
 func _leave() -> void:
-	await say("Les Allées se taisent.", 2.5)
-	hud.show_message("Au bout de l'allée, la Chapelle des cendres.", 4.0)
-	await reach(EXIT, 2.5)
-	finish()
+	await victory("Les Allées se taisent.")
 
 
 # --- Décor --------------------------------------------------------------------

@@ -77,6 +77,9 @@ var _time := 0.0
 var _hud_timer := 0.0
 var _finished := false
 var _crier_called := false
+## Ce que le niveau a rapporté (souvenirs, or), montré à la victoire.
+var _gained_memories := 0
+var _gained_gold := 0
 var _solids: StaticBody3D
 ## Les vantaux de chaque grille, et l'obstacle qui la ferme.
 var _gates: Array[Dictionary] = []
@@ -379,8 +382,67 @@ func crossed(where: Vector3, radius: float) -> bool:
 
 
 ## Attend que tous les morts du niveau reposent.
+## Attend que tous les morts reposent. Quand il ne reste que des corps au sol
+## (le joueur ne les voit peut-être pas : derrière une pierre, au bord de la
+## fosse), le repère montre le plus proche et un message dit combien il en
+## reste : le niveau n'attend jamais un corps sans dire où il est.
 func until_peace() -> void:
-	await wait_until(func() -> bool: return _enemies.is_empty())
+	var quiet := [0.0, 0.0]
+	await wait_until(func() -> bool:
+		if _enemies.is_empty():
+			return true
+		var delta := get_physics_process_delta_time()
+		if standing_count() > 0:
+			quiet[0] = 0.0
+			if objective is Vector3 and quiet[1] > 0.0:
+				objective = null
+			quiet[1] = 0.0
+			return false
+		quiet[0] += delta
+		if quiet[0] >= BODY_HINT_DELAY:
+			var nearest := _nearest_body_left()
+			objective = nearest.body_position() if nearest != null else null
+			quiet[1] -= delta
+			if quiet[1] <= 0.0:
+				quiet[1] = 9.0
+				var left := _enemies.size()
+				hud.show_message("Il reste %d corps sans repos." % left if left > 1 \
+					else "Il reste un corps sans repos.", 3.0)
+		return false)
+	objective = null
+
+
+## Délai, sans mort debout, avant de montrer les corps qui attendent le Repos.
+const BODY_HINT_DELAY := 5.0
+
+
+func _nearest_body_left() -> Enemy:
+	var best: Enemy = null
+	var best_distance := INF
+	for enemy in _enemies:
+		if not is_instance_valid(enemy):
+			continue
+		var distance := enemy.body_position().distance_to(hero.global_position)
+		if distance < best_distance:
+			best_distance = distance
+			best = enemy
+	return best
+
+
+## Fin du niveau : le bandeau de victoire, puis le niveau se ferme et ramène à
+## la carte. `line` est la phrase sous le nom du niveau.
+const VICTORY_TIME := 4.0
+
+
+func victory(line := "") -> void:
+	objective = null
+	controls.visible = false
+	Audio.play(&"level_done")
+	var gains := "+%d souvenirs    +%d or" % [_gained_memories, _gained_gold] \
+		if _gained_memories > 0 or _gained_gold > 0 else ""
+	hud.show_victory(title, line, gains)
+	await wait(VICTORY_TIME)
+	finish()
 
 
 func mark_checkpoint(index: int) -> void:
@@ -395,8 +457,10 @@ func mark_checkpoint(index: int) -> void:
 func finish() -> void:
 	if _finished:
 		return
+	var celebrated := hud != null and hud.victory_shown()
 	_finished = true
-	Audio.play(&"level_done")
+	if not celebrated:
+		Audio.play(&"level_done")
 	completed.emit()
 
 
@@ -526,6 +590,8 @@ func _on_enemy_rose(_enemy: Enemy) -> void:
 
 func _on_enemy_rested(enemy: Enemy) -> void:
 	_enemies.erase(enemy)
+	_gained_memories += enemy.memories_given()
+	_gained_gold += enemy.gold_given()
 	Progress.note_rest(enemy.type_id_name)
 	Progress.add_memories(enemy.memories_given())
 	Progress.add_gold(enemy.gold_given())

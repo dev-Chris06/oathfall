@@ -106,10 +106,7 @@ func _last_room() -> void:
 
 
 func _leave() -> void:
-	await say("Les caves sont silencieuses.", 2.5)
-	hud.show_message("Au bout, l'escalier vers la Halle du Prévôt.", 4.0)
-	await reach(EXIT, 2.5)
-	finish()
+	await victory("Les caves sont silencieuses.")
 
 
 # --- Décor --------------------------------------------------------------------

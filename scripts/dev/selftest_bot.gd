@@ -41,6 +41,7 @@ var _attack_timer := 0.0
 var _rose := false
 var _checkpoint := 0
 var _completed := false
+var _victory_seen := false
 var _last_position := Vector3.ZERO
 var _stuck_time := 0.0
 var _detour_time := 0.0
@@ -370,6 +371,8 @@ func _run() -> void:
 	if not await _pause_tests():
 		return
 	if not await _camera_tests():
+		return
+	if not await _peace_hint_tests():
 		return
 	if not await _stone_tests():
 		return
@@ -1253,6 +1256,8 @@ func _grille_tests() -> bool:
 		return _fail("le joueur automatique est tombé plus de six fois")
 	if not Progress.is_completed(&"la_grille"):
 		return _fail("la fin de la Grille n'a pas été enregistrée")
+	if not _victory_seen:
+		return _fail("la Grille se ferme sans bandeau de victoire")
 	print("test 11 réussi : la Grille est terminée, vie %d, niveau %d, %d d'or, %d chute(s)" % [
 		_level().hero.health, Progress.hero_level, Progress.gold, falls[0]])
 	return true
@@ -1499,6 +1504,40 @@ func _camera_tests() -> bool:
 	if problem != "":
 		return _fail(problem)
 	print("test réussi : trois vues de caméra (joystick, murs, héros caché), réglage gardé, verrouillage")
+	return true
+
+
+## Un corps oublié n'arrête pas un niveau en silence : quand il ne reste que
+## des corps au sol, le repère montre le plus proche, puis s'efface quand tous
+## reposent.
+func _peace_hint_tests() -> bool:
+	main.load_level(&"arena")
+	var arena := _level() as Arena
+	await get_tree().create_timer(0.5).timeout
+	_passive = true
+	arena.spawn_wave(1, 60.0)
+	var enemy: Enemy = arena.enemies()[0]
+	await _frames(2)
+	enemy.take_hit(enemy.global_position + Vector3(0.0, 0.0, 1.0), 999)
+	var done := [false]
+	var watch := func() -> void:
+		await arena.until_peace()
+		done[0] = true
+	watch.call()
+	await get_tree().create_timer(Level.BODY_HINT_DELAY + 1.0).timeout
+	var problem := ""
+	if not (arena.objective is Vector3) or (arena.objective as Vector3).distance_to(enemy.body_position()) > 0.5:
+		problem = "le corps oublié n'est pas montré par le repère"
+	enemy.give_rest()
+	await get_tree().create_timer(0.3).timeout
+	if problem == "" and (not done[0] or arena.objective != null):
+		problem = "le repère reste après le dernier Repos"
+	_passive = false
+	_clear_arena(arena)
+	await _frames(2)
+	if problem != "":
+		return _fail(problem)
+	print("test réussi : un corps oublié est montré, la paix efface le repère")
 	return true
 
 
@@ -1951,6 +1990,8 @@ func _traverse(id: StringName) -> bool:
 		return _fail("%s n'a pas été terminé (%d chutes)" % [id, falls[0]])
 	if not Progress.is_completed(id):
 		return _fail("la fin de %s n'a pas été enregistrée" % id)
+	if not _victory_seen:
+		return _fail("%s se ferme sans bandeau de victoire" % id)
 	print("test réussi : %s terminé, niveau %d, %d d'or, %d chute(s), rites lancés : %s" % [
 		_level().title, Progress.hero_level, Progress.gold, falls[0], rites_cast])
 	rites_cast.clear()
@@ -2819,7 +2860,10 @@ func _menu_tests() -> bool:
 
 func _watch(level: Level) -> void:
 	level.checkpoint_reached.connect(func(index: int) -> void: _checkpoint = index)
-	level.completed.connect(func() -> void: _completed = true)
+	level.completed.connect(func() -> void:
+		_completed = true
+		# Chaque niveau finit sur le bandeau de victoire, puis se ferme.
+		_victory_seen = level.hud.victory_shown())
 
 
 ## Attend que `condition` soit vraie. Renvoie faux si le délai (en temps de

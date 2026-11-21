@@ -116,13 +116,10 @@ func _boss_fight() -> void:
 
 	await until_peace()
 	hud.hide_boss()
-	await say("Le Sonneur repose. La cloche se tait.", 3.0)
 
 
 func _leave() -> void:
-	hud.show_message("Derrière l'autel, la porte du caveau.", 4.0)
-	await reach(EXIT, 2.5)
-	finish()
+	await victory("Le Sonneur repose. La cloche se tait.")
 
 
 # --- Le combat ----------------------------------------------------------------

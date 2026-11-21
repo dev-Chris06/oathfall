@@ -114,10 +114,7 @@ func _vault_yard() -> void:
 
 
 func _leave() -> void:
-	await say("La cour est en paix.", 2.5)
-	hud.show_message("Le passage derrière le caveau\nmène aux Allées.", 4.0)
-	await reach(EXIT, 2.5)
-	finish()
+	await victory("La cour est en paix.")
 
 
 # --- Décor --------------------------------------------------------------------
