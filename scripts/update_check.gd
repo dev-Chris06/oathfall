@@ -10,7 +10,7 @@ signal finished(state: String, remote: String)
 
 const API := "https://api.github.com/repos/dev-Chris06/oathfall/releases/tags/dev"
 ## Le fichier à télécharger : le navigateur du téléphone s'en charge.
-const DOWNLOAD := "https://github.com/dev-Chris06/oathfall/releases/download/dev/oathfall-debug.apk"
+const DOWNLOAD := "https://github.com/dev-Chris06/oathfall/releases/download/dev/oathfall.apk"
 
 var _request: HTTPRequest
 

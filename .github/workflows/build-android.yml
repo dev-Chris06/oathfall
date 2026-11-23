@@ -120,29 +120,35 @@ jobs:
             exit 1
           }
 
+      # Export « release » (plus rapide, sans débogage), signé avec la clé du
+      # projet : c'est la même que celle des builds précédents, donc le jeu se
+      # met à jour par-dessus sans perdre la sauvegarde. Ne jamais en changer.
       - name: Exporter l'APK
         env:
-          GODOT_ANDROID_KEYSTORE_DEBUG_PATH: ${{ runner.temp }}/debug.keystore
-          GODOT_ANDROID_KEYSTORE_DEBUG_USER: oathfalldebug
-          GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD: ${{ secrets.DEBUG_KEYSTORE_PASSWORD }}
+          GODOT_ANDROID_KEYSTORE_RELEASE_PATH: ${{ runner.temp }}/debug.keystore
+          GODOT_ANDROID_KEYSTORE_RELEASE_USER: oathfalldebug
+          GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD: ${{ secrets.DEBUG_KEYSTORE_PASSWORD }}
         run: |
           set -euo pipefail
           mkdir -p build
-          ~/godot-cache/godot --headless --path . --export-debug "Android" build/oathfall-debug.apk
-          test -s build/oathfall-debug.apk
+          ~/godot-cache/godot --headless --path . --export-release "Android" build/oathfall.apk
+          test -s build/oathfall.apk
+          # Les versions déjà installées cherchent encore ce nom (bouton Mise à jour).
+          cp build/oathfall.apk build/oathfall-debug.apk
           ls -la build
 
       - name: Vérifier la signature
         run: |
           set -euo pipefail
           APKSIGNER=$(ls "${ANDROID_HOME}"/build-tools/*/apksigner | sort -V | tail -1)
-          "$APKSIGNER" verify --verbose build/oathfall-debug.apk | head -5
+          "$APKSIGNER" verify --verbose build/oathfall.apk | head -5
+          "$APKSIGNER" verify --print-certs build/oathfall.apk | grep -i "SHA-256"
 
       - name: Conserver l'APK dans les artefacts
         uses: actions/upload-artifact@v4
         with:
-          name: oathfall-debug-apk
-          path: build/oathfall-debug.apk
+          name: oathfall-apk
+          path: build/oathfall.apk
           retention-days: 14
 
       # Une seule page de téléchargement, toujours à la même adresse, mise à
@@ -156,14 +162,14 @@ jobs:
           # La version est lue par le bouton « Mise à jour » du jeu : garder la
           # forme « Version x.y.z. » au début des notes.
           VERSION="$(sed -n 's/^config\/version="\(.*\)"/\1/p' project.godot)"
-          NOTES="Version ${VERSION}. Build de test automatique, non destiné à la diffusion. Commit ${SHORT_SHA}, construit le $(date -u '+%Y-%m-%d à %H:%M UTC')."
+          NOTES="Version ${VERSION}. Build automatique. Commit ${SHORT_SHA}, construit le $(date -u '+%Y-%m-%d à %H:%M UTC')."
           if gh release view dev --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
             gh release edit dev --repo "${GITHUB_REPOSITORY}" --notes "${NOTES}"
           else
             gh release create dev --repo "${GITHUB_REPOSITORY}" --prerelease \
               --title "Dernier build de test" --notes "${NOTES}" --target "${GITHUB_SHA}"
           fi
-          gh release upload dev build/oathfall-debug.apk --repo "${GITHUB_REPOSITORY}" --clobber
+          gh release upload dev build/oathfall.apk build/oathfall-debug.apk --repo "${GITHUB_REPOSITORY}" --clobber
 
       # Une page par version (vX.Y.Z), gardée pour toujours : l'auteur
       # retrouve chaque APK sur GitHub. Si la version existe déjà (envoi sans
@@ -185,7 +191,7 @@ jobs:
           fi
           NOTES="$(printf 'Oathfall %s, commit %s, construit le %s.\n\n%s\n\n%s\n' \
             "${VERSION}" "${GITHUB_SHA::7}" "$(date -u '+%Y-%m-%d à %H:%M UTC')" "${SINCE}" "${CHANGES}")"
-          cp build/oathfall-debug.apk "build/oathfall-${VERSION}.apk"
+          cp build/oathfall.apk "build/oathfall-${VERSION}.apk"
           if gh release view "${TAG}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
             gh release edit "${TAG}" --repo "${GITHUB_REPOSITORY}" --notes "${NOTES}"
           else

@@ -86,7 +86,7 @@ apprendre les compétences et quelques personnages à qui parler.
 | 7. Niveau 3 : le Sonneur | Fait |
 | 8. Niveau 5 : la Fossoyeuse | Fait |
 | 9. Le refuge, le menu, le texte d'ouverture | Fait |
-| 10. Finition : sons, musique, équilibrage, icône, APK signé | **En cours** : sons, musiques et icône faits ; restent APK signé, équilibrage |
+| 10. Finition : sons, musique, équilibrage, icône, APK signé | **En cours** : sons, musiques, icône et APK signé faits ; reste l'équilibrage |
 
 Le jeu s'ouvre sur **l'écran-titre** (`TitleScreen` : Continuer s'il y a une
 partie, Nouvelle partie avec confirmation, Options avec crédits et effacement
@@ -572,9 +572,14 @@ change le jeu augmente la version.**
 - `config/version` dans `project.godot` ;
 - `version/code` et `version/name` dans `export_presets.cfg`.
 
-La clé de signature de test est dans les secrets du dépôt
-(`DEBUG_KEYSTORE_B64`, `DEBUG_KEYSTORE_PASSWORD`). Aucune clé ne doit entrer
-dans le dépôt.
+L'APK est un export **release** (`--export-release`), signé avec la clé du
+projet, rangée dans les secrets du dépôt (`DEBUG_KEYSTORE_B64`,
+`DEBUG_KEYSTORE_PASSWORD`, alias `oathfalldebug` : le nom est resté de
+l'époque des builds de test). **Ne jamais changer de clé** : le téléphone
+refuserait la mise à jour et il faudrait désinstaller, donc perdre la
+sauvegarde. La page `dev` porte `oathfall.apk` et, pour le bouton « Mise à
+jour » des versions antérieures à 0.31.0, une copie `oathfall-debug.apk`.
+Aucune clé ne doit entrer dans le dépôt.
 
 ## Pièges déjà rencontrés
 
