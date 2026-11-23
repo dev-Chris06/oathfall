@@ -172,6 +172,12 @@ func _dodge_if_needed(level: Level, hero: Hero, controls: TouchControls) -> void
 			return
 		if enemy is ArcherEnemy and enemy.state == Enemy.State.SPECIAL:
 			threat = enemy._state_time > float(enemy._type["aim_time"]) - 0.2 and not enemy._fired
+		elif enemy is HaleurEnemy and enemy.haul_time_left() < 0.3 and enemy.in_band(hero.global_position, 0.6):
+			# Le coup de collier : on sort de la bande, de côté.
+			var along: Vector3 = enemy._band_to - enemy._band_from
+			controls.simulated_move = Vector2(along.x, along.z).normalized().orthogonal()
+			controls.press_dodge()
+			return
 		elif enemy is DrownedEnemy and enemy.is_reaching():
 			# L'Étreinte annoncée : comme un coup, une fois sur quatre il se laisse prendre.
 			threat = enemy._state_time > enemy._grab_windup - 0.25 and enemy.spawn_index % 4 != 0 \
@@ -397,6 +403,8 @@ func _run() -> void:
 		return
 	if not await _harbor_tests():
 		return
+	if not await _haleur_tests():
+		return
 	if not await _peseur_tests():
 		return
 	if not await _prevot_tests():
@@ -453,6 +461,8 @@ func _run() -> void:
 	if not await _traverse(&"le_quai_des_fuyards"):
 		return
 	if not await _traverse(&"les_barges"):
+		return
+	if not await _traverse(&"le_halage"):
 		return
 	if not await _map_tests():
 		return
@@ -1350,7 +1360,7 @@ func _reach_tests() -> bool:
 	main._drop_level()
 	await _frames(4)
 	for id: StringName in [&"la_grille", &"les_allees", &"la_chapelle", &"l_ossuaire",
-			&"la_fosse", &"la_porte_des_halles", &"les_etals", &"la_balance", &"les_caves", &"la_halle_du_prevot", &"le_quai_des_fuyards", &"les_barges", &"refuge",
+			&"la_fosse", &"la_porte_des_halles", &"les_etals", &"la_balance", &"les_caves", &"la_halle_du_prevot", &"le_quai_des_fuyards", &"les_barges", &"le_halage", &"refuge",
 			&"cour_d_armes"]:
 		var level := main.LEVELS[id].new() as Level
 		main.add_child(level)
@@ -1376,7 +1386,7 @@ func _visible_walls_tests() -> bool:
 	main._drop_level()
 	await _frames(3)
 	for id: StringName in [&"la_grille", &"les_allees", &"la_chapelle", &"l_ossuaire",
-			&"la_fosse", &"la_porte_des_halles", &"les_etals", &"la_balance", &"les_caves", &"la_halle_du_prevot", &"le_quai_des_fuyards", &"les_barges", &"refuge",
+			&"la_fosse", &"la_porte_des_halles", &"les_etals", &"la_balance", &"les_caves", &"la_halle_du_prevot", &"le_quai_des_fuyards", &"les_barges", &"le_halage", &"refuge",
 			&"cour_d_armes"]:
 		var level := main.LEVELS[id].new() as Level
 		main.add_child(level)
@@ -2086,6 +2096,111 @@ func _embrace_tests() -> bool:
 	return true
 
 
+## Le Haleur : sa barge le suit ; le coup de collier est annoncé, blesse sur
+## la bande, relève les corps qu'il balaie et pas les autres ; l'esquive y
+## échappe ; il enrage sous la moitié de sa vie.
+func _haleur_tests() -> bool:
+	var arena := _level() as Arena
+	var hero := arena.hero
+	var data := EnemyTypes.get_type(&"haleur")
+	hero.heal(1000)
+	hero.state = Hero.State.MOVE
+	_passive = true
+	_allow_rest = false
+	arena.water_x = 7.0
+	var boss := arena.spawn(&"haleur", Vector3(-3.0, 0.0, -4.0), false) as HaleurEnemy
+	await _frames(2)
+	if boss.barge == null:
+		arena.water_x = INF
+		return _fail("le Haleur n'a pas de barge")
+	var hauls := [0]
+	boss.hauled.connect(func(_at: Vector3) -> void: hauls[0] += 1)
+	# Deux corps : l'un sur la ligne de la chaîne, l'autre loin d'elle.
+	var swept := arena.spawn(&"depouille", Vector3(3.0, 0.0, -4.0), false)
+	var spared := arena.spawn(&"depouille", Vector3(-4.0, 0.0, 6.0), false)
+	await _frames(2)
+	swept.take_hit(Vector3(3.0, 0.0, 0.0), 100000)
+	spared.take_hit(Vector3(-4.0, 0.0, 10.0), 100000)
+	await _frames(70)
+	swept.global_position += Vector3(3.0, 0.0, -4.0) - swept.body_position()
+	var spot := Vector3(1.0, 0.0, -4.0)
+	var pin := func() -> void:
+		hero.heal(1000)
+		hero.global_position = Vector3(1.0, 0.0, boss.global_position.z)
+		if boss.state != Enemy.State.SPECIAL:
+			boss.global_position = Vector3(-3.0, 0.0, -4.0)
+			boss._cooldown = 1.0
+	boss._haul_timer = 0.0
+	if not await _until(func() -> bool:
+		pin.call()
+		return boss.state == Enemy.State.SPECIAL, 5.0):
+		arena.water_x = INF
+		return _fail("le Haleur ne donne pas le coup de collier")
+	# Le Haleur a pu faire un pas : le héros se tient sur la bande.
+	spot = Vector3(1.0, 0.0, boss._band_from.z)
+	hero.global_position = spot
+	swept.global_position += Vector3(3.0, 0.0, spot.z) - swept.body_position()
+	await _frames(2)
+	if not boss._band.visible or not boss.in_band(spot):
+		arena.water_x = INF
+		return _fail("le coup de collier n'est pas annoncé sous la chaîne")
+	if not _check_blow("coup de collier", boss, float(data["haul_windup"]), float(data["haul_impact"])):
+		arena.water_x = INF
+		return false
+	var life := hero.health
+	if not await _until(func() -> bool: return boss._yanked, 3.0):
+		arena.water_x = INF
+		return _fail("la chaîne du Haleur ne se tend pas")
+	await _frames(2)
+	if hero.health >= life:
+		arena.water_x = INF
+		return _fail("le coup de collier ne blesse pas le héros sur la bande")
+	if swept.is_down() or not spared.is_down():
+		arena.water_x = INF
+		return _fail("le coup de collier relève mal les corps (balayé à terre : %s, épargné à terre : %s)" % [swept.is_down(), spared.is_down()])
+	if hauls[0] != 1:
+		arena.water_x = INF
+		return _fail("la barge ne débarque rien après le coup de collier")
+	# En esquivant au moment où la chaîne se tend, on y échappe.
+	swept.take_hit(hero.global_position, 100000)
+	await _frames(60)
+	hero._dodge_cooldown = 0.0
+	boss._haul_timer = 0.0
+	if not await _until(func() -> bool:
+		pin.call()
+		return boss.state == Enemy.State.SPECIAL, 6.0):
+		arena.water_x = INF
+		return _fail("le Haleur ne donne pas un second coup de collier")
+	spot = Vector3(1.0, 0.0, boss._band_from.z)
+	await _until(func() -> bool:
+		hero.global_position = spot
+		return boss.haul_time_left() <= 0.12, 3.0)
+	life = hero.health
+	hero._on_dodge_pressed()
+	await _until(func() -> bool: return boss._yanked, 2.0)
+	await _frames(2)
+	if hero.health != life:
+		return _fail("le coup de collier blesse un héros qui esquive")
+	# Sous la moitié de sa vie, il enrage et tire plus souvent.
+	boss.take_hit(hero.global_position, boss.health - boss.max_health() / 2 + 5)
+	await _frames(3)
+	if boss.phase != 2 or boss.haul_interval() >= float(data["haul_interval"]):
+		arena.water_x = INF
+		return _fail("le Haleur n'enrage pas sous la moitié de sa vie")
+	print("test réussi : le Haleur tire sa barge ; le coup de collier est annoncé, blesse, relève les corps balayés, s'esquive ; il enrage")
+	swept.take_hit(hero.global_position, 100000)
+	boss.take_hit(hero.global_position, 100000)
+	var barge := boss.barge
+	arena.water_x = INF
+	_passive = false
+	_allow_rest = true
+	hero.global_position = Vector3(0.0, 0.0, 3.0)
+	if not await _until(func() -> bool: return arena.enemies_left() == 0, 120.0):
+		return _fail("les morts de l'essai du Haleur n'ont pas été mis au repos")
+	barge.queue_free()
+	return true
+
+
 ## Le Peseur : la balance règle les dégâts qu'il subit, ses poids sont annoncés.
 func _peseur_tests() -> bool:
 	var arena := _level() as Arena
@@ -2293,7 +2408,7 @@ func _traverse(id: StringName) -> bool:
 	falls[0] = 0
 	# Le joueur automatique n'a pas de fiole : un combat de boss du chapitre II
 	# lui est permis plus de chutes (il reprend alors au point de reprise).
-	var limit := 12 if id in [&"la_balance", &"la_halle_du_prevot"] else 6
+	var limit := 12 if id in [&"la_balance", &"la_halle_du_prevot", &"le_halage"] else 6
 	var done := await _until(func() -> bool: return _completed or falls[0] > limit, 1500.0, false)
 	main.level_loaded.disconnect(on_load)
 	if not done or not _completed:

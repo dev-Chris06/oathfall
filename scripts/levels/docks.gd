@@ -106,7 +106,7 @@ static func quay_edge(level: Level, x: float, z_from: float, z_to: float) -> voi
 
 ## Une barge amarrée, posée sur l'eau en contrebas, chargée de caisses et de
 ## formes couchées sous des bâches. `yaw_deg` : 0 pour une barge le long du quai.
-static func barge(level: Level, at: Vector3, length := 11.0, yaw_deg := 0.0, lantern := true) -> void:
+static func barge(level: Level, at: Vector3, length := 11.0, yaw_deg := 0.0, lantern := true) -> Node3D:
 	var root := Node3D.new()
 	root.position = Vector3(at.x, WATER_Y, at.z)
 	root.rotation_degrees.y = yaw_deg
@@ -136,6 +136,7 @@ static func barge(level: Level, at: Vector3, length := 11.0, yaw_deg := 0.0, lan
 	# Une amarre, du plat-bord au quai.
 	var rope := box(root, Vector3(3.4, 0.06, 0.06), Vector3(-width / 2.0 - 1.1, 2.4, length / 2.0 - 1.0), material(Color(0.3, 0.26, 0.2), 0.5))
 	rope.rotation_degrees.z = -48.0
+	return root
 
 
 ## Des pieux plantés dans l'eau, le long du quai.

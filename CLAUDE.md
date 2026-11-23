@@ -122,8 +122,8 @@ s'écrit niveau par niveau ; `WorldData.CHAPTER_3` ne nomme que les niveaux
 construits. Plan : 11 le Quai des fuyards (fait : long quai, fleuve et barges
 du côté de la caméra, entrepôts de l'autre, barricades de caisses), 12 les
 Barges (fait : un ponton de bois, l'eau des deux côtés ; arrivée du Noyé et du
-Gaffeur), 13 le Halage (boss intermédiaire : le
-**Haleur**, enchaîné à sa barge qu'il tire dans l'arène), 14 les Entrepôts
+Gaffeur), 13 le Halage (fait : boss intermédiaire, le
+**Haleur**, enchaîné à sa barge qui le suit le long du quai), 14 les Entrepôts
 (le plus dur, tous les morts), 15 le Bac (boss : la **Batelière**, gardienne
 du Sceau des Corps). Fin du chapitre : **le sceau se brise**, les corps
 mettent ensuite plus longtemps à se relever. Les pièces du port (bittes,
@@ -146,6 +146,13 @@ ni quai.
   comme relevé, `rose`). Il ne glisse pas pendant qu'on lui donne le Repos, ni
   sous un cierge. Le joueur automatique met au repos un Noyé tombé près de lui
   même en plein combat.
+- **Haleur** (`haleur.gd`, boss, armure) : sa barge (`Docks.barge`, qu'il
+  crée si le niveau a de l'eau) le suit le long du quai, reliée par une
+  chaîne. **Coup de collier** toutes les 8 s (6 s enragé, sous la moitié de
+  sa vie) : une bande rouge s'allume de lui au bord de l'eau (1,4 s), puis la
+  chaîne la balaie : le héros dessus est blessé et jeté vers l'eau (l'esquive
+  y échappe), **les corps qu'elle traverse se relèvent**, et la barge
+  débarque deux morts (`hauled` ; Dépouilles, puis Noyés enragé).
 - **Gaffeur** (`gaffeur.gd`) : à mi-distance (3,5 à 8), il vise (trait orangé,
   0,9 s) puis lance sa gaffe : un peu de dégâts et le héros est **tiré** à lui
   (`Hero.pull`, interrompt comme un coup ; l'esquive, la ruée et le bond y
@@ -320,8 +327,8 @@ Retour de l'auteur encore attendu : les sensations de combat sur téléphone
 | `scripts/levels/la_balance.gd` | Niveau 8, boss intermédiaire : la place des poids et mesures, le Peseur, la balance publique qui penche en direct |
 | `scripts/levels/les_caves.gd` | Niveau 9 : les caves du marché, souterraines (couloirs et trois salles de tonneaux), tous les morts du chapitre |
 | `scripts/levels/la_halle_du_prevot.gd` | Niveau 10, boss : la halle voûtée, antichambre puis le Prévôt ; fin du chapitre II |
-| `scripts/levels/le_quai_des_fuyards.gd`, `les_barges.gd`, `docks.gd` | Niveaux 11 et 12 (chapitre III) : le quai, le ponton ; pièces du port |
-| `scripts/enemies/drowned.gd`, `gaffeur.gd` | Chapitre III : le Noyé (corps qui glisse à l'eau), le Gaffeur (jet de gaffe qui tire le héros) |
+| `scripts/levels/le_quai_des_fuyards.gd`, `les_barges.gd`, `le_halage.gd`, `docks.gd` | Niveaux 11 à 13 (chapitre III) : le quai, le ponton, le chemin de halage et le Haleur ; pièces du port |
+| `scripts/enemies/drowned.gd`, `gaffeur.gd`, `haleur.gd` | Chapitre III : le Noyé (Étreinte, corps qui glisse à l'eau), le Gaffeur (jet de gaffe qui tire le héros), le Haleur (boss : chaîne et barge) |
 | `scripts/levels/refuge.gd`, `npc.gd` | Le moulin et ses personnages |
 | `scripts/levels/cour_d_armes.gd` | L'entraînement, facultatif : le vieux Hugues, le parcours guidé, l'entraînement libre |
 | `scripts/data/refuge_texts.gd`, `gear.gd` | Conversations du refuge ; équipement (objets, effets, `Gear.apply`) |
@@ -389,7 +396,7 @@ Règles à garder :
   `interacted` à l'appui. Les corps et les cordes ont la priorité.
 - **Un type de mort** se déclare dans `enemy_types.gd` avec son `behavior`
   (`melee`, `archer`, `bell`, `burrower`, `widow`, `sonneur`, `fossoyeuse`,
-  `crier`, `butcher`, `peseur`, `prevot`, `drowned`, `hook`) ; `Enemy.create()`
+  `crier`, `butcher`, `peseur`, `prevot`, `drowned`, `hook`, `haleur`) ; `Enemy.create()`
   choisit la classe. Un comportement écrit `_chase()` et, pour ses actions
   propres, `_special()` dans l'état SPECIAL. Frapper un mort en SPECIAL
   l'interrompt.

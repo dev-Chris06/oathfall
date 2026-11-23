@@ -29,6 +29,7 @@ const BEHAVIORS := {
 	"prevot": "res://scripts/enemies/prevot.gd",
 	"drowned": "res://scripts/enemies/drowned.gd",
 	"hook": "res://scripts/enemies/gaffeur.gd",
+	"haleur": "res://scripts/enemies/haleur.gd",
 }
 ## Portée et force des cloches : chaque Porte-cloche debout dans ce rayon
 ## ajoute `BELL_BOOST` à la vitesse de relèvement d'un corps.

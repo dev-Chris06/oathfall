@@ -358,6 +358,58 @@ const TYPES := {
 			"drag": "Walking_Backwards",
 		},
 	},
+	# Le Haleur, boss du Halage : enchaîné à sa barge, qui le suit le long du
+	# quai. Son coup de collier balaie la ligne de sa chaîne et relève les
+	# corps qu'elle traverse ; chaque fois, la barge débarque des morts.
+	&"haleur": {
+		"name": "Le Haleur",
+		"bestiary": {
+			"text": "Il tire encore sa barge à contre-courant, enchaîné à elle. Quand il donne le coup de collier, sa chaîne balaie le chemin jusqu'à l'eau : elle jette le vivant vers le fleuve et relève les corps qu'elle traverse. La barge, chaque fois, débarque des morts.",
+			"tip": "Quand la bande rouge s'allume sous sa chaîne, sors-en ou esquive. Donne le Repos aux corps qui gisent sur sa ligne, ou attire-le ailleurs. Sous la moitié de sa vie, il tire plus souvent.",
+		},
+		"behavior": "haleur",
+		"boss": true,
+		"model": "res://assets/kaykit/skeletons/Skeleton_Warrior.glb",
+		"hidden_parts": ["Skeleton_Warrior_Helmet"],
+		"props": [{"kind": "croc", "bone": "handslot.r", "rotation": Vector3(0.0, 0.0, 0.0), "scale": 0.6}],
+		"tint": Color(0.7, 0.8, 0.82),
+		"scale": 1.9,
+		"health": 720,
+		"move_speed": 1.5,
+		"attack_range": 2.8,
+		"attack_damage": 22,
+		"attack_windup": 1.0,
+		"attack_cooldown": 2.6,
+		"attack_speed": 1.0,
+		"attack_impact": 0.52,
+		"armor": true,
+		"open_time": 1.4,
+		"stagger_guard": 3.5,
+		"combo_chance": 0.25,
+		# Le coup de collier : intervalle (puis enragé), annonce, largeur de
+		# la bande, dégâts. La barge le suit à `barge_speed`.
+		"haul_interval": 8.0,
+		"haul_interval_enraged": 6.0,
+		"haul_windup": 1.4,
+		"haul_impact": 0.53,
+		"haul_width": 2.0,
+		"haul_damage": 28,
+		"barge_speed": 1.2,
+		"enrage_at": 0.5,
+		"rise_delay": 40.0,
+		"rise_health": 0.3,
+		"memories": 90,
+		"gold": 60,
+		"animations": {
+			"idle": "Idle_Combat",
+			"walk": "Walking_D_Skeletons",
+			"attack": "2H_Melee_Attack_Chop",
+			"haul": "Throw",
+			"hit": "Hit_A",
+			"fall": "Death_C_Skeletons",
+			"rise": "Death_C_Skeletons_Resurrect",
+		},
+	},
 	# Le Gaffeur (chapitre III) : de près il frappe de sa gaffe ; à
 	# mi-distance, il la lance et tire le héros à lui.
 	&"gaffeur": {

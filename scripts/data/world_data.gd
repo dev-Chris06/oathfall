@@ -59,6 +59,7 @@ const CHAPTER_3 := {
 	"levels": [
 		{"id": &"le_quai_des_fuyards", "name": "Le Quai des fuyards", "dead": [&"depouille", &"archer_creux", &"fouisseur", &"veuve"]},
 		{"id": &"les_barges", "name": "Les Barges", "dead": [&"depouille", &"archer_creux", &"noye", &"gaffeur"]},
+		{"id": &"le_halage", "name": "Le Halage", "dead": [&"haleur", &"depouille", &"noye", &"gaffeur"]},
 	],
 }
 
