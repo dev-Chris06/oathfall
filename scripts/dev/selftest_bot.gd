@@ -330,6 +330,13 @@ func _nearest(group: StringName, hero: Hero) -> Node3D:
 
 func _run() -> void:
 	if only_level != &"":
+		# Le héros arrive comme dans la traversée complète : les niveaux
+		# d'avant sont faits (rites ouverts) et il a gagné leurs souvenirs.
+		var index := WorldData.level_index(only_level)
+		for i in maxi(index, 0):
+			Progress.mark_completed(WorldData.level_at(i)["id"])
+		var hero_level := clampi(2 + index, 1, 12)
+		Progress.add_memories(maxi(Progression.threshold(hero_level) - Progress.memories, 0))
 		var result := await _traverse(only_level)
 		print("ESSAI SEUL %s : %s (fioles bues : %d, restantes : %d)" % [only_level, "réussi" if result else "échec", _drinks, Progress.flasks])
 		get_tree().quit(0 if result else 1)
@@ -408,6 +415,8 @@ func _run() -> void:
 	if not await _traverse(&"les_caves"):
 		return
 	if not await _traverse(&"la_halle_du_prevot"):
+		return
+	if not await _traverse(&"le_quai_des_fuyards"):
 		return
 	if not await _map_tests():
 		return
@@ -1305,7 +1314,7 @@ func _reach_tests() -> bool:
 	main._drop_level()
 	await _frames(4)
 	for id: StringName in [&"la_grille", &"les_allees", &"la_chapelle", &"l_ossuaire",
-			&"la_fosse", &"la_porte_des_halles", &"les_etals", &"la_balance", &"les_caves", &"la_halle_du_prevot", &"refuge",
+			&"la_fosse", &"la_porte_des_halles", &"les_etals", &"la_balance", &"les_caves", &"la_halle_du_prevot", &"le_quai_des_fuyards", &"refuge",
 			&"cour_d_armes"]:
 		var level := main.LEVELS[id].new() as Level
 		main.add_child(level)
@@ -1331,7 +1340,7 @@ func _visible_walls_tests() -> bool:
 	main._drop_level()
 	await _frames(3)
 	for id: StringName in [&"la_grille", &"les_allees", &"la_chapelle", &"l_ossuaire",
-			&"la_fosse", &"la_porte_des_halles", &"les_etals", &"la_balance", &"les_caves", &"la_halle_du_prevot", &"refuge",
+			&"la_fosse", &"la_porte_des_halles", &"les_etals", &"la_balance", &"les_caves", &"la_halle_du_prevot", &"le_quai_des_fuyards", &"refuge",
 			&"cour_d_armes"]:
 		var level := main.LEVELS[id].new() as Level
 		main.add_child(level)

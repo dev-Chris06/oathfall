@@ -1,8 +1,8 @@
 class_name WorldData
 extends RefCounted
 ## La carte d'Orvana : les chapitres et leurs niveaux, dans l'ordre où la
-## route les traverse. Seul le chapitre 1 est écrit ; la route compte
-## cependant dix chapitres, les suivants restent fermés.
+## route les traverse. La route compte dix chapitres ; ceux qui ne sont pas
+## écrits restent fermés.
 
 const LEVELS_PER_CHAPTER := 5
 ## Les chapitres de la ville, un par voie de la route : trois dans la ville
@@ -52,7 +52,16 @@ const CHAPTER_2 := {
 	],
 }
 
-const CHAPTERS := [CHAPTER_1, CHAPTER_2]
+## Le chapitre III s'écrit niveau par niveau : seuls ceux qui sont construits
+## sont nommés ici.
+const CHAPTER_3 := {
+	"title": "Les Quais noirs",
+	"levels": [
+		{"id": &"le_quai_des_fuyards", "name": "Le Quai des fuyards", "dead": [&"depouille", &"archer_creux", &"fouisseur", &"veuve"]},
+	],
+}
+
+const CHAPTERS := [CHAPTER_1, CHAPTER_2, CHAPTER_3]
 
 
 ## Le niveau placé au `index`-ième point de la route, ou un dictionnaire vide.

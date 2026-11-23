@@ -117,6 +117,21 @@ la Balance, les Caves du marché, la Halle du Prévôt. Les morts y sont plus
 solides (+30 % de vie, +20 % de dégâts, corps qui se relèvent plus vite :
 `Enemy.apply_chapter`, `Level.chapter`). Les armes coûtent le double.
 
+**Le chapitre III** (« Les Quais noirs », niveaux 11 à 15 : le port fluvial)
+s'écrit niveau par niveau ; `WorldData.CHAPTER_3` ne nomme que les niveaux
+construits. Plan : 11 le Quai des fuyards (fait : long quai, fleuve et barges
+du côté de la caméra, entrepôts de l'autre, barricades de caisses), 12 les
+Barges (arrivée de deux morts du port : le **Noyé**, dont le corps glisse vers
+l'eau et s'y relève s'il n'a pas reçu le Repos à temps, et le **Gaffeur**, qui
+tire le héros à lui avec sa gaffe), 13 le Halage (boss intermédiaire : le
+**Haleur**, enchaîné à sa barge qu'il tire dans l'arène), 14 les Entrepôts
+(le plus dur, tous les morts), 15 le Bac (boss : la **Batelière**, gardienne
+du Sceau des Corps). Fin du chapitre : **le sceau se brise**, les corps
+mettent ensuite plus longtemps à se relever. Les pièces du port (bittes,
+caisses, bord du quai, barges, pieux) sont dans `scripts/levels/docks.gd`
+(`Docks`) : les packs n'ont ni barque ni quai. `--selftest --only=<niveau>`
+donne au héros la progression des niveaux d'avant.
+
 **Armure d'élan** (`"armor": true` dans les données) : un mort à armure n'est
 pas interrompu pendant son coup, n'est pas ébranlé deux fois de suite
 (`stagger_guard`), enchaîne parfois deux coups (`combo_chance`) et reste
@@ -275,6 +290,7 @@ Retour de l'auteur encore attendu : les sensations de combat sur téléphone
 | `scripts/levels/la_balance.gd` | Niveau 8, boss intermédiaire : la place des poids et mesures, le Peseur, la balance publique qui penche en direct |
 | `scripts/levels/les_caves.gd` | Niveau 9 : les caves du marché, souterraines (couloirs et trois salles de tonneaux), tous les morts du chapitre |
 | `scripts/levels/la_halle_du_prevot.gd` | Niveau 10, boss : la halle voûtée, antichambre puis le Prévôt ; fin du chapitre II |
+| `scripts/levels/le_quai_des_fuyards.gd`, `docks.gd` | Niveau 11 (chapitre III) : le quai, le fleuve et ses barges ; pièces du port |
 | `scripts/levels/refuge.gd`, `npc.gd` | Le moulin et ses personnages |
 | `scripts/levels/cour_d_armes.gd` | L'entraînement, facultatif : le vieux Hugues, le parcours guidé, l'entraînement libre |
 | `scripts/data/refuge_texts.gd`, `gear.gd` | Conversations du refuge ; équipement (objets, effets, `Gear.apply`) |
