@@ -20,6 +20,7 @@ func _init() -> void:
 	title = "Le Quai des fuyards"
 	chapter = 3
 	scenery = Scenery.RIVER
+	water_x = HALF_WIDTH - 0.6
 	play_area = Rect2(-HALF_WIDTH, -80.0, 2.0 * HALF_WIDTH, 88.0)
 	next_level = &""
 

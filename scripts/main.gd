@@ -33,6 +33,7 @@ const LEVELS := {
 	&"les_caves": preload("res://scripts/levels/les_caves.gd"),
 	&"la_halle_du_prevot": preload("res://scripts/levels/la_halle_du_prevot.gd"),
 	&"le_quai_des_fuyards": preload("res://scripts/levels/le_quai_des_fuyards.gd"),
+	&"les_barges": preload("res://scripts/levels/les_barges.gd"),
 	&"refuge": preload("res://scripts/levels/refuge.gd"),
 	&"cour_d_armes": preload("res://scripts/levels/cour_d_armes.gd"),
 }

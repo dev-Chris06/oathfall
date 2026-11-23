@@ -301,6 +301,86 @@ const TYPES := {
 			"rise": "Death_C_Skeletons_Resurrect",
 		},
 	},
+	# Le Noyé (chapitre III) : abattu, son corps glisse vers l'eau ; s'il
+	# l'atteint sans avoir reçu le Repos, il coule et remonte plus loin, debout.
+	&"noye": {
+		"name": "Noyé",
+		"bestiary": {
+			"text": "Un fuyard que le fleuve a rendu. Abattu, son corps glisse vers l'eau ; s'il y tombe, il remonte sur le quai un peu plus loin.",
+			"tip": "Donne-lui le Repos sans tarder, ou abats-le loin du bord. Tant que tu t'agenouilles près de lui, il ne glisse plus.",
+		},
+		"behavior": "drowned",
+		"model": "res://assets/kaykit/skeletons/Skeleton_Minion.glb",
+		"tint": Color(0.52, 0.66, 0.7),
+		"health": 44,
+		"move_speed": 2.3,
+		"attack_range": 1.9,
+		"attack_damage": 11,
+		"attack_windup": 0.55,
+		"attack_cooldown": 1.4,
+		"attack_speed": 1.0,
+		"attack_impact": 0.40,
+		# Le corps commence à glisser après `slide_delay`, à `slide_speed` ; il
+		# reste `sunk_time` sous l'eau avant de remonter.
+		"slide_delay": 1.2,
+		"slide_speed": 0.8,
+		"sunk_time": 5.0,
+		"rise_delay": 24.0,
+		"rise_health": 0.7,
+		"memories": 8,
+		"gold": 5,
+		"animations": {
+			"idle": "Idle_Combat",
+			"walk": "Walking_D_Skeletons",
+			"attack": "Unarmed_Melee_Attack_Punch_A",
+			"hit": "Hit_A",
+			"fall": "Death_C_Skeletons",
+			"rise": "Death_C_Skeletons_Resurrect",
+		},
+	},
+	# Le Gaffeur (chapitre III) : de près il frappe de sa gaffe ; à
+	# mi-distance, il la lance et tire le héros à lui.
+	&"gaffeur": {
+		"name": "Gaffeur",
+		"bestiary": {
+			"text": "Un batelier mort, armé de sa gaffe. De loin, il la lance et te tire à lui, au milieu des autres.",
+			"tip": "Un trait orangé le relie à toi avant le jet : esquive. Frappe-le pendant qu'il vise, il lâche prise.",
+		},
+		"behavior": "hook",
+		"model": "res://assets/kaykit/skeletons/Skeleton_Warrior.glb",
+		"hidden_parts": ["Skeleton_Warrior_Helmet"],
+		"props": [{"kind": "gaffe", "bone": "handslot.r", "rotation": Vector3(0.0, 0.0, 0.0)}],
+		"tint": Color(0.7, 0.66, 0.6),
+		"health": 52,
+		"move_speed": 2.6,
+		"attack_range": 2.4,
+		"attack_damage": 12,
+		"attack_windup": 0.8,
+		"attack_cooldown": 1.7,
+		"attack_speed": 0.9,
+		"attack_impact": 0.68,
+		# Le jet de gaffe : entre `hook_min` et `hook_range` du héros ; temps de
+		# visée (la fenêtre pour esquiver) et part de l'animation où il lâche.
+		"hook_min": 3.5,
+		"hook_range": 8.0,
+		"hook_windup": 0.9,
+		"hook_impact": 0.53,
+		"hook_damage": 6,
+		"hook_cooldown": 6.0,
+		"rise_delay": 20.0,
+		"rise_health": 0.6,
+		"memories": 10,
+		"gold": 6,
+		"animations": {
+			"idle": "Idle_Combat",
+			"walk": "Walking_D_Skeletons",
+			"attack": "1H_Melee_Attack_Chop",
+			"throw": "Throw",
+			"hit": "Hit_A",
+			"fall": "Death_C_Skeletons",
+			"rise": "Death_C_Skeletons_Resurrect",
+		},
+	},
 	# Le Peseur, boss de la Balance. Sa balance juge combien de morts sont
 	# debout et combien gisent : trop de morts debout, il est protégé ; trop de
 	# corps, ses poids tombent plus vite ; à l'équilibre, il est vulnérable.

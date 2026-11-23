@@ -10,7 +10,7 @@ signal closed
 ## Tout type déclaré dans `EnemyTypes` doit y figurer (le test le vérifie) : un
 ## mort rencontré s'affiche, un mort inconnu reste une silhouette.
 const ORDER: Array[StringName] = [&"depouille", &"archer_creux", &"porte_cloche", &"fouisseur", &"veuve", &"sonneur", &"fossoyeuse",
-	&"boucher", &"crieur", &"peseur", &"prevot"]
+	&"boucher", &"crieur", &"peseur", &"prevot", &"noye", &"gaffeur"]
 const PORTRAITS := "res://assets/ui/portraits/"
 
 var selected: StringName = &"depouille"

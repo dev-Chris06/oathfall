@@ -229,6 +229,25 @@ def sfx():
     crackle = np.roll(crackle, 0)
     save("sfx/fire_loop", norm(fade(crackle, 20), 0.6))
 
+    # Le port (chapitre III). Ajoutés à la fin : le hasard des sons d'avant
+    # reste le même.
+    t = tt(1.1)
+    plunge = lp(noise(1.1), 900) * attack(t, 0.02) * decay(t, 4.5) * 1.4
+    plunge += 0.8 * np.sin(2 * np.pi * (70 + 60 * decay(t, 12)) * t) * decay(t, 9)
+    for _ in range(22):
+        s = int(RNG.uniform(0.1, 0.9) * SR)
+        drop = np.sin(2 * np.pi * RNG.uniform(500, 1400) * tt(0.04)) * decay(tt(0.04), 90) * RNG.uniform(0.1, 0.4)
+        plunge[s:s + len(drop)] += drop[: len(plunge) - s]
+    save("sfx/splash", norm(fade(reverb(plunge, 1.2, 0.2)), 0.8))
+    t = tt(0.5)
+    whirl = bp(noise(0.5), 500, 2200) * (0.5 + 0.5 * np.sin(2 * np.pi * 14 * t)) * attack(t, 0.15) * decay(t, 5)
+    links = np.zeros_like(t)
+    for k in range(9):
+        s = int((0.22 + 0.025 * k) * SR)
+        click = bp(noise(0.05), 2500, 6500) * decay(tt(0.05), 80) * (1.0 - 0.08 * k)
+        links[s:s + len(click)] += click[: len(links) - s]
+    save("sfx/hook", norm(fade(whirl + links), 0.75))
+
 
 # ------------------------------------------------------------------ musiques
 NOTE = {"C": 0, "D": 2, "E": 4, "F": 5, "G": 7, "A": 9, "B": 11}

@@ -144,3 +144,51 @@ static func piles(level: Level, x: float, z_from: float, z_to: float, step := 4.
 	while z > z_to:
 		cylinder(level, 0.22, 3.6, Vector3(x, WATER_Y + 1.6, z), dark_wood())
 		z -= step
+
+
+## Un plancher de ponton sur `rect` (x, z, largeur, profondeur) : des planches
+## en travers, de deux bois, en deux commandes de dessin. Le dessus est à 0.
+static func deck(level: Level, rect: Rect2) -> void:
+	var mesh := BoxMesh.new()
+	mesh.size = Vector3(rect.size.x, 0.2, 0.92)
+	var light: Array[Transform3D] = []
+	var dark: Array[Transform3D] = []
+	var z := rect.end.y - 0.5
+	var i := 0
+	while z > rect.position.y:
+		var t := Transform3D(Basis(), Vector3(rect.get_center().x + (0.08 if i % 3 == 0 else -0.05), -0.1, z))
+		(light if i % 2 == 0 else dark).append(t)
+		z -= 0.97
+		i += 1
+	Scenery._multi(level, mesh, material(Color(0.36, 0.26, 0.18), 0.3), light)
+	Scenery._multi(level, mesh, material(Color(0.28, 0.2, 0.14), 0.3), dark)
+
+
+## Le bord d'un ponton : une lisse basse sur des poteaux, et l'obstacle.
+static func rail(level: Level, x: float, z_from: float, z_to: float) -> void:
+	var length := absf(z_to - z_from)
+	var mid := (z_from + z_to) / 2.0
+	var root := Node3D.new()
+	level.add_child(root)
+	box(root, Vector3(0.35, 0.18, length), Vector3(x, 0.75, mid), wood())
+	box(root, Vector3(0.45, 0.25, length), Vector3(x, 0.12, mid), dark_wood())
+	var z := maxf(z_from, z_to) - 0.5
+	while z > minf(z_from, z_to):
+		box(root, Vector3(0.28, 0.85, 0.28), Vector3(x, 0.42, z), dark_wood())
+		z -= 1.6
+	level.solid(Vector3(x, 0.0, mid), Vector3(0.6, 4.0, length))
+
+
+## Une lisse en travers du ponton (à `z`, de `x_from` à `x_to`), et l'obstacle.
+static func rail_across(level: Level, z: float, x_from: float, x_to: float) -> void:
+	var length := absf(x_to - x_from)
+	var mid := (x_from + x_to) / 2.0
+	var root := Node3D.new()
+	level.add_child(root)
+	box(root, Vector3(length, 0.18, 0.35), Vector3(mid, 0.75, z), wood())
+	box(root, Vector3(length, 0.25, 0.45), Vector3(mid, 0.12, z), dark_wood())
+	var x := minf(x_from, x_to) + 0.5
+	while x < maxf(x_from, x_to):
+		box(root, Vector3(0.28, 0.85, 0.28), Vector3(x, 0.42, z), dark_wood())
+		x += 1.6
+	level.solid(Vector3(mid, 0.0, z), Vector3(length + 0.6, 4.0, 0.6))

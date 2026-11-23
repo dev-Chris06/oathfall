@@ -37,6 +37,8 @@ var start_checkpoint := 0
 
 var _allow_rest := true
 var _passive := false
+## Maintient REPOS pendant un essai passif (le Repos d'un Noyé).
+var _hold_rite := false
 var _attack_timer := 0.0
 var _rose := false
 var _checkpoint := 0
@@ -66,7 +68,7 @@ func _physics_process(delta: float) -> void:
 	var hero := level.hero
 	var controls := level.controls
 	controls.simulated_move = Vector2.ZERO
-	controls.simulated_rite = false
+	controls.simulated_rite = _hold_rite
 	if hero.is_dead() or _passive:
 		return
 	_dodge_if_needed(level, hero, controls)
@@ -75,6 +77,20 @@ func _physics_process(delta: float) -> void:
 	_drink_if_needed(level, hero, controls)
 	if _use_rite(level, hero, controls, delta):
 		return
+
+	# Un Noyé tombé tout près : on lui donne le Repos avant qu'il ne glisse à
+	# l'eau, même en plein combat.
+	if _allow_rest:
+		for node in get_tree().get_nodes_in_group(&"bodies"):
+			var drowned := node as DrownedEnemy
+			if drowned == null or not drowned.is_down() or drowned.distance_to_body(hero.global_position) > 4.0:
+				continue
+			var to_body := drowned.body_position() - hero.global_position
+			if Vector2(to_body.x, to_body.z).length() > 1.4:
+				controls.simulated_move = Vector2(to_body.x, to_body.z).normalized()
+			else:
+				controls.simulated_rite = true
+			return
 
 	var target := _choose_target(hero)
 	if target != null:
@@ -146,6 +162,8 @@ func _dodge_if_needed(level: Level, hero: Hero, controls: TouchControls) -> void
 			return
 		if enemy is ArcherEnemy and enemy.state == Enemy.State.SPECIAL:
 			threat = enemy._state_time > float(enemy._type["aim_time"]) - 0.2 and not enemy._fired
+		elif enemy is GaffeurEnemy and enemy.state == Enemy.State.SPECIAL:
+			threat = enemy._state_time > float(enemy._type["hook_windup"]) - 0.2 and not enemy._thrown
 		elif enemy is Burrower and enemy.state == Enemy.State.SPECIAL:
 			threat = enemy._phase == Burrower.Phase.WARNING and enemy._state_time > 0.35
 		elif enemy is SonneurEnemy and enemy.is_quaking():
@@ -363,6 +381,8 @@ func _run() -> void:
 		return
 	if not await _butcher_tests():
 		return
+	if not await _harbor_tests():
+		return
 	if not await _peseur_tests():
 		return
 	if not await _prevot_tests():
@@ -417,6 +437,8 @@ func _run() -> void:
 	if not await _traverse(&"la_halle_du_prevot"):
 		return
 	if not await _traverse(&"le_quai_des_fuyards"):
+		return
+	if not await _traverse(&"les_barges"):
 		return
 	if not await _map_tests():
 		return
@@ -942,7 +964,7 @@ func _blow_alignment_tests() -> bool:
 	sonneur.take_hit(hero.global_position, 100000)
 
 	# Les morts du chapitre : on attend qu'ils arment leur coup au corps à corps.
-	for id: StringName in [&"depouille", &"porte_cloche", &"fouisseur", &"archer_creux", &"boucher"]:
+	for id: StringName in [&"depouille", &"porte_cloche", &"fouisseur", &"archer_creux", &"boucher", &"noye", &"gaffeur"]:
 		var enemy := arena.spawn(id, hero.global_position + Vector3(1.3, 0.0, 0.0), false)
 		enemy._cooldown = 0.0
 		var armed := await _until(func() -> bool:
@@ -1314,7 +1336,7 @@ func _reach_tests() -> bool:
 	main._drop_level()
 	await _frames(4)
 	for id: StringName in [&"la_grille", &"les_allees", &"la_chapelle", &"l_ossuaire",
-			&"la_fosse", &"la_porte_des_halles", &"les_etals", &"la_balance", &"les_caves", &"la_halle_du_prevot", &"le_quai_des_fuyards", &"refuge",
+			&"la_fosse", &"la_porte_des_halles", &"les_etals", &"la_balance", &"les_caves", &"la_halle_du_prevot", &"le_quai_des_fuyards", &"les_barges", &"refuge",
 			&"cour_d_armes"]:
 		var level := main.LEVELS[id].new() as Level
 		main.add_child(level)
@@ -1340,7 +1362,7 @@ func _visible_walls_tests() -> bool:
 	main._drop_level()
 	await _frames(3)
 	for id: StringName in [&"la_grille", &"les_allees", &"la_chapelle", &"l_ossuaire",
-			&"la_fosse", &"la_porte_des_halles", &"les_etals", &"la_balance", &"les_caves", &"la_halle_du_prevot", &"le_quai_des_fuyards", &"refuge",
+			&"la_fosse", &"la_porte_des_halles", &"les_etals", &"la_balance", &"les_caves", &"la_halle_du_prevot", &"le_quai_des_fuyards", &"les_barges", &"refuge",
 			&"cour_d_armes"]:
 		var level := main.LEVELS[id].new() as Level
 		main.add_child(level)
@@ -1786,6 +1808,140 @@ func _butcher_tests() -> bool:
 	hero.global_position = Vector3(0.0, 0.0, 3.0)
 	if not await _until(func() -> bool: return arena.enemies_left() == 0, 60.0):
 		return _fail("les morts de l'essai du Boucher n'ont pas été mis au repos")
+	return true
+
+
+## Les morts du port (chapitre III). Le Noyé : son corps glisse vers l'eau,
+## coule, et remonte debout plus loin ; il ne glisse pas pendant le Repos. Le
+## Gaffeur : son jet, annoncé, tire le héros à lui ; l'esquive y échappe ;
+## le frapper pendant qu'il vise l'interrompt.
+func _harbor_tests() -> bool:
+	var arena := _level() as Arena
+	var hero := arena.hero
+	hero.heal(1000)
+	_passive = true
+	_allow_rest = false
+	arena.water_x = 6.0
+	hero.global_position = Vector3(-8.0, 0.0, 8.0)
+	var noye := arena.spawn(&"noye", Vector3(0.0, 0.0, 0.0), false) as DrownedEnemy
+	var noye_data := EnemyTypes.get_type(&"noye")
+	await _frames(2)
+	var risen := [0]
+	noye.rose.connect(func(_e: Enemy) -> void: risen[0] += 1)
+	noye.take_hit(hero.global_position, 100000)
+	var start := noye.body_position()
+	await _frames(int(float(noye_data["slide_delay"]) * 60.0) + 40)
+	if noye.body_position().x <= start.x + 0.2:
+		arena.water_x = INF
+		return _fail("le corps du Noyé ne glisse pas vers l'eau")
+	if not await _until(func() -> bool: return noye.is_sunk(), 20.0):
+		arena.water_x = INF
+		return _fail("le corps du Noyé n'atteint pas l'eau")
+	if noye.is_in_group(&"bodies") or noye.is_down():
+		arena.water_x = INF
+		return _fail("le Noyé coulé reste un corps qu'on peut mettre au repos")
+	if not await _until(func() -> bool:
+		hero.heal(1000)
+		return noye.is_standing() and not noye.is_sunk() and noye.state == Enemy.State.CHASE, float(noye_data["sunk_time"]) + 8.0):
+		arena.water_x = INF
+		return _fail("le Noyé coulé ne remonte pas")
+	if risen[0] != 1:
+		arena.water_x = INF
+		return _fail("le Noyé qui remonte ne compte pas comme un mort relevé")
+	# Agenouillé près de lui, le corps ne glisse plus, et le Repos aboutit.
+	# (Il est remonté près du bord : on l'abat loin de l'eau.)
+	noye.global_position = Vector3(-3.0, 0.0, 0.0)
+	await _frames(2)
+	noye.take_hit(hero.global_position, 100000)
+	await _frames(int(float(noye_data["slide_delay"]) * 60.0) + 20)
+	var body := noye.body_position()
+	hero.global_position = body + Vector3(-0.9, 0.0, 0.0)
+	_hold_rite = true
+	await _frames(6)
+	if hero.state != Hero.State.RITE:
+		_hold_rite = false
+		arena.water_x = INF
+		return _fail("le héros ne s'agenouille pas près du Noyé (état %d, corps à %.2f, à terre %s, REPOS %s)" % [hero.state, noye.distance_to_body(hero.global_position), noye.is_down(), hero.controls.rite_held])
+	var kneel := noye.body_position()
+	await _frames(30)
+	if noye.body_position().distance_to(kneel) > 0.05:
+		_hold_rite = false
+		arena.water_x = INF
+		return _fail("le corps du Noyé glisse pendant qu'on lui donne le Repos")
+	var rested := await _until(func() -> bool: return noye.state == Enemy.State.RESTED or not is_instance_valid(noye), 4.0)
+	_hold_rite = false
+	arena.water_x = INF
+	if not rested:
+		return _fail("le Noyé ne reçoit pas le Repos")
+	print("test réussi : le corps du Noyé glisse, coule et remonte debout ; il ne glisse pas pendant le Repos")
+
+	# Le Gaffeur : il vise, lance, et tire le héros à lui.
+	hero.heal(1000)
+	hero.state = Hero.State.MOVE
+	hero.global_position = Vector3(0.0, 0.0, 6.0)
+	var gaffeur := arena.spawn(&"gaffeur", Vector3(0.0, 0.0, 0.0), false) as GaffeurEnemy
+	var data := EnemyTypes.get_type(&"gaffeur")
+	await _frames(2)
+	gaffeur._hook_timer = 0.0
+	gaffeur._cooldown = 0.0
+	if not await _until(func() -> bool:
+		hero.global_position = Vector3(0.0, 0.0, 6.0)
+		if gaffeur.state != Enemy.State.SPECIAL:
+			gaffeur.global_position = Vector3.ZERO
+		return gaffeur.state == Enemy.State.SPECIAL, 5.0):
+		return _fail("le Gaffeur ne vise pas un héros à mi-distance")
+	if not _check_blow("jet de gaffe", gaffeur, float(data["hook_windup"]), float(data["hook_impact"])):
+		return false
+	await _frames(2)
+	if not gaffeur._line.visible:
+		return _fail("le jet du Gaffeur n'est pas annoncé")
+	if not await _until(func() -> bool: return gaffeur._thrown, 3.0):
+		return _fail("le Gaffeur ne lance pas sa gaffe")
+	await _frames(30)
+	var pulled := hero.global_position.distance_to(gaffeur.global_position)
+	if pulled > 2.6:
+		return _fail("la gaffe n'a pas tiré le héros (il est à %.1f du Gaffeur)" % pulled)
+	# En esquivant au moment du jet, on y échappe.
+	await _frames(40)
+	hero.heal(1000)
+	hero.state = Hero.State.MOVE
+	hero._dodge_cooldown = 0.0
+	gaffeur.state = Enemy.State.CHASE
+	gaffeur._hook_timer = 0.0
+	gaffeur._cooldown = 0.0
+	if not await _until(func() -> bool:
+		hero.global_position = Vector3(0.0, 0.0, 6.0)
+		if gaffeur.state != Enemy.State.SPECIAL:
+			gaffeur.global_position = Vector3.ZERO
+		return gaffeur.state == Enemy.State.SPECIAL, 5.0):
+		return _fail("le Gaffeur ne vise pas une seconde fois")
+	await _until(func() -> bool: return gaffeur._state_time >= float(data["hook_windup"]) - 0.12, 3.0)
+	var life := hero.health
+	hero._on_dodge_pressed()
+	await _frames(8)
+	if hero.health != life:
+		return _fail("la gaffe blesse un héros qui esquive")
+	# Frappé pendant qu'il vise, il lâche prise.
+	await _frames(40)
+	gaffeur.state = Enemy.State.CHASE
+	gaffeur._hook_timer = 0.0
+	gaffeur._cooldown = 0.0
+	if not await _until(func() -> bool:
+		hero.global_position = Vector3(0.0, 0.0, 6.0)
+		if gaffeur.state != Enemy.State.SPECIAL:
+			gaffeur.global_position = Vector3.ZERO
+		return gaffeur.state == Enemy.State.SPECIAL, 5.0):
+		return _fail("le Gaffeur ne vise pas une troisième fois")
+	gaffeur.take_hit(hero.global_position, 5)
+	if gaffeur.state == Enemy.State.SPECIAL or gaffeur._line.visible:
+		return _fail("frappé pendant qu'il vise, le Gaffeur ne lâche pas prise")
+	print("test réussi : la gaffe est annoncée, tire le héros, l'esquive y échappe, un coup l'interrompt")
+	gaffeur.take_hit(hero.global_position, 100000)
+	_passive = false
+	_allow_rest = true
+	hero.global_position = Vector3(0.0, 0.0, 3.0)
+	if not await _until(func() -> bool: return arena.enemies_left() == 0, 60.0):
+		return _fail("les morts de l'essai du port n'ont pas été mis au repos")
 	return true
 
 

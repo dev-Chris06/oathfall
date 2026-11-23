@@ -37,6 +37,8 @@ const EVENTS := {
 	&"quake": {"files": ["quake"], "db": 0.0},
 	&"scream": {"files": ["scream"], "db": -2.0},
 	&"dig": {"files": ["dig"], "db": -3.0, "pitch": 0.1},
+	&"splash": {"files": ["splash"], "db": -3.0, "pitch": 0.1},
+	&"hook": {"files": ["hook"], "db": -4.0, "pitch": 0.08},
 	&"level_done": {"files": ["level_done"], "db": -2.0},
 	&"ui_click": {"files": ["ui_click"], "db": -4.0},
 	&"ui_select": {"files": ["ui_select"], "db": -4.0},

@@ -44,6 +44,8 @@ var chapter := 1
 var play_area := Rect2()
 ## Décor des abords (voir `Scenery`) : cimetière par défaut.
 var scenery: StringName = &""
+## Bord de l'eau, le long du quai (x), ou INF sans eau. Voir `water_edge`.
+var water_x := INF
 ## Étendue du sol dallé, notée par `pave()`.
 var floor_bounds := Rect2()
 
@@ -348,6 +350,15 @@ func _checkpoint_position(_index: int) -> Vector3:
 # --- Outils d'écriture des scénarios ------------------------------------------
 
 ## Attend `seconds` secondes de jeu.
+## Le bord de l'eau le plus proche de `from`, ou null s'il n'y a pas d'eau
+## dans le niveau. Les corps des Noyés y glissent. Au chapitre III, le fleuve
+## longe le quai du côté +X : son bord est la ligne x = `water_x`.
+func water_edge(from: Vector3) -> Variant:
+	if is_inf(water_x):
+		return null
+	return Vector3(water_x, 0.0, from.z)
+
+
 func wait(seconds: float) -> void:
 	var timer := Timer.new()
 	timer.one_shot = true

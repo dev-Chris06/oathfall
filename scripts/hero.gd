@@ -226,6 +226,31 @@ func _physics_process(delta: float) -> void:
 	move_and_slide()
 
 
+## Tiré vers `point` (la gaffe d'un Gaffeur) : le héros est interrompu et
+## glisse jusque-là. L'esquive, la ruée et le bond y échappent. Renvoie vrai
+## s'il a été tiré.
+func pull(point: Vector3) -> bool:
+	if state == State.DODGE or state == State.DEAD:
+		return false
+	if state == State.CAST and _rites.untouchable():
+		return false
+	if state == State.CAST:
+		_rites.finish()
+		_rites.id = &""
+	var offset := point - global_position
+	offset.y = 0.0
+	_rite_target = null
+	_cut_target = null
+	_rite_progress = 0.0
+	# En état HIT, la vitesse décroît de _knockback à zéro : la distance
+	# parcourue vaut _knockback × HIT_TIME / 2.
+	_knockback = offset * (2.0 / HIT_TIME)
+	state = State.HIT
+	_state_time = 0.0
+	_once(_animation("hit"), 1.6)
+	return true
+
+
 ## Vrai pendant l'esquive : les coups ennemis ne portent pas.
 func is_dodging() -> bool:
 	return state == State.DODGE
