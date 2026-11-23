@@ -131,7 +131,15 @@ caisses, bord du quai, barges, pieux) sont dans `scripts/levels/docks.gd`
 (`Docks`, avec le plancher et la lisse du ponton) : les packs n'ont ni barque
 ni quai.
 
-- **Noyé** (`drowned.gd`) : abattu, son corps glisse vers le bord de l'eau
+- **Noyé** (`drowned.gd`) : près du bord (à moins de 3 de l'eau), il ne
+  frappe plus, il **agrippe** (l'Étreinte, annoncée par une flaque qui
+  s'éclaire) et traîne le héros vers l'eau en le blessant ; au bord il plonge
+  (gros dégâts) et coule. Frapper le Noyé ou esquiver libère (`Hero.grab`,
+  `held_by`, `release` ; agrippé, on ne peut ni s'agenouiller ni boire). Sous
+  l'eau, il guette : si le héros s'approche du bord, **une main** en jaillit et
+  l'agrippe. Tant qu'un Noyé est debout, **le brouillard du fleuve** monte
+  (`Level._update_mist`, nappe au ras du sol qui suit le héros) et efface les
+  repères des corps (`Enemy.mist_hides`). Abattu, son corps glisse vers le bord de l'eau
   (`Level.water_edge`, par défaut la ligne x = `Level.water_x`, INF sans eau ;
   les Barges la redéfinissent : l'eau est des deux côtés). S'il l'atteint, il
   coule (il n'est plus un corps), puis remonte debout près du héros (compte
@@ -143,6 +151,16 @@ ni quai.
   (`Hero.pull`, interrompt comme un coup ; l'esquive, la ruée et le bond y
   échappent). Le frapper pendant qu'il vise l'interrompt. `--selftest --only=<niveau>`
 donne au héros la progression des niveaux d'avant.
+
+**Les éléments : forces du lieu** (choix de l'auteur). Pas de table de
+faiblesses et de résistances : chaque élément change la façon dont les corps
+tombent, glissent et se relèvent, selon le lieu, pour servir le Repos. L'eau
+emporte les corps (les quais, le Noyé) ; la terre les déterre (Fouisseur,
+Fossoyeuse) ; le feu les brûle mais se propage (forges de la citadelle) ; le
+vent pousse corps et flèches (remparts) ; lumière et ténèbres à la cathédrale
+(vitraux où le Repos va vite, ombre où les morts sont invisibles). Le héros
+gagnera plus tard des huiles et consécrations pour sa lame (l'huile de lampe
+brûle le corps abattu, qui se relève plus tard). Rien de fait n'est à refaire.
 
 **Armure d'élan** (`"armor": true` dans les données) : un mort à armure n'est
 pas interrompu pendant son coup, n'est pas ébranlé deux fois de suite

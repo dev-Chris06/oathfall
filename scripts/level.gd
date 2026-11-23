@@ -81,6 +81,12 @@ var _lights: Array[OmniLight3D] = []
 var _light_base: Array[float] = []
 var _time := 0.0
 var _hud_timer := 0.0
+## Le brouillard du fleuve : il monte tant qu'un Noyé est debout.
+var _mist: MeshInstance3D
+var _mist_material: StandardMaterial3D
+var _mist_amount := 0.0
+var _mist_target := 0.0
+var _mist_drift := Vector2.ZERO
 var _finished := false
 var _crier_called := false
 ## Ce que le niveau a rapporté (souvenirs, or), montré à la victoire.
@@ -92,6 +98,7 @@ var _gates: Array[Dictionary] = []
 
 
 func _ready() -> void:
+	Enemy.mist_hides = false
 	Engine.time_scale = 1.0
 	_solids = StaticBody3D.new()
 	add_child(_solids)
@@ -155,14 +162,81 @@ func _process(delta: float) -> void:
 
 	_update_view()
 	_update_guide()
+	_update_mist(delta)
 
 	_hud_timer -= delta
 	if _hud_timer <= 0.0:
 		_hud_timer = 0.25
 		hud.set_counts(standing_count(), get_tree().get_nodes_in_group(&"bodies").size())
+		_mist_target = 1.0 if drowned_standing() > 0 else 0.0
 		hud.set_debug("Oathfall %s — %s — %d images/s" % [
 			ProjectSettings.get_setting("application/config/version", "?"),
 			title, Engine.get_frames_per_second()])
+
+
+# --- Brouillard du fleuve -----------------------------------------------------
+
+const MIST_ALPHA := 0.75
+
+
+## Noyés debout et hors de l'eau : ce sont eux qui font monter la brume.
+func drowned_standing() -> int:
+	var count := 0
+	for node in get_tree().get_nodes_in_group(&"hittable"):
+		var drowned := node as DrownedEnemy
+		if drowned != null and drowned.is_standing() and not drowned.is_sunk():
+			count += 1
+	return count
+
+
+## Vrai quand la brume est assez épaisse pour cacher les corps.
+func mist_thick() -> bool:
+	return _mist_amount > 0.5
+
+
+## Une nappe de brume au ras du sol, qui suit le héros : les morts debout la
+## dépassent, les corps couchés y disparaissent, et leurs repères s'effacent.
+func _update_mist(delta: float) -> void:
+	if _mist_target <= 0.0 and _mist_amount <= 0.0:
+		return
+	_mist_amount = move_toward(_mist_amount, _mist_target, delta / 2.5)
+	if _mist == null:
+		_build_mist()
+	_mist.visible = _mist_amount > 0.0
+	_mist.global_position = Vector3(hero.global_position.x, 0.55, hero.global_position.z)
+	_mist_material.albedo_color.a = MIST_ALPHA * _mist_amount
+	# Le motif reste posé sur le monde (la nappe suit le héros) et dérive lentement.
+	_mist_drift += Vector2(0.012, 0.004) * delta
+	var tile := 70.0 / 5.0
+	_mist_material.uv1_offset = Vector3(hero.global_position.x / tile + _mist_drift.x,
+		hero.global_position.z / tile + _mist_drift.y, 0.0)
+	Enemy.mist_hides = mist_thick()
+
+
+func _build_mist() -> void:
+	var noise := FastNoiseLite.new()
+	noise.frequency = 0.012
+	noise.fractal_octaves = 3
+	var ramp := Gradient.new()
+	ramp.set_color(0, Color(0.13, 0.16, 0.22, 0.6))
+	ramp.set_color(1, Color(0.24, 0.29, 0.36, 1.0))
+	var texture := NoiseTexture2D.new()
+	texture.width = 256
+	texture.height = 256
+	texture.seamless = true
+	texture.noise = noise
+	texture.color_ramp = ramp
+	_mist_material = Fx.glow(Color(1.0, 1.0, 1.0, 0.0))
+	_mist_material.albedo_texture = texture
+	_mist_material.uv1_scale = Vector3(5.0, 5.0, 1.0)
+	_mist_material.uv1_world_triplanar = false
+	var plane := PlaneMesh.new()
+	plane.size = Vector2(70.0, 70.0)
+	_mist = MeshInstance3D.new()
+	_mist.mesh = plane
+	_mist.material_override = _mist_material
+	_mist.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(_mist)
 
 
 # --- Vue et cible ----------------------------------------------------------------

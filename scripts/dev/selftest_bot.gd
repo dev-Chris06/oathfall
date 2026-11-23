@@ -72,6 +72,16 @@ func _physics_process(delta: float) -> void:
 	if hero.is_dead() or _passive:
 		return
 	_dodge_if_needed(level, hero, controls)
+	# Agrippé par un Noyé : on esquive vers l'intérieur si on peut, sinon on le frappe.
+	if hero.is_held():
+		var away := hero.global_position - hero.held_by.global_position
+		controls.simulated_move = Vector2(away.x, away.z).normalized()
+		if hero._dodge_cooldown <= 0.0:
+			controls.press_dodge()
+		else:
+			controls.simulated_move = -Vector2(away.x, away.z).normalized() * 0.25
+			controls.press_attack()
+		return
 	if _levy_step(level, hero, controls):
 		return
 	_drink_if_needed(level, hero, controls)
@@ -162,6 +172,10 @@ func _dodge_if_needed(level: Level, hero: Hero, controls: TouchControls) -> void
 			return
 		if enemy is ArcherEnemy and enemy.state == Enemy.State.SPECIAL:
 			threat = enemy._state_time > float(enemy._type["aim_time"]) - 0.2 and not enemy._fired
+		elif enemy is DrownedEnemy and enemy.is_reaching():
+			# L'Étreinte annoncée : comme un coup, une fois sur quatre il se laisse prendre.
+			threat = enemy._state_time > enemy._grab_windup - 0.25 and enemy.spawn_index % 4 != 0 \
+				and enemy.global_position.distance_to(hero.global_position) < 2.8
 		elif enemy is GaffeurEnemy and enemy.state == Enemy.State.SPECIAL:
 			threat = enemy._state_time > float(enemy._type["hook_windup"]) - 0.2 and not enemy._thrown
 		elif enemy is Burrower and enemy.state == Enemy.State.SPECIAL:
@@ -1875,6 +1889,9 @@ func _harbor_tests() -> bool:
 		return _fail("le Noyé ne reçoit pas le Repos")
 	print("test réussi : le corps du Noyé glisse, coule et remonte debout ; il ne glisse pas pendant le Repos")
 
+	if not await _embrace_tests():
+		return false
+
 	# Le Gaffeur : il vise, lance, et tire le héros à lui.
 	hero.heal(1000)
 	hero.state = Hero.State.MOVE
@@ -1942,6 +1959,130 @@ func _harbor_tests() -> bool:
 	hero.global_position = Vector3(0.0, 0.0, 3.0)
 	if not await _until(func() -> bool: return arena.enemies_left() == 0, 60.0):
 		return _fail("les morts de l'essai du port n'ont pas été mis au repos")
+	return true
+
+
+## L'Étreinte du Noyé, sa main sous l'eau, et le brouillard du fleuve.
+func _embrace_tests() -> bool:
+	var arena := _level() as Arena
+	var hero := arena.hero
+	var data := EnemyTypes.get_type(&"noye")
+	hero.heal(1000)
+	hero.state = Hero.State.MOVE
+	_passive = true
+	_allow_rest = false
+	arena.water_x = 6.0
+	var spot := Vector3(3.5, 0.0, 0.0)
+	hero.global_position = spot
+	var noye := arena.spawn(&"noye", Vector3(3.5, 0.0, -1.5), false) as DrownedEnemy
+	var other := arena.spawn(&"depouille", Vector3(-3.0, 0.0, 3.0), false)
+	await _frames(2)
+	other.take_hit(hero.global_position, 100000)
+	noye._grab_timer = 0.0
+	noye._cooldown = 0.0
+	if not await _until(func() -> bool:
+		hero.heal(1000)
+		hero.global_position = spot
+		return noye.is_reaching(), 5.0):
+		arena.water_x = INF
+		return _fail("le Noyé n'agrippe pas un héros près du bord")
+	await _frames(2)
+	if not noye._puddle.visible:
+		arena.water_x = INF
+		return _fail("l'Étreinte du Noyé n'est pas annoncée")
+	if not _check_blow("étreinte", noye, float(data["grab_windup"]), float(data["grab_impact"])):
+		arena.water_x = INF
+		return false
+	if not await _until(func() -> bool: return noye.is_holding(), 3.0) or not hero.is_held():
+		arena.water_x = INF
+		return _fail("l'Étreinte du Noyé ne tient pas le héros")
+	var life := hero.health
+	await _frames(40)
+	if hero.global_position.x < spot.x + 0.4:
+		arena.water_x = INF
+		return _fail("le Noyé ne traîne pas le héros vers l'eau (x = %.2f)" % hero.global_position.x)
+	if hero.health >= life:
+		arena.water_x = INF
+		return _fail("l'Étreinte ne blesse pas le héros")
+	# Le brouillard : un Noyé debout cache les corps.
+	if not await _until(func() -> bool: return arena.mist_thick(), 5.0):
+		arena.water_x = INF
+		return _fail("le brouillard du fleuve ne monte pas quand un Noyé est debout")
+	await _frames(2)
+	if other._marker.visible:
+		arena.water_x = INF
+		return _fail("le brouillard du fleuve ne cache pas le repère d'un corps")
+	# L'esquive dégage le héros.
+	hero._dodge_cooldown = 0.0
+	hero._on_dodge_pressed()
+	await _frames(2)
+	if hero.is_held() or noye.is_holding():
+		arena.water_x = INF
+		return _fail("l'esquive ne dégage pas le héros de l'Étreinte")
+	# Un coup aussi.
+	await _frames(30)
+	hero.heal(1000)
+	noye._grab_timer = 0.0
+	noye._cooldown = 0.0
+	if not await _until(func() -> bool:
+		hero.heal(1000)
+		if not noye.is_holding():
+			hero.global_position = spot
+			if noye.state != Enemy.State.SPECIAL:
+				noye.global_position = spot + Vector3(0.0, 0.0, -1.5)
+		return noye.is_holding(), 6.0):
+		arena.water_x = INF
+		return _fail("le Noyé n'agrippe pas une seconde fois")
+	noye.take_hit(hero.global_position, 5)
+	if hero.is_held() or noye.is_holding():
+		arena.water_x = INF
+		return _fail("frappé, le Noyé ne lâche pas le héros")
+	# Laissé faire, il traîne le héros jusqu'au bord et plonge.
+	await _frames(30)
+	hero.heal(1000)
+	noye._grab_timer = 0.0
+	noye._cooldown = 0.0
+	if not await _until(func() -> bool:
+		if not noye.is_holding():
+			hero.heal(1000)
+			hero.global_position = spot
+			if noye.state != Enemy.State.SPECIAL:
+				noye.global_position = spot + Vector3(0.0, 0.0, -1.5)
+		return noye.is_holding(), 6.0):
+		arena.water_x = INF
+		return _fail("le Noyé n'agrippe pas une troisième fois")
+	life = hero.health
+	if not await _until(func() -> bool: return noye.is_sunk(), 6.0):
+		arena.water_x = INF
+		return _fail("le Noyé ne plonge pas au bord de l'eau")
+	if life - hero.health < int(data["plunge_damage"]) or hero.is_held():
+		arena.water_x = INF
+		return _fail("le plongeon du Noyé ne meurtrit pas le héros, ou ne le lâche pas")
+	# La main : sous l'eau, il guette le héros qui s'approche du bord.
+	hero.heal(1000)
+	hero.global_position = Vector3(4.6, 0.0, 4.0)
+	if not await _until(func() -> bool:
+		hero.global_position = Vector3(4.6, 0.0, 4.0)
+		return not noye.is_sunk(), float(data["hand_delay"]) + 2.0):
+		arena.water_x = INF
+		return _fail("le Noyé sous l'eau ne sort pas quand le héros s'approche du bord")
+	if not noye.is_reaching() or not noye.is_in_group(&"hittable"):
+		arena.water_x = INF
+		return _fail("la main du Noyé n'agrippe pas en sortant de l'eau")
+	noye.take_hit(hero.global_position, 100000)
+	arena.water_x = INF
+	if not await _until(func() -> bool: return not arena.mist_thick(), 6.0):
+		return _fail("le brouillard du fleuve ne retombe pas")
+	await _frames(2)
+	if not other._marker.visible:
+		return _fail("le repère du corps ne revient pas quand la brume retombe")
+	print("test réussi : l'Étreinte est annoncée, traîne et blesse ; esquive et coup libèrent ; le plongeon, la main, le brouillard")
+	_passive = false
+	_allow_rest = true
+	if not await _until(func() -> bool: return arena.enemies_left() == 0, 60.0):
+		return _fail("les morts de l'essai de l'Étreinte n'ont pas été mis au repos")
+	_passive = true
+	_allow_rest = false
 	return true
 
 
@@ -2156,6 +2297,13 @@ func _traverse(id: StringName) -> bool:
 	var done := await _until(func() -> bool: return _completed or falls[0] > limit, 1500.0, false)
 	main.level_loaded.disconnect(on_load)
 	if not done or not _completed:
+		var stuck := _level()
+		var left: Array[String] = []
+		for enemy in stuck.enemies():
+			left.append("%s état %d en %s" % [enemy.type_id_name, enemy.state, enemy.global_position.snapped(Vector3.ONE * 0.1)])
+		print("bloqué : héros en %s (état %d), objectif %s, morts : %s, corps : %d" % [
+			stuck.hero.global_position.snapped(Vector3.ONE * 0.1), stuck.hero.state, stuck.objective,
+			left, get_tree().get_nodes_in_group(&"bodies").size()])
 		return _fail("%s n'a pas été terminé (%d chutes)" % [id, falls[0]])
 	if not Progress.is_completed(id):
 		return _fail("la fin de %s n'a pas été enregistrée" % id)

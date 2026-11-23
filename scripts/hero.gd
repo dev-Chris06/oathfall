@@ -69,6 +69,10 @@ var _dodge_direction := Vector3.ZERO
 var _dodge_cooldown := 0.0
 var _knockback := Vector3.ZERO
 var _rite_target: Enemy
+## Le mort qui agrippe le héros (l'Étreinte du Noyé) et la dérive qu'il lui
+## impose : en marchant, le héros est traîné au lieu d'avancer.
+var held_by: Node3D
+var held_drag := Vector3.ZERO
 var _cut_target: BellRope
 var _rite_progress := 0.0
 ## Caractéristiques que la progression peut changer (voir `apply_stats`).
@@ -152,12 +156,14 @@ func _physics_process(delta: float) -> void:
 	match state:
 		State.MOVE:
 			velocity = wish * float(_data["move_speed"]) * speed_scale
+			if is_held():
+				velocity = held_drag
 			if controls.rite_held and not _interact_was_held and body == null and rope == null \
 					and interaction_label != "":
 				interacted.emit()
-			if controls.rite_held and body != null:
+			if controls.rite_held and body != null and not is_held():
 				_start_rite(body)
-			elif controls.rite_held and rope != null:
+			elif controls.rite_held and rope != null and not is_held():
 				_start_cut(rope)
 			elif wish.length() > 0.1:
 				_facing = wish.normalized()
@@ -249,6 +255,38 @@ func pull(point: Vector3) -> bool:
 	_state_time = 0.0
 	_once(_animation("hit"), 1.6)
 	return true
+
+
+## Agrippé par `by` (l'Étreinte d'un Noyé) : le héros est traîné, ne peut plus
+## s'agenouiller ni boire ; frapper celui qui le tient ou esquiver le libère.
+## Renvoie faux si la prise échoue (esquive, mort, ruée, bond).
+func grab(by: Node3D) -> bool:
+	if state == State.DODGE or state == State.DEAD:
+		return false
+	if state == State.CAST and _rites.untouchable():
+		return false
+	if state == State.CAST:
+		_rites.finish()
+		_rites.id = &""
+	if state != State.ATTACK:
+		state = State.MOVE
+		_state_time = 0.0
+	_rite_target = null
+	_cut_target = null
+	_rite_progress = 0.0
+	held_by = by
+	held_drag = Vector3.ZERO
+	return true
+
+
+func release(by: Node3D) -> void:
+	if held_by == by:
+		held_by = null
+		held_drag = Vector3.ZERO
+
+
+func is_held() -> bool:
+	return held_by != null and is_instance_valid(held_by)
 
 
 ## Vrai pendant l'esquive : les coups ennemis ne portent pas.
@@ -380,7 +418,7 @@ func show_model(shown: bool) -> void:
 
 ## Boire une fiole : un instant sans défense ; un coup ou une esquive l'annule.
 func _on_flask_pressed() -> void:
-	if state != State.MOVE or flasks <= 0 or health >= max_health:
+	if state != State.MOVE or flasks <= 0 or health >= max_health or is_held():
 		return
 	state = State.DRINK
 	_state_time = 0.0
@@ -397,6 +435,8 @@ func _on_dodge_pressed() -> void:
 		_rites.finish()
 	var wish := _wish_direction()
 	_dodge_direction = wish.normalized() if wish.length() > 0.1 else _facing
+	held_by = null
+	held_drag = Vector3.ZERO
 	_facing = _dodge_direction
 	_rite_target = null
 	_cut_target = null

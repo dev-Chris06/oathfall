@@ -45,6 +45,9 @@ const OPEN_FACTOR := 1.5
 const TURN_SPEED := 9.0
 const STAGGER_TIME := 0.35
 
+## Le brouillard du fleuve (Noyés debout) : les repères des corps s'effacent.
+static var mist_hides := false
+
 var state := State.CHASE
 var type_id_name: StringName
 ## Rang d'apparition dans le niveau : stable d'une partie d'essai à l'autre,
@@ -593,6 +596,7 @@ func _build_marker() -> void:
 
 
 func _update_marker() -> void:
+	_marker.visible = state == State.DOWN and not mist_hides
 	_marker.global_position = body_position() + Vector3(0.0, 0.07, 0.0)
 	var progress := rise_progress()
 	var calm := Color(0.6, 0.8, 1.0)

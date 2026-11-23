@@ -306,8 +306,8 @@ const TYPES := {
 	&"noye": {
 		"name": "Noyé",
 		"bestiary": {
-			"text": "Un fuyard que le fleuve a rendu. Abattu, son corps glisse vers l'eau ; s'il y tombe, il remonte sur le quai un peu plus loin.",
-			"tip": "Donne-lui le Repos sans tarder, ou abats-le loin du bord. Tant que tu t'agenouilles près de lui, il ne glisse plus.",
+			"text": "Un fuyard que le fleuve a rendu, et qui veut y emmener les vivants. Près du bord, il agrippe et traîne vers l'eau ; abattu, son corps y glisse et remonte plus loin. Tant qu'il est debout, la brume du fleuve cache les corps.",
+			"tip": "Reste loin du bord. Pris, frappe-le ou esquive. Donne-lui le Repos sans tarder : agenouillé près de lui, il ne glisse plus.",
 		},
 		"behavior": "drowned",
 		"model": "res://assets/kaykit/skeletons/Skeleton_Minion.glb",
@@ -325,6 +325,24 @@ const TYPES := {
 		"slide_delay": 1.2,
 		"slide_speed": 0.8,
 		"sunk_time": 5.0,
+		# L'Étreinte : quand le héros est à moins de `grab_edge` de l'eau, il
+		# l'agrippe au lieu de frapper, puis le traîne à `drag_speed` en le
+		# blessant toutes les `grab_tick` ; au bord (`plunge_at`), il plonge.
+		"grab_edge": 3.0,
+		"grab_range": 1.9,
+		"grab_windup": 0.7,
+		"grab_impact": 0.40,
+		"grab_cooldown": 4.0,
+		"grab_tick": 0.5,
+		"grab_damage": 3,
+		"drag_speed": 1.5,
+		"plunge_at": 1.0,
+		"plunge_damage": 16,
+		"hold_max": 5.0,
+		# La main : sous l'eau, il guette un héros à moins de `hand_reach` du bord.
+		"hand_delay": 1.5,
+		"hand_reach": 1.8,
+		"hand_windup": 0.5,
 		"rise_delay": 24.0,
 		"rise_health": 0.7,
 		"memories": 8,
@@ -336,6 +354,8 @@ const TYPES := {
 			"hit": "Hit_A",
 			"fall": "Death_C_Skeletons",
 			"rise": "Death_C_Skeletons_Resurrect",
+			"grab": "Unarmed_Melee_Attack_Punch_B",
+			"drag": "Walking_Backwards",
 		},
 	},
 	# Le Gaffeur (chapitre III) : de près il frappe de sa gaffe ; à

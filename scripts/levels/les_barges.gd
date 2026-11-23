@@ -119,11 +119,13 @@ func _build() -> void:
 	for z: float in [-12.0, -31.0, -50.0, -68.0]:
 		Docks.barge(self, Vector3(-HALF_WIDTH - 3.4, 0.0, z), 12.0, 180.0, int(z) % 4 == 0)
 
-	# Des caisses débarquées, des lanternes sur des poteaux.
-	Docks.crates(self, Vector3(-3.6, 0.0, -7.0), 6.0)
-	Docks.crates(self, Vector3(3.4, 0.0, -18.5), -10.0, true)
-	Docks.crates(self, Vector3(-3.2, 0.0, -42.0), 12.0, true)
-	Docks.crates(self, Vector3(3.5, 0.0, -63.0), -4.0)
+	# Des caisses débarquées, contre la lisse : pas de couloir étroit entre les
+	# deux, où le héros se coincerait. Des lanternes sur des poteaux.
+	var flush := HALF_WIDTH - 0.3 - 1.2
+	Docks.crates(self, Vector3(-flush, 0.0, -7.0), 3.0)
+	Docks.crates(self, Vector3(flush, 0.0, -18.5), -3.0, true)
+	Docks.crates(self, Vector3(-flush, 0.0, -42.0), 4.0, true)
+	Docks.crates(self, Vector3(flush, 0.0, -63.0), -2.0)
 	for lz: float in [-2.0, -33.0, -58.0]:
 		for side: float in [-1.0, 1.0]:
 			grave_piece("post_lantern", Vector3(side * (HALF_WIDTH - 0.9), 0.0, lz + side * 6.0))
